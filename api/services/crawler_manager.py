@@ -146,8 +146,11 @@ class CrawlerManager:
                 return True
             except Exception as e:
                 self.status = "error"
-                entry = self._create_log_entry(f"Failed to start crawler: {str(e)}", "error")
+                import traceback
+                error_detail = f"{str(e)}\n{traceback.format_exc()}"
+                entry = self._create_log_entry(f"Failed to start crawler: {error_detail}", "error")
                 await self._push_log(entry)
+                print(f"[ERROR] Failed to start crawler: {error_detail}")
                 return False
 
     async def stop(self) -> bool:
@@ -204,7 +207,7 @@ class CrawlerManager:
 
     def _build_command(self, config: CrawlerStartRequest) -> list:
         """Build main.py command line arguments"""
-        cmd = ["uv", "run", "python", "main.py"]
+        cmd = ["python", "main.py"]
 
         cmd.extend(["--platform", config.platform.value])
         cmd.extend(["--lt", config.login_type.value])
