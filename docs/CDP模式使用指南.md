@@ -39,7 +39,7 @@ AUTO_CLOSE_BROWSER = True
 python examples/cdp_example.py
 
 # 运行小红书爬虫（CDP模式）
-python main.py
+python backend/crawler/main.py
 ```
 
 ## 配置选项详解
@@ -130,7 +130,7 @@ CDP模式已集成到所有平台爬虫中，只需启用配置即可：
 ENABLE_CDP_MODE = True
 
 # 然后正常运行爬虫
-python main.py
+python backend/crawler/main.py
 ```
 
 ## 故障排除
