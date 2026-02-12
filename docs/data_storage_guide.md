@@ -29,34 +29,34 @@ MediaCrawler 支持多种数据存储方式，您可以根据需求选择最适�
 
 ```shell
 # 使用 Excel 存储数据（推荐用于数据分析）✨ 新功能
-uv run main.py --platform xhs --lt qrcode --type search --save_data_option excel
+python backend/crawler/main.py --platform xhs --lt qrcode --type search --save_data_option excel
 
 # 初始化 SQLite 数据库
-uv run main.py --init_db sqlite
+python backend/crawler/main.py --init_db sqlite
 # 使用 SQLite 存储数据
-uv run main.py --platform xhs --lt qrcode --type search --save_data_option sqlite
+python backend/crawler/main.py --platform xhs --lt qrcode --type search --save_data_option sqlite
 ```
 
 ```shell
 # 初始化 MySQL 数据库
-uv run main.py --init_db mysql
+python backend/crawler/main.py --init_db mysql
 # 使用 MySQL 存储数据（为适配历史更新，db参数进行沿用）
-uv run main.py --platform xhs --lt qrcode --type search --save_data_option db
+python backend/crawler/main.py --platform xhs --lt qrcode --type search --save_data_option db
 ```
 
 ```shell
 # 初始化 PostgreSQL 数据库
-uv run main.py --init_db postgres
+python backend/crawler/main.py --init_db postgres
 # 使用 PostgreSQL 存储数据
-uv run main.py --platform xhs --lt qrcode --type search --save_data_option postgres
+python backend/crawler/main.py --platform xhs --lt qrcode --type search --save_data_option postgres
 ```
 
 ```shell
 # 使用 CSV 存储数据
-uv run main.py --platform xhs --lt qrcode --type search --save_data_option csv
+python backend/crawler/main.py --platform xhs --lt qrcode --type search --save_data_option csv
 
 # 使用 JSON 存储数据
-uv run main.py --platform xhs --lt qrcode --type search --save_data_option json
+python backend/crawler/main.py --platform xhs --lt qrcode --type search --save_data_option json
 ```
 
 #### 详细文档

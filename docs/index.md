@@ -4,10 +4,9 @@
 
 - [项目架构文档](项目架构文档.md) - 系统架构、模块设计、数据流向（含 Mermaid 图表）
 
-## 推荐：使用 uv 管理依赖
+## 推荐：使用 Python venv 管理依赖
 
 ### 1. 前置依赖
-- 安装 [uv](https://docs.astral.sh/uv/getting-started/installation)，并用 `uv --version` 验证。
 - Python 版本建议使用 **3.11**（当前依赖基于该版本构建）。
 - 安装 Node.js（抖音、知乎等平台需要），版本需 `>= 16.0.0`。
 
@@ -16,13 +15,13 @@
 # 进入项目根目录
 cd MediaCrawler
 
-# 使用 uv 保证 Python 版本和依赖一致性
-uv sync
+# 安装依赖
+pip install -r backend/requirements.txt
 ```
 
 ### 3. 安装 Playwright 浏览器驱动
 ```shell
-uv run playwright install
+python -m playwright install
 ```
 > 项目已支持使用 Playwright 连接本地 Chrome。如需使用 CDP 方式，可在 `config/base_config.py` 中调整 `xhs` 和 `dy` 的相关配置。
 
@@ -32,22 +31,22 @@ uv run playwright install
 # 其他功能开关也可在 config/base_config.py 查看，均有中文注释
 
 # 从配置中读取关键词搜索并爬取帖子与评论
-uv run main.py --platform xhs --lt qrcode --type search
+python backend/crawler/main.py --platform xhs --lt qrcode --type search
 
 # 从配置中读取指定帖子ID列表并爬取帖子与评论
-uv run main.py --platform xhs --lt qrcode --type detail
+python backend/crawler/main.py --platform xhs --lt qrcode --type detail
 
 # 使用 SQLite 数据库存储数据（推荐个人用户使用）
-uv run main.py --platform xhs --lt qrcode --type search --save_data_option sqlite
+python backend/crawler/main.py --platform xhs --lt qrcode --type search --save_data_option sqlite
 
 # 使用 MySQL 数据库存储数据
-uv run main.py --platform xhs --lt qrcode --type search --save_data_option db
+python backend/crawler/main.py --platform xhs --lt qrcode --type search --save_data_option db
 
 # 其他平台示例
-uv run main.py --help
+python backend/crawler/main.py --help
 ```
 
-## 备选：Python 原生 venv（不推荐）
+## 备选：Python 原生 venv
 > 如果爬取抖音或知乎，需要提前安装 Node.js，版本 `>= 16`。
 ```shell
 # 进入项目根目录
@@ -64,16 +63,16 @@ venv\Scripts\activate
 ```
 ```shell
 # 安装依赖与驱动
-pip install -r requirements.txt
-playwright install
+pip install -r backend/requirements.txt
+python -m playwright install
 ```
 ```shell
 # 运行爬虫程序（venv 环境）
-python main.py --platform xhs --lt qrcode --type search
-python main.py --platform xhs --lt qrcode --type detail
-python main.py --platform xhs --lt qrcode --type search --save_data_option sqlite
-python main.py --platform xhs --lt qrcode --type search --save_data_option db
-python main.py --help
+python backend/crawler/main.py --platform xhs --lt qrcode --type search
+python backend/crawler/main.py --platform xhs --lt qrcode --type detail
+python backend/crawler/main.py --platform xhs --lt qrcode --type search --save_data_option sqlite
+python backend/crawler/main.py --platform xhs --lt qrcode --type search --save_data_option db
+python backend/crawler/main.py --help
 ```
 
 ## 💾 数据存储

@@ -1,0 +1,167 @@
+# -*- coding: utf-8 -*-
+# MediaCrawler Django Backend - .gitignore
+
+# ============== Environment Variables ==============
+# Keep environment variables secure
+.env
+.env.local
+.env.production
+.env.*.local
+
+# ============== Python ==============
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# C extensions
+*.cu
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+PIPFILE.lock
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+# ============== Django ==============
+# Django specific:
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+db.sqlite3-wal
+db.*
+
+# Static files
+staticfiles/
+static/
+
+# Media files
+media/
+
+# ============== IDEs ==============
+# VSCode
+.vscode/
+*.code-workspace
+
+# PyCharm
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+*.ipynb
+
+# Sublime Text
+*.tmlanguage.cache
+*.sublime-workspace
+
+# Vim
+[._*.s[a-v][a-z]
+[._*.s[a-v][a-z].un~
+Session.vim
+Sessionx.vim
+.netrwhist
+
+# ============== OS ==============
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# ============== Project Specific ==============
+# Logs
+logs/
+*.log
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Backup files
+*.bak
+*.backup
+*.swp
+*.swo
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Secrets
+secrets/
+*.secrets
+credentials.json
+service-account.json
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# Redis
+dump.rdb
+
+# ============== Data ==============
+# Data directory (may contain sensitive scraped data)
+# Uncomment to ignore if data should not be tracked
+# data/
+*.csv
+*.xlsx
+*.xls
+# *.json  # Keep .json files for configuration

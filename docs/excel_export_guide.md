@@ -20,8 +20,8 @@ MediaCrawler now supports exporting crawled data to formatted Excel files (.xlsx
 Excel export requires the `openpyxl` library:
 
 ```bash
-# Using uv (recommended)
-uv sync
+# Install dependencies
+pip install -r backend/requirements.txt
 
 # Or using pip
 pip install openpyxl
@@ -41,13 +41,13 @@ SAVE_DATA_OPTION = "excel"  # Change from json/csv/db to excel
 
 ```bash
 # Xiaohongshu example
-uv run main.py --platform xhs --lt qrcode --type search
+python backend/crawler/main.py --platform xhs --lt qrcode --type search
 
 # Douyin example
-uv run main.py --platform dy --lt qrcode --type search
+python backend/crawler/main.py --platform dy --lt qrcode --type search
 
 # Bilibili example
-uv run main.py --platform bili --lt qrcode --type search
+python backend/crawler/main.py --platform bili --lt qrcode --type search
 ```
 
 3. **Find your Excel file** in `data/{platform}/` directory:
@@ -58,13 +58,13 @@ uv run main.py --platform bili --lt qrcode --type search
 
 ```bash
 # Search by keywords and export to Excel
-uv run main.py --platform xhs --lt qrcode --type search --save_data_option excel
+python backend/crawler/main.py --platform xhs --lt qrcode --type search --save_data_option excel
 
 # Crawl specific posts and export to Excel
-uv run main.py --platform xhs --lt qrcode --type detail --save_data_option excel
+python backend/crawler/main.py --platform xhs --lt qrcode --type detail --save_data_option excel
 
 # Crawl creator profile and export to Excel
-uv run main.py --platform xhs --lt qrcode --type creator --save_data_option excel
+python backend/crawler/main.py --platform xhs --lt qrcode --type creator --save_data_option excel
 ```
 
 ## Excel File Structure
@@ -158,7 +158,7 @@ Contains creator/author information:
 
 ```bash
 # Install openpyxl
-uv add openpyxl
+pip install openpyxl
 # or
 pip install openpyxl
 ```

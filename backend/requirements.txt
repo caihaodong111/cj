@@ -1,0 +1,49 @@
+# -*- coding: utf-8 -*-
+# MediaCrawler Backend - Django Dependencies
+#
+# Copyright (c) 2025 relakkes@gmail.com
+# Licensed under NON-COMMERCIAL LEARNING LICENSE 1.1
+
+# ============== Django Core ==============
+Django>=5.0.0,<5.1.0
+djangorestframework>=3.14.0
+django-cors-headers>=4.3.0
+django-filter>=23.0
+
+# ============== Database Clients ==============
+# MySQL client (required by .env)
+pymysql>=1.1.0
+# PostgreSQL client (optional)
+psycopg2-binary>=2.9.0
+# MongoDB client (optional)
+pymongo>=4.6.0
+# Redis client (optional, for caching)
+redis>=5.0.0
+django-redis>=5.4.0
+
+# ============== Data Processing ==============
+pandas>=2.0.0
+openpyxl>=3.1.0
+xlrd>=2.0.0
+
+# ============== Async Support ==============
+asyncio>=3.4.3
+aiofiles>=23.0.0
+
+# ============== HTTP & API ==============
+requests>=2.31.0
+httpx>=0.24.0
+
+# ============== Utilities ==============
+python-dotenv>=1.0.0
+pytz>=2023.3
+
+# ============== Development ==============
+# Uncomment for development
+# django-debug-toolbar>=4.2.0
+# django-extensions>=3.2.0
+
+# ============== Production ==============
+# Uncomment for production deployment
+# gunicorn>=21.0.0
+# whitenoise>=6.6.0
