@@ -18,7 +18,7 @@
     <main class="main-content">
       <!-- 左侧：爬虫控制面板 -->
       <aside class="crawler-panel">
-        <CrawlerControl />
+        <CrawlerControl @crawler-status-change="onCrawlerStatusChange" />
       </aside>
 
       <!-- 右侧：数据展示区域 -->
@@ -127,21 +127,12 @@
           </div>
 
           <!-- 空状态 -->
-          <div v-else-if="!currentFile" class="welcome-state">
+          <div v-else-if="!currentFile" class="welcome-state full">
             <div class="welcome-content">
               <span class="welcome-icon">📊</span>
               <h4>数据预览</h4>
               <p>选择一个文件查看数据内容</p>
             </div>
-          </div>
-        </div>
-
-        <!-- 未选择平台 -->
-        <div v-else class="welcome-state full">
-          <div class="welcome-content">
-            <span class="welcome-icon">👈</span>
-            <h4>请选择数据来源</h4>
-            <p>点击上方平台标签查看已爬取的数据</p>
           </div>
         </div>
       </section>
@@ -150,7 +141,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import axios from 'axios'
 import CrawlerControl from './components/CrawlerControl.vue'
 
@@ -165,11 +156,12 @@ const loadingFiles = ref(false)
 const loadingPreview = ref(false)
 const searchQuery = ref('')
 const fileTypeFilter = ref('')
+const crawlerStatus = ref('idle')
 
 // Computed
 const filteredFiles = computed(() => {
   return files.value.filter(file => {
-    const matchesSearch = file.name.toLowerCase().includes(searchQuery.value.toLowerCase())
+    const matchesSearch = !searchQuery.value || file.name.toLowerCase().includes(searchQuery.value.toLowerCase())
     const matchesType = !fileTypeFilter.value || file.type === fileTypeFilter.value
     return matchesSearch && matchesType
   })
@@ -264,6 +256,9 @@ const selectPlatform = async (platformValue) => {
       params: { platform: platformValue }
     })
     files.value = res.data.files
+
+    console.log('[App] Files loaded:', files.value.length, 'files for', platformValue)
+    console.log('[App] Files:', files.value.map(f => ({ name: f.name, type: f.type, size: f.size, modified: new Date(f.modified_at * 1000).toLocaleString('zh-CN') })))
   } catch (e) {
     console.error('Failed to fetch files', e)
   } finally {
@@ -287,8 +282,27 @@ const selectFile = async (file) => {
   }
 }
 
-onMounted(() => {
-  fetchConfig()
+const onCrawlerStatusChange = async (newStatus) => {
+  console.log('[App] Crawler status changed:', newStatus)
+  crawlerStatus.value = newStatus
+
+  // 爬虫状态变化时刷新文件列表
+  if (currentPlatform.value) {
+    await selectPlatform(currentPlatform.value)
+  }
+}
+
+// Lifecycle
+onMounted(async () => {
+  await fetchConfig()
+  // Auto-load first platform's files
+  if (platforms.value.length > 0) {
+    await selectPlatform(platforms.value[0].value)
+  }
+})
+
+onUnmounted(() => {
+  currentPlatform.value = null
 })
 </script>
 
@@ -332,10 +346,8 @@ onMounted(() => {
   color: var(--text-color);
 }
 
-.main-content {
-  display: flex;
-  flex: 1;
-  overflow: hidden;
+.stat-item {
+  font-size: 0.8rem;
 }
 
 /* 左侧爬虫面板 */
@@ -364,10 +376,10 @@ onMounted(() => {
 }
 
 .platform-bar h3 {
+  margin: 0 0.75rem 0 0;
   font-size: 0.75rem;
-  text-transform: uppercase;
   color: var(--secondary-color);
-  margin: 0 0 0.75rem 0;
+  text-transform: uppercase;
 }
 
 .platform-tabs {
@@ -385,7 +397,6 @@ onMounted(() => {
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.2s;
-  font-size: 0.85rem;
 }
 
 .platform-tab:hover {
@@ -412,10 +423,6 @@ onMounted(() => {
   font-size: 0.7rem;
 }
 
-.platform-tab.active .tab-count {
-  background: rgba(0, 0, 0, 0.2);
-}
-
 /* 内容区域 */
 .content-area {
   flex: 1;
@@ -435,31 +442,23 @@ onMounted(() => {
 
 .section-header {
   padding: 0.75rem 1rem;
+  background: rgba(22, 27, 34, 0.5);
   border-bottom: 1px solid var(--border-color);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: rgba(22, 27, 34, 0.5);
 }
 
 .section-header h4 {
   margin: 0;
   font-size: 0.9rem;
   font-weight: 600;
+  color: var(--secondary-color);
 }
 
 .file-controls {
   display: flex;
   gap: 0.5rem;
-}
-
-.search-input, .type-select {
-  background: var(--bg-color);
-  border: 1px solid var(--border-color);
-  color: var(--text-color);
-  padding: 0.35rem 0.5rem;
-  border-radius: 4px;
-  font-size: 0.8rem;
 }
 
 .search-input {
@@ -474,6 +473,8 @@ onMounted(() => {
   flex: 1;
   overflow-y: auto;
   padding: 0.5rem;
+  max-height: calc(100vh - 250px);
+  scrollbar-width: 6px;
 }
 
 .file-item {
@@ -483,7 +484,6 @@ onMounted(() => {
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.2s;
-  margin-bottom: 0.25rem;
 }
 
 .file-item:hover {
@@ -491,7 +491,7 @@ onMounted(() => {
 }
 
 .file-item.active {
-  background: rgba(88, 166, 255, 0.15);
+  background: rgba(35, 134, 54, 0.15);
   border-left: 3px solid var(--primary-color);
 }
 
@@ -511,7 +511,6 @@ onMounted(() => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  margin-bottom: 0.25rem;
 }
 
 .file-meta {
@@ -524,23 +523,14 @@ onMounted(() => {
 /* 数据预览 */
 .preview-section {
   flex: 1;
-  display: flex;
-  flex-direction: column;
   overflow: hidden;
-}
-
-.record-count {
-  font-size: 0.8rem;
-  color: var(--secondary-color);
-  background: var(--border-color);
-  padding: 0.2rem 0.5rem;
-  border-radius: 4px;
 }
 
 .table-wrapper {
   flex: 1;
   overflow: auto;
   padding: 0.5rem;
+  scrollbar-width: 6px;
 }
 
 table {
@@ -566,11 +556,6 @@ th {
   z-index: 1;
   font-weight: 600;
   color: var(--secondary-color);
-  font-size: 0.8rem;
-}
-
-tr:hover {
-  background: var(--hover-color);
 }
 
 .cell-content {
@@ -585,10 +570,6 @@ tr:hover {
   justify-content: center;
   flex: 1;
   color: var(--secondary-color);
-}
-
-.welcome-state.full {
-  width: 100%;
 }
 
 .welcome-content {
@@ -612,19 +593,9 @@ tr:hover {
   font-size: 0.9rem;
 }
 
-.loading-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  flex: 1;
-  color: var(--secondary-color);
-  gap: 1rem;
-}
-
 .loading-spinner {
-  border: 3px solid rgba(255, 255, 255, 0.1);
-  border-left-color: var(--primary-color);
+  border: 3px solid var(--primary-color);
+  border-top: 3px solid var(--primary-color);
   border-radius: 50%;
   width: 30px;
   height: 30px;
@@ -632,26 +603,24 @@ tr:hover {
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
-.empty-state {
+.loading-state {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  flex: 1;
+  gap: 1rem;
   color: var(--secondary-color);
+}
+
+.empty-state {
   text-align: center;
-  gap: 0.5rem;
-}
-
-.empty-state p {
-  margin: 0;
-}
-
-.empty-state .hint {
+  padding: 2rem;
+  color: var(--secondary-color);
+  font-style: italic;
   font-size: 0.8rem;
-  opacity: 0.7;
 }
 </style>

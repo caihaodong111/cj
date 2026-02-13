@@ -107,8 +107,9 @@
             子评论
           </label>
           <label>
-            <input type="checkbox" v-model="config.headless" :disabled="isRunning" />
+            <input type="checkbox" v-model="config.headless" :disabled="isRunning || config.login_type === 'qrcode'" />
             无头模式
+            <span v-if="config.login_type === 'qrcode'" style="color: #d29922; margin-left: 0.5rem;">(二维码登录时需关闭)</span>
           </label>
         </div>
       </div>
@@ -171,6 +172,9 @@
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import axios from 'axios'
 
+// 定义事件
+const emit = defineEmits(['crawler-status-change'])
+
 // State
 const platforms = ref([])
 const status = ref('idle')
@@ -179,22 +183,7 @@ const starting = ref(false)
 const stopping = ref(false)
 const logsContainer = ref(null)
 let statusInterval = null
-
-// Config
-const config = ref({
-  platform: 'xhs',
-  login_type: 'qrcode',
-  crawler_type: 'search',
-  keywords: '',
-  specified_ids: '',
-  creator_ids: '',
-  save_option: 'db',
-  start_page: 1,
-  enable_comments: true,
-  enable_sub_comments: false,
-  cookies: '',
-  headless: true
-})
+let logsInterval = null
 
 // Computed
 const isRunning = computed(() => status.value === 'running')
@@ -215,7 +204,39 @@ const statusLabel = computed(() => {
   }
 })
 
+// Config
+const config = ref({
+  platform: 'xhs',
+  login_type: 'qrcode',
+  crawler_type: 'search',
+  keywords: '',
+  specified_ids: '',
+  creator_ids: '',
+  save_option: 'json',
+  start_page: 1,
+  enable_comments: true,
+  enable_sub_comments: false,
+  cookies: '',
+  headless: true
+})
+
 // Methods
+const scrollToBottom = () => {
+  if (logsContainer.value) {
+    logsContainer.value.scrollTop = logsContainer.value.scrollHeight
+  }
+}
+
+const addLog = (message, level = 'info') => {
+  logs.value.push({
+    id: Date.now(),
+    timestamp: new Date().toLocaleTimeString('zh-CN'),
+    message,
+    level
+  })
+  nextTick(() => scrollToBottom())
+}
+
 const fetchPlatforms = async () => {
   try {
     const res = await axios.get('/api/config/platforms')
@@ -228,7 +249,13 @@ const fetchPlatforms = async () => {
 const fetchStatus = async () => {
   try {
     const res = await axios.get('/api/crawler/status')
-    status.value = res.data.status
+    const newStatus = res.data.status
+
+    // 只有状态变化时才通知父组件
+    if (status.value !== newStatus) {
+      status.value = newStatus
+      emit('crawler-status-change', newStatus)
+    }
   } catch (e) {
     console.error('获取状态失败:', e)
   }
@@ -242,12 +269,6 @@ const fetchLogs = async () => {
     scrollToBottom()
   } catch (e) {
     console.error('获取日志失败:', e)
-  }
-}
-
-const scrollToBottom = () => {
-  if (logsContainer.value) {
-    logsContainer.value.scrollTop = logsContainer.value.scrollHeight
   }
 }
 
@@ -269,8 +290,15 @@ const startCrawler = async () => {
       return
     }
 
+    // 二维码登录时强制关闭无头模式，否则用户无法看到二维码
+    const requestConfig = { ...config.value }
+    if (requestConfig.login_type === 'qrcode') {
+      requestConfig.headless = false
+      addLog('二维码登录模式已自动开启浏览器窗口', 'info')
+    }
+
     console.log('[前端] 发送启动请求到 /api/crawler/start')
-    const response = await axios.post('/api/crawler/start', config.value)
+    const response = await axios.post('/api/crawler/start', requestConfig)
     console.log('[前端] 响应:', response.data)
     addLog('爬虫启动成功', 'success')
     await fetchStatus()
@@ -303,16 +331,6 @@ const clearLogs = () => {
   logs.value = []
 }
 
-const addLog = (message, level = 'info') => {
-  logs.value.push({
-    id: Date.now(),
-    timestamp: new Date().toLocaleTimeString('zh-CN'),
-    message,
-    level
-  })
-  nextTick(() => scrollToBottom())
-}
-
 // Lifecycle
 onMounted(async () => {
   await fetchPlatforms()
@@ -322,6 +340,9 @@ onMounted(async () => {
   // 每2秒轮询状态和日志
   statusInterval = setInterval(async () => {
     await fetchStatus()
+  }, 2000)
+
+  logsInterval = setInterval(async () => {
     await fetchLogs()
   }, 2000)
 })
@@ -329,6 +350,9 @@ onMounted(async () => {
 onUnmounted(() => {
   if (statusInterval) {
     clearInterval(statusInterval)
+  }
+  if (logsInterval) {
+    clearInterval(logsInterval)
   }
 })
 </script>

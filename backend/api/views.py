@@ -344,6 +344,7 @@ class CrawlerView(APIView):
         state = _get_state()
 
         return Response({
+            "status": "running" if is_running else "idle",
             "running": is_running,
             "platform": state["platform"],
             "login_type": state["login_type"],
