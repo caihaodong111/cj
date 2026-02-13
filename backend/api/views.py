@@ -235,19 +235,33 @@ def _pick_first_value(row: dict, fields):
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def get_monitor_feed(request):
-    """Get latest feed items from monitor_feed table, fallback to platform tables."""
+    """Get latest feed items from monitor_feed table with pagination support."""
+    # 获取分页参数
     try:
-        limit = max(1, int(request.GET.get("limit", 50)))
+        page = max(1, int(request.GET.get("page", 1)))
+        page_size = max(1, int(request.GET.get("page_size", 100)))
     except ValueError:
-        limit = 50
+        page = 1
+        page_size = 100
+
+    # 计算 offset
+    offset = (page - 1) * page_size
 
     items = []
+    total_count = 0
+    total_pages = 0
+
     try:
-        # First try to get from monitor_feed table
-        rows = list(
-            MonitorFeed.objects.order_by("-created_at")
-            .values("id", "platform", "platform_name", "content_id", "content", "author", "url", "created_at")[:limit]
-        )
+        # 首先尝试从 monitor_feed 表获取
+        # 获取总数
+        total_count = MonitorFeed.objects.count()
+        total_pages = (total_count + page_size - 1) // page_size if total_count > 0 else 1
+
+        # 获取当前页数据
+        queryset = MonitorFeed.objects.order_by("-created_at").values(
+            "id", "platform", "platform_name", "content_id", "content", "author", "url", "created_at"
+        )[offset:offset + page_size]
+        rows = list(queryset)
 
         for row in rows:
             items.append({
@@ -262,26 +276,33 @@ def get_monitor_feed(request):
             })
 
     except Exception as e:
-        items = []
-
-    # Fallback: if monitor_feed is empty, fetch from platform tables directly
-    if not items:
-        items = _fetch_from_platform_tables(limit)
+        # 如果 monitor_feed 为空，从平台表获取
+        items, total_count, total_pages = _fetch_from_platform_tables_paginated(page, page_size)
 
     return Response({
         "items": items,
+        "pagination": {
+            "page": page,
+            "page_size": page_size,
+            "total_count": total_count,
+            "total_pages": total_pages,
+            "has_next": page < total_pages,
+            "has_prev": page > 1,
+        },
         "fetched_at": int(time.time() * 1000),
     })
 
 
-def _fetch_from_platform_tables(limit: int) -> list:
+def _fetch_from_platform_tables(limit: int = None) -> list:
     """Fetch items from platform tables when monitor_feed is empty"""
     items = []
     try:
-        try:
-            limit = max(1, int(limit))
-        except (TypeError, ValueError):
-            limit = 50
+        # 如果 limit 为 None，则不限制返回数量
+        if limit is not None:
+            try:
+                limit = max(1, int(limit))
+            except (TypeError, ValueError):
+                limit = 50
 
         # Fetch from all platform tables and merge
         queries = [
@@ -314,7 +335,11 @@ def _fetch_from_platform_tables(limit: int) -> list:
         all_rows = []
         with connection.cursor() as cursor:
             for query in queries:
-                cursor.execute(f"{query} ORDER BY created_at DESC LIMIT %s", [limit])
+                # 根据 limit 决定是否添加 LIMIT 子句
+                if limit is not None:
+                    cursor.execute(f"{query} ORDER BY created_at DESC LIMIT %s", [limit])
+                else:
+                    cursor.execute(f"{query} ORDER BY created_at DESC")
                 columns = [col[0] for col in cursor.description]
                 for row in cursor.fetchall():
                     all_rows.append(dict(zip(columns, row)))
@@ -322,7 +347,10 @@ def _fetch_from_platform_tables(limit: int) -> list:
         # Sort by created_at descending
         all_rows.sort(key=lambda x: (_to_millis(x.get("created_at")) or 0), reverse=True)
 
-        for row in all_rows[:limit]:
+        # 如果 limit 不为 None，则限制返回数量
+        rows_to_process = all_rows[:limit] if limit is not None else all_rows
+
+        for row in rows_to_process:
             items.append({
                 "id": str(hash(row.get("content_id", ""))),
                 "platform": row.get("platform", ""),
@@ -338,6 +366,80 @@ def _fetch_from_platform_tables(limit: int) -> list:
         items = []
 
     return items
+
+
+def _fetch_from_platform_tables_paginated(page: int = 1, page_size: int = 100) -> tuple:
+    """Fetch items from platform tables with pagination when monitor_feed is empty"""
+    items = []
+    total_count = 0
+    total_pages = 1
+
+    try:
+        # Fetch from all platform tables and merge
+        queries = [
+            # xhs
+            "SELECT 'xhs' as platform, '小红书' as platform_name, CAST(note_id AS CHAR) as content_id, "
+            "CONCAT_WS(' ', IFNULL(`title`, ''), IFNULL(`desc`, '')) as content, nickname as author, "
+            "note_url as url, `time` as created_at, COALESCE(source_keyword, '') as source_keyword FROM xhs_note",
+            # douyin
+            "SELECT 'dy' as platform, '抖音' as platform_name, CAST(aweme_id AS CHAR) as content_id, "
+            "CONCAT_WS(' ', IFNULL(`title`, ''), IFNULL(`desc`, '')) as content, nickname as author, "
+            "aweme_url as url, create_time as created_at, COALESCE(source_keyword, '') as source_keyword FROM douyin_aweme",
+            # bilibili
+            "SELECT 'bili' as platform, 'B站' as platform_name, CAST(video_id AS CHAR) as content_id, "
+            "CONCAT_WS(' ', IFNULL(`title`, ''), IFNULL(`desc`, '')) as content, nickname as author, "
+            "video_url as url, create_time as created_at, COALESCE(source_keyword, '') as source_keyword FROM bilibili_video",
+            # weibo
+            "SELECT 'wb' as platform, '微博' as platform_name, CAST(note_id AS CHAR) as content_id, "
+            "IFNULL(`content`, '') as content, nickname as author, "
+            "note_url as url, create_time as created_at, COALESCE(source_keyword, '') as source_keyword FROM weibo_note",
+            # tieba
+            "SELECT 'tieba' as platform, '贴吧' as platform_name, note_id as content_id, "
+            "CONCAT_WS(' ', IFNULL(`title`, ''), IFNULL(`desc`, '')) as content, user_nickname as author, "
+            "note_url as url, 0 as created_at, COALESCE(source_keyword, '') as source_keyword FROM tieba_note",
+            # zhihu
+            "SELECT 'zhihu' as platform, '知乎' as platform_name, content_id as content_id, "
+            "CONCAT_WS(' ', IFNULL(`title`, ''), IFNULL(`desc`, ''), IFNULL(`content_text`, '')) as content, user_nickname as author, "
+            "content_url as url, 0 as created_at, COALESCE(source_keyword, '') as source_keyword FROM zhihu_content",
+        ]
+
+        all_rows = []
+        with connection.cursor() as cursor:
+            for query in queries:
+                cursor.execute(f"{query} ORDER BY created_at DESC")
+                columns = [col[0] for col in cursor.description]
+                for row in cursor.fetchall():
+                    all_rows.append(dict(zip(columns, row)))
+
+        # Sort by created_at descending
+        all_rows.sort(key=lambda x: (_to_millis(x.get("created_at")) or 0), reverse=True)
+
+        # Calculate pagination
+        total_count = len(all_rows)
+        total_pages = (total_count + page_size - 1) // page_size if total_count > 0 else 1
+
+        # Get current page data
+        offset = (page - 1) * page_size
+        rows_to_process = all_rows[offset:offset + page_size]
+
+        for row in rows_to_process:
+            items.append({
+                "id": str(hash(row.get("content_id", ""))),
+                "platform": row.get("platform", ""),
+                "platform_name": row.get("platform_name", ""),
+                "content_id": str(row.get("content_id", "")),
+                "content": row.get("content") or "",
+                "author": row.get("author") or "",
+                "url": row.get("url") or "",
+                "created_at": row.get("created_at") or 0,
+            })
+
+    except Exception as e:
+        items = []
+        total_count = 0
+        total_pages = 1
+
+    return items, total_count, total_pages
 
 
 # ============== Health Check ==============

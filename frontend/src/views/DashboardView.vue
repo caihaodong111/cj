@@ -1,5 +1,15 @@
 <template>
-  <div class="dashboard-view">
+  <div class="dashboard-wrapper">
+    <!-- Ambient Background Effects -->
+    <div class="ambient-background">
+      <div class="blue-halo"></div>
+      <div class="grid-background"></div>
+      <div class="particles">
+        <div class="particle" v-for="i in 8" :key="i" :style="{ animationDelay: `${i * 1.5}s` }"></div>
+      </div>
+    </div>
+
+    <div class="dashboard-view">
     <!-- 顶部概览卡片 -->
     <div class="stats-grid">
       <div class="stat-card glass">
@@ -82,7 +92,59 @@
         <p>暂无数据动态</p>
         <p class="hint">请先在数据采集界面生成数据</p>
       </div>
+
+      <!-- 分页控制 -->
+      <div v-if="feedItems && feedItems.length > 0" class="pagination-wrapper">
+        <div class="pagination-info">
+          <span class="pagination-text">共 {{ totalCount }} 条数据</span>
+          <span class="pagination-divider">|</span>
+          <span class="pagination-text">第 {{ currentPage }} / {{ totalPages }} 页</span>
+        </div>
+        <div class="pagination-controls">
+          <button
+            class="pagination-btn"
+            :disabled="currentPage === 1"
+            @click="goToPage(1)"
+          >
+            首页
+          </button>
+          <button
+            class="pagination-btn"
+            :disabled="currentPage === 1"
+            @click="goToPage(currentPage - 1)"
+          >
+            上一页
+          </button>
+          <div class="pagination-numbers">
+            <button
+              v-for="page in displayedPages"
+              :key="page"
+              class="pagination-number"
+              :class="{ active: page === currentPage, ellipsis: page === '...' }"
+              :disabled="page === '...'"
+              @click="page !== '...' && goToPage(page)"
+            >
+              {{ page }}
+            </button>
+          </div>
+          <button
+            class="pagination-btn"
+            :disabled="currentPage === totalPages"
+            @click="goToPage(currentPage + 1)"
+          >
+            下一页
+          </button>
+          <button
+            class="pagination-btn"
+            :disabled="currentPage === totalPages"
+            @click="goToPage(totalPages)"
+          >
+            末页
+          </button>
+        </div>
+      </div>
     </div>
+  </div>
   </div>
 </template>
 
@@ -95,7 +157,8 @@ import ChartCard from '../components/ChartCard.vue'
 const trendChartOptions = computed(() => ({
   tooltip: {
     trigger: 'axis',
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    backgroundColor: 'rgba(10, 10, 15, 0.95)',
+    borderColor: 'rgba(0, 204, 255, 0.3)',
     textStyle: { color: '#fff' }
   },
   grid: {
@@ -108,13 +171,13 @@ const trendChartOptions = computed(() => ({
     type: 'category',
     boundaryGap: false,
     data: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-    axisLine: { lineStyle: { color: '#555' } },
-    axisLabel: { color: '#aaa' }
+    axisLine: { lineStyle: { color: 'rgba(0, 204, 255, 0.2)' } },
+    axisLabel: { color: '#aaaaaa' }
   },
   yAxis: {
     type: 'value',
-    splitLine: { lineStyle: { color: '#333' } },
-    axisLabel: { color: '#aaa' }
+    splitLine: { lineStyle: { color: 'rgba(0, 204, 255, 0.1)' } },
+    axisLabel: { color: '#aaaaaa' }
   },
   series: [
     {
@@ -122,12 +185,12 @@ const trendChartOptions = computed(() => ({
       type: 'line',
       stack: 'Total',
       smooth: true,
-      lineStyle: { width: 3, color: '#FFD700' },
+      lineStyle: { width: 3, color: '#00ccff' },
       areaStyle: {
         color: {
           type: 'linear',
           x: 0, y: 0, x2: 0, y2: 1,
-          colorStops: [{ offset: 0, color: 'rgba(255, 215, 0, 0.5)' }, { offset: 1, color: 'rgba(255, 215, 0, 0)' }]
+          colorStops: [{ offset: 0, color: 'rgba(0, 204, 255, 0.5)' }, { offset: 1, color: 'rgba(0, 204, 255, 0)' }]
         }
       },
       emphasis: { focus: 'series' },
@@ -138,7 +201,7 @@ const trendChartOptions = computed(() => ({
       type: 'line',
       stack: 'Total',
       smooth: true,
-      lineStyle: { width: 3, color: '#FF4500' },
+      lineStyle: { width: 3, color: '#ff6b6b' },
       areaStyle: { opacity: 0 },
       data: [20, 32, 11, 34, 10, 30, 20]
     }
@@ -147,12 +210,15 @@ const trendChartOptions = computed(() => ({
 
 const pieChartOptions = computed(() => ({
   tooltip: {
-    trigger: 'item'
+    trigger: 'item',
+    backgroundColor: 'rgba(10, 10, 15, 0.95)',
+    borderColor: 'rgba(0, 204, 255, 0.3)',
+    textStyle: { color: '#fff' }
   },
   legend: {
     bottom: '5%',
     left: 'center',
-    textStyle: { color: '#aaa' }
+    textStyle: { color: '#aaaaaa' }
   },
   series: [
     {
@@ -162,7 +228,7 @@ const pieChartOptions = computed(() => ({
       avoidLabelOverlap: false,
       itemStyle: {
         borderRadius: 10,
-        borderColor: '#050510',
+        borderColor: '#000000',
         borderWidth: 2
       },
       label: { show: false, position: 'center' },
@@ -171,9 +237,9 @@ const pieChartOptions = computed(() => ({
       },
       labelLine: { show: false },
       data: [
-        { value: 1048, name: '积极', itemStyle: { color: '#91CC75' } },
-        { value: 735, name: '中性', itemStyle: { color: '#5470C6' } },
-        { value: 580, name: '消极', itemStyle: { color: '#EE6666' } }
+        { value: 1048, name: '积极', itemStyle: { color: '#00ff88' } },
+        { value: 735, name: '中性', itemStyle: { color: '#0066ff' } },
+        { value: 580, name: '消极', itemStyle: { color: '#ff6b6b' } }
       ]
     }
   ]
@@ -182,6 +248,12 @@ const pieChartOptions = computed(() => ({
 const feedItems = ref([])
 const feedLoading = ref(false)
 const lastUpdatedAt = ref(null)
+
+// 分页状态
+const currentPage = ref(1)
+const pageSize = ref(100)
+const totalCount = ref(0)
+const totalPages = ref(1)
 
 // 请求管理：使用 AbortController 控制请求取消
 const abortController = ref(null)
@@ -312,7 +384,54 @@ const buildFeedItems = (rows) => {
   })
 }
 
-const fetchMonitorFeed = async ({ withLoading = true, signal = null } = {}) => {
+// 分页计算属性 - 显示页码范围（带省略号）
+const displayedPages = computed(() => {
+  const pages = []
+  const total = totalPages.value
+  const current = currentPage.value
+  const delta = 2 // 当前页前后显示的页数
+
+  // 总是显示第一页
+  pages.push(1)
+
+  // 如果第一页不是当前页且距离较远，添加省略号
+  if (current > delta + 3) {
+    pages.push('...')
+  }
+
+  // 当前页附近的页码
+  for (let i = Math.max(2, current - delta); i <= Math.min(total - 1, current + delta); i++) {
+    pages.push(i)
+  }
+
+  // 如果最后一页不是当前页且距离较远，添加省略号
+  if (current < total - delta - 2) {
+    pages.push('...')
+  }
+
+  // 总是显示最后一页
+  if (total > 1) {
+    pages.push(total)
+  }
+
+  return pages
+})
+
+// 页面跳转函数
+const goToPage = async (page) => {
+  if (page < 1 || page > totalPages.value) return
+  currentPage.value = page
+  // 滚动到列表顶部
+  const listWrapper = document.querySelector('.list-wrapper')
+  if (listWrapper) {
+    listWrapper.scrollTop = 0
+  }
+  // 获取该页数据
+  await fetchMonitorFeedPage()
+}
+
+// 获取指定页的数据
+const fetchMonitorFeedPage = async ({ withLoading = true, signal = null } = {}) => {
   // 如果请求已被取消，直接返回
   if (signal?.aborted) return
 
@@ -321,7 +440,10 @@ const fetchMonitorFeed = async ({ withLoading = true, signal = null } = {}) => {
   }
   try {
     const res = await axios.get('/api/monitor/feed', {
-      params: { limit: 20, per_platform: 10 },
+      params: {
+        page: currentPage.value,
+        page_size: pageSize.value
+      },
       signal
     })
     // 请求完成后再次检查是否被取消
@@ -330,12 +452,16 @@ const fetchMonitorFeed = async ({ withLoading = true, signal = null } = {}) => {
     const items = Array.isArray(res.data?.items) ? res.data.items : []
     console.log('API Response success:', items.length, 'items')
 
+    // 更新分页信息
+    if (res.data?.pagination) {
+      totalCount.value = res.data.pagination.total_count || 0
+      totalPages.value = res.data.pagination.total_pages || 1
+    }
+
     const merged = buildFeedItems(items)
     console.log('buildFeedItems result:', merged.length, 'items')
 
     feedItems.value = merged
-      .sort((a, b) => b.sortTime - a.sortTime)
-      .slice(0, 20)
 
     lastUpdatedAt.value = res.data?.fetched_at || new Date()
     console.log('fetchMonitorFeed complete, feedItems.value.length:', feedItems.value.length)
@@ -346,6 +472,8 @@ const fetchMonitorFeed = async ({ withLoading = true, signal = null } = {}) => {
 
     // 只在组件未卸载时更新状态
     feedItems.value = []
+    totalCount.value = 0
+    totalPages.value = 1
     lastUpdatedAt.value = new Date()
     console.log('fetchMonitorFeed error:', e.message)
   } finally {
@@ -353,6 +481,12 @@ const fetchMonitorFeed = async ({ withLoading = true, signal = null } = {}) => {
       feedLoading.value = false
     }
   }
+}
+
+// 刷新数据（重置到第一页）
+const fetchMonitorFeed = async ({ withLoading = true, signal = null } = {}) => {
+  currentPage.value = 1
+  await fetchMonitorFeedPage({ withLoading, signal })
 }
 
 const batchPlatforms = ['xhs', 'dy', 'ks', 'bili', 'wb', 'tieba', 'zhihu']
@@ -485,21 +619,18 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .dashboard-view {
+  position: relative;
+  z-index: 1;
   padding: 1.5rem;
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
   height: 100%;
   overflow-y: auto;
-  /* 优化滚动体验 */
   scroll-behavior: smooth;
 }
 
-/* 定义滚动条样式 */
-.scrollbar-width: thin;
-.scrollbar-color: rgba(255, 215, 0, 0.3) rgba(255, 255, 255, 0.05);
-
-/* Webkit 滚动条样式 */
+/* Cyberpunk Scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
 }
@@ -510,13 +641,15 @@ onBeforeUnmount(() => {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 215, 0, 0.3);
+  background: var(--cyan-primary);
   border-radius: 4px;
-  transition: background 0.2s;
+  box-shadow: 0 0 10px var(--cyan-primary);
+  transition: all 0.3s;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 215, 0, 0.5);
+  background: var(--blue-secondary);
+  box-shadow: 0 0 15px var(--blue-secondary);
 }
 
 /* Stats Grid */
@@ -531,24 +664,35 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 1.5rem;
-  border-radius: 12px;
-  transition: transform 0.3s;
+  border-radius: 20px;
+  background: rgba(10, 10, 15, 0.85);
+  backdrop-filter: blur(30px) saturate(180%);
+  border: 1px solid var(--border-cyan);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow:
+    0 0 40px rgba(0, 204, 255, 0.1),
+    0 4px 24px rgba(0, 0, 0, 0.4);
 }
 
 .stat-card:hover {
   transform: translateY(-5px);
-  box-shadow: 0 5px 15px rgba(255, 215, 0, 0.1);
+  border-color: var(--glow-cyan);
+  box-shadow:
+    0 0 60px rgba(0, 204, 255, 0.2),
+    0 8px 32px rgba(0, 0, 0, 0.6);
 }
 
 .stat-icon {
   font-size: 2.5rem;
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(0, 204, 255, 0.08);
   width: 60px;
   height: 60px;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
+  border: 1px solid rgba(0, 204, 255, 0.2);
+  box-shadow: 0 0 20px rgba(0, 204, 255, 0.2);
 }
 
 .stat-info {
@@ -557,28 +701,44 @@ onBeforeUnmount(() => {
 }
 
 .stat-info .label {
-  font-size: 0.85rem;
-  color: var(--secondary-color);
+  font-size: 0.75rem;
+  color: var(--text-dim);
   text-transform: uppercase;
+  letter-spacing: 1.5px;
+  font-weight: 500;
 }
 
 .stat-info .value {
-  font-size: 1.5rem;
+  font-size: 1.8rem;
   font-weight: 700;
-  color: var(--text-color);
+  color: var(--text-white);
   margin: 0.2rem 0;
+  letter-spacing: 1px;
 }
 
-.stat-info .value.warning { color: #EE6666; }
-.stat-info .value.positive { color: #91CC75; }
+.stat-info .value.warning {
+  color: #ff6b6b;
+  text-shadow: 0 0 20px rgba(255, 107, 107, 0.5);
+}
+
+.stat-info .value.positive {
+  color: var(--green-status);
+  text-shadow: 0 0 20px rgba(0, 255, 136, 0.5);
+}
 
 .stat-info .trend {
   font-size: 0.75rem;
-  color: var(--secondary-color);
+  color: var(--text-dim);
+  letter-spacing: 0.5px;
 }
 
-.stat-info .trend.up { color: #91CC75; }
-.stat-info .trend.down { color: #EE6666; }
+.stat-info .trend.up {
+  color: var(--green-status);
+}
+
+.stat-info .trend.down {
+  color: #ff6b6b;
+}
 
 /* Charts Grid */
 .charts-grid {
@@ -591,17 +751,27 @@ onBeforeUnmount(() => {
 /* Recent List */
 .recent-list {
   padding: 1.5rem;
-  border-radius: 12px;
+  border-radius: 20px;
+  background: rgba(10, 10, 15, 0.85);
+  backdrop-filter: blur(30px) saturate(180%);
+  border: 1px solid var(--border-cyan);
   flex: 1;
   display: flex;
   flex-direction: column;
   min-height: 300px;
+  box-shadow:
+    0 0 40px rgba(0, 204, 255, 0.1),
+    0 4px 24px rgba(0, 0, 0, 0.4);
 }
 
 .recent-list h3 {
   margin: 0;
   font-size: 1rem;
-  color: var(--primary-color);
+  color: var(--cyan-primary);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  font-weight: 600;
+  text-shadow: 0 0 20px rgba(0, 204, 255, 0.5);
 }
 
 .recent-header {
@@ -620,25 +790,31 @@ onBeforeUnmount(() => {
 
 .feed-updated {
   font-size: 0.75rem;
-  color: var(--secondary-color);
+  color: var(--text-dim);
+  letter-spacing: 0.5px;
 }
 
 .refresh-btn {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  padding: 0.35rem 0.7rem;
-  border-radius: 6px;
-  border: 1px solid rgba(255, 215, 0, 0.35);
-  background: rgba(255, 215, 0, 0.12);
-  color: var(--primary-color);
+  padding: 0.5rem 1rem;
+  border-radius: 12px;
+  border: 1px solid var(--border-cyan);
+  background: linear-gradient(135deg, rgba(0, 102, 255, 0.3), rgba(0, 204, 255, 0.15));
+  color: var(--cyan-primary);
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  box-shadow: 0 0 20px rgba(0, 204, 255, 0.2);
 }
 
 .refresh-btn:hover:not(:disabled) {
-  background: rgba(255, 215, 0, 0.2);
-  box-shadow: 0 10px rgba(255, 215, 0, 0.2);
+  background: linear-gradient(135deg, rgba(0, 102, 255, 0.4), rgba(0, 204, 255, 0.25));
+  border-color: var(--glow-cyan);
+  box-shadow: 0 0 30px rgba(0, 204, 255, 0.4);
+  transform: translateY(-2px);
 }
 
 .refresh-btn:disabled {
@@ -660,14 +836,15 @@ onBeforeUnmount(() => {
   flex-direction: column;
   align-items: center;
   gap: 0.4rem;
-  color: var(--secondary-color);
+  color: var(--text-dim);
   padding: 1rem 0;
   flex: 1;
 }
 
 .feed-state .hint {
   font-size: 0.8rem;
-  color: var(--secondary-color);
+  color: var(--text-dim);
+  opacity: 0.7;
 }
 
 .list-wrapper {
@@ -685,12 +862,13 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 1rem;
   padding: 0.8rem;
-  background: rgba(255, 255, 255, 0.02);
-  border-radius: 8px;
-  border: 1px solid transparent;
+  background: rgba(0, 204, 255, 0.03);
+  border-radius: 12px;
+  border: 1px solid rgba(0, 204, 255, 0.1);
   opacity: 0;
   transform: translateX(-20px);
   animation: fadeSlideIn 0.4s ease-out forwards;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @keyframes fadeSlideIn {
@@ -701,16 +879,21 @@ onBeforeUnmount(() => {
 }
 
 .list-item:hover {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 215, 0, 0.2);
+  background: rgba(0, 204, 255, 0.08);
+  border-color: var(--border-cyan);
+  box-shadow: 0 0 20px rgba(0, 204, 255, 0.15);
 }
 
 .platform-tag {
-  background: rgba(255, 0, 0, 0.2);
-  color: #ffcccc;
-  padding: 2px 8px;
-  border-radius: 4px;
+  background: rgba(0, 102, 255, 0.2);
+  color: var(--cyan-primary);
+  padding: 4px 10px;
+  border-radius: 8px;
   font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  border: 1px solid rgba(0, 204, 255, 0.2);
+  text-transform: uppercase;
 }
 
 .content {
@@ -719,31 +902,34 @@ onBeforeUnmount(() => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  color: var(--text-color);
+  color: var(--text-light);
 }
 
 .time {
   font-size: 0.8rem;
-  color: var(--secondary-color);
+  color: var(--text-dim);
+  font-weight: 500;
 }
 
 .author {
   font-size: 0.8rem;
-  color: var(--text-color);
+  color: var(--text-light);
+  font-weight: 500;
 }
 
 .author.muted {
-  color: var(--secondary-color);
+  color: var(--text-dim);
 }
 
 /* 加载动画 */
 .loading-spinner {
   width: 24px;
   height: 24px;
-  border: 2px solid var(--primary-color);
+  border: 2px solid var(--cyan-primary);
   border-top-color: transparent;
   border-radius: 50%;
   animation: spin 1s linear infinite;
+  box-shadow: 0 0 20px rgba(0, 204, 255, 0.5);
 }
 
 @keyframes spin {
@@ -751,25 +937,264 @@ onBeforeUnmount(() => {
   100% { transform: rotate(360deg); }
 }
 
-/* 全局样式 */
+/* Cyberpunk Style - CSS Variables */
 :root {
-  --primary-color: #FFD700;
-  --secondary-color: #aaa;
-  --text-color: #fff;
-  --bg-glass: rgba(255, 255, 255, 0.05);
-  --border-color: rgba(255, 215, 0, 0.15);
+  --cyan-primary: #00ccff;
+  --blue-secondary: #0066ff;
+  --orange-gold: #ffae00;
+  --green-status: #00ff88;
+  --text-white: #FFFFFF;
+  --text-gray: #888888;
+  --text-light: #aaaaaa;
+  --text-dim: #666666;
+  --bg-pure-black: #000000;
+  --bg-glass: rgba(255, 255, 255, 0.03);
+  --border-cyan: rgba(0, 204, 255, 0.2);
+  --glow-cyan: rgba(0, 204, 255, 0.4);
 }
 
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 0%);
-  color: var(--text-color);
+  background: var(--bg-pure-black);
+  color: var(--text-white);
 }
 
+/* Dashboard Wrapper with Cyberpunk Background */
+.dashboard-wrapper {
+  min-height: 100vh;
+  background: var(--bg-pure-black);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Ambient Background Effects */
+.ambient-background {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* Blue Halo - Top Left Corner */
+.blue-halo {
+  position: absolute;
+  top: -100px;
+  left: -100px;
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(ellipse, rgba(0, 102, 255, 0.5) 0%, transparent 70%);
+  animation: bluePulse 4s ease-in-out infinite alternate;
+}
+
+@keyframes bluePulse {
+  0% { opacity: 0.6; transform: scale(1); }
+  100% { opacity: 1; transform: scale(1.1); }
+}
+
+/* Perspective Grid Background */
+.grid-background {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 50%;
+  background-image:
+    linear-gradient(rgba(0, 204, 255, 0.15) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 204, 255, 0.15) 1px, transparent 1px);
+  background-size: 50px 50px;
+  transform: perspective(500px) rotateX(60deg);
+  transform-origin: bottom center;
+  animation: gridMove 20s linear infinite;
+}
+
+@keyframes gridMove {
+  0% { background-position: 0 0; }
+  100% { background-position: 0 50px; }
+}
+
+/* Floating Particles */
+.particles {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+}
+
+.particle {
+  position: absolute;
+  bottom: -10px;
+  width: 3px;
+  height: 3px;
+  background: var(--cyan-primary);
+  border-radius: 50%;
+  opacity: 0;
+  animation: particleFloat 15s linear infinite;
+}
+
+@keyframes particleFloat {
+  0% {
+    opacity: 0;
+    transform: translateY(0) translateX(0);
+  }
+  10% {
+    opacity: 0.8;
+  }
+  90% {
+    opacity: 0.8;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-100vh) translateX(50px);
+  }
+}
+
+/* Distribute particles horizontally */
+.particle:nth-child(1) { left: 10%; }
+.particle:nth-child(2) { left: 20%; }
+.particle:nth-child(3) { left: 30%; }
+.particle:nth-child(4) { left: 40%; }
+.particle:nth-child(5) { left: 50%; }
+.particle:nth-child(6) { left: 60%; }
+.particle:nth-child(7) { left: 70%; }
+.particle:nth-child(8) { left: 80%; }
+
 .glass {
-  background: var(--bg-glass);
-  backdrop-filter: blur(10px);
-  border: 1px solid var(--border-color);
+  background: rgba(10, 10, 15, 0.85);
+  backdrop-filter: blur(30px) saturate(180%);
+  border: 1px solid var(--border-cyan);
+  border-radius: 20px;
+  box-shadow:
+    0 0 40px rgba(0, 204, 255, 0.1),
+    0 4px 24px rgba(0, 0, 0, 0.4);
+}
+
+/* Pagination Styles */
+.pagination-wrapper {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-cyan);
+  flex-wrap: wrap;
+}
+
+.pagination-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}
+
+.pagination-divider {
+  color: var(--border-cyan);
+}
+
+.pagination-text {
+  color: var(--text-light);
+  font-weight: 500;
+}
+
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.pagination-btn {
+  padding: 0.4rem 0.8rem;
+  border-radius: 8px;
+  border: 1px solid var(--border-cyan);
+  background: rgba(0, 204, 255, 0.05);
+  color: var(--cyan-primary);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  font-size: 0.85rem;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+}
+
+.pagination-btn:hover:not(:disabled) {
+  background: rgba(0, 204, 255, 0.15);
+  border-color: var(--glow-cyan);
+  box-shadow: 0 0 15px rgba(0, 204, 255, 0.3);
+  transform: translateY(-1px);
+}
+
+.pagination-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.pagination-numbers {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.pagination-number {
+  min-width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 8px;
+  border: 1px solid var(--border-cyan);
+  background: rgba(0, 204, 255, 0.05);
+  color: var(--text-light);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  font-size: 0.85rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pagination-number:hover:not(:disabled):not(.ellipsis) {
+  background: rgba(0, 204, 255, 0.15);
+  border-color: var(--glow-cyan);
+  box-shadow: 0 0 15px rgba(0, 204, 255, 0.3);
+  transform: translateY(-1px);
+}
+
+.pagination-number.active {
+  background: linear-gradient(135deg, rgba(0, 102, 255, 0.4), rgba(0, 204, 255, 0.25));
+  border-color: var(--glow-cyan);
+  color: var(--text-white);
+  box-shadow: 0 0 20px rgba(0, 204, 255, 0.4);
+}
+
+.pagination-number.ellipsis {
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: default;
+}
+
+.pagination-number:disabled {
+  cursor: not-allowed;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .pagination-wrapper {
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .pagination-controls {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .pagination-numbers {
+    order: -1;
+    width: 100%;
+    justify-content: center;
+  }
 }
 </style>
