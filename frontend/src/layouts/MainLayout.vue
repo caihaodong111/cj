@@ -1,12 +1,28 @@
 <template>
   <div class="main-layout">
+    <!-- Trigger Zone -->
+    <div
+      class="sidebar-trigger"
+      @mouseenter="showSidebar"
+      @mouseleave="hideSidebar"
+    >
+      <div class="trigger-indicator">
+        <span class="trigger-dots">···</span>
+      </div>
+    </div>
+
     <!-- Sidebar -->
-    <aside class="sidebar glass">
+    <aside
+      class="sidebar glass"
+      :class="{ 'sidebar-visible': isSidebarVisible }"
+      @mouseenter="showSidebar"
+      @mouseleave="hideSidebar"
+    >
       <div class="logo">
         <span class="logo-icon">🕷️</span>
         <h1>舆情分析</h1>
       </div>
-      
+
       <nav class="nav-menu">
         <router-link to="/dashboard" class="nav-item" active-class="active">
           <span class="icon">📊</span>
@@ -56,11 +72,31 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { ref, computed } from 'vue'
 import { useRoute } from 'vue-router'
 
 const route = useRoute()
 const currentRouteTitle = computed(() => route.meta.title || 'MediaCrawler')
+
+const isSidebarVisible = ref(false)
+let hideTimer = null
+
+const showSidebar = () => {
+  if (hideTimer) {
+    clearTimeout(hideTimer)
+    hideTimer = null
+  }
+  isSidebarVisible.value = true
+}
+
+const hideSidebar = () => {
+  if (hideTimer) {
+    clearTimeout(hideTimer)
+  }
+  hideTimer = setTimeout(() => {
+    isSidebarVisible.value = false
+  }, 200)
+}
 </script>
 
 <style scoped>
@@ -70,8 +106,56 @@ const currentRouteTitle = computed(() => route.meta.title || 'MediaCrawler')
   width: 100vw;
   overflow: hidden;
   background: radial-gradient(circle at top right, rgba(255, 215, 0, 0.05), transparent 40%);
+  position: relative;
 }
 
+/* Trigger Zone */
+.sidebar-trigger {
+  position: fixed;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  z-index: 5;
+  cursor: pointer;
+}
+
+.trigger-indicator {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 60px;
+  background: linear-gradient(180deg, transparent, var(--primary-color), transparent);
+  border-radius: 0 4px 4px 0;
+  opacity: 0.3;
+  transition: opacity 0.3s, width 0.3s;
+}
+
+.sidebar-trigger:hover .trigger-indicator {
+  opacity: 0.8;
+  width: 6px;
+}
+
+.trigger-dots {
+  display: none;
+  position: absolute;
+  left: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--primary-color);
+  font-size: 14px;
+  letter-spacing: 1px;
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+}
+
+.sidebar-trigger:hover .trigger-dots {
+  display: block;
+}
+
+/* Sidebar */
 .sidebar {
   width: 240px;
   display: flex;
@@ -79,6 +163,17 @@ const currentRouteTitle = computed(() => route.meta.title || 'MediaCrawler')
   border-right: 1px solid var(--border-color);
   background: var(--sidebar-bg);
   z-index: 10;
+  transform: translateX(-100%);
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  position: fixed;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  box-shadow: 2px 0 20px rgba(0, 0, 0, 0.5);
+}
+
+.sidebar.sidebar-visible {
+  transform: translateX(0);
 }
 
 .logo {
@@ -155,6 +250,7 @@ const currentRouteTitle = computed(() => route.meta.title || 'MediaCrawler')
   display: flex;
   flex-direction: column;
   min-width: 0;
+  width: 100%;
 }
 
 .top-header {
@@ -187,7 +283,7 @@ const currentRouteTitle = computed(() => route.meta.title || 'MediaCrawler')
 
 .content-wrapper {
   flex: 1;
-  overflow: hidden;
+  overflow-y: auto;
   position: relative;
 }
 

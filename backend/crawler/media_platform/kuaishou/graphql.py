@@ -17,26 +17,39 @@
 # 详细许可条款请参阅项目根目录下的LICENSE文件。
 # 使用本代码即表示您同意遵守上述原则和LICENSE中的所有条款。
 
-
 # Kuaishou's data transmission is based on GraphQL
 # This class is responsible for obtaining some GraphQL schemas
+from pathlib import Path
 from typing import Dict
 
-
-class KuaiShouGraphQL:
-    graphql_queries: Dict[str, str]= {}
+class KuaishouGraphQL:
+    graphql_queries: Dict[str, str] = {}
 
     def __init__(self):
-        self.graphql_dir = "media_platform/kuaishou/graphql/"
+        # Get absolute path relative to this file
+        current_file = Path(__file__).resolve()
+        self.graphql_dir = str(current_file.parent / "graphql/")
         self.load_graphql_queries()
 
     def load_graphql_queries(self):
-        graphql_files = ["search_query.graphql", "video_detail.graphql", "comment_list.graphql", "vision_profile.graphql","vision_profile_photo_list.graphql","vision_profile_user_list.graphql","vision_sub_comment_list.graphql"]
+        graphql_files = [
+            "search_query.graphql",
+            "video_detail.graphql",
+            "comment_list.graphql",
+            "vision_profile.graphql",
+            "vision_profile_photo_list.graphql",
+            "vision_profile_user_list.graphql",
+            "vision_sub_comment_list.graphql"
+        ]
 
         for file in graphql_files:
-            with open(self.graphql_dir + file, mode="r") as f:
-                query_name = file.split(".")[0]
-                self.graphql_queries[query_name] = f.read()
+            file_path = Path(self.graphql_dir) / file
+            if file_path.exists():
+                with open(file_path, mode="r", encoding="utf-8") as f:
+                    query_name = file.split(".")[0]
+                    self.graphql_queries[query_name] = f.read()
+            else:
+                print(f"Warning: GraphQL file not found: {file_path}")
 
     def get(self, query_name: str) -> str:
         return self.graphql_queries.get(query_name, "Query not found")

@@ -24,6 +24,14 @@ from api.views import (
     download_file,
     get_data_stats,
     CrawlerView,
+    # Cookie Management
+    list_cookies,
+    get_cookie,
+    create_cookie,
+    update_cookie,
+    delete_cookie,
+    toggle_cookie_status,
+    get_active_cookie,
 )
 
 urlpatterns = [
@@ -44,6 +52,15 @@ urlpatterns = [
     path("api/data/stats", get_data_stats, name="get_data_stats"),
     path("api/data/files/<path:file_path>", get_file_content, name="get_file_content"),
     path("api/data/download/<path:file_path>", download_file, name="download_file"),
+
+    # API: Cookie Management
+    path("api/cookies", list_cookies, name="list_cookies"),
+    path("api/cookies/active", get_active_cookie, name="get_active_cookie"),
+    path("api/cookies/<int:cookie_id>", get_cookie, name="get_cookie"),
+    path("api/cookies/create", create_cookie, name="create_cookie"),
+    path("api/cookies/<int:cookie_id>/update", update_cookie, name="update_cookie"),
+    path("api/cookies/<int:cookie_id>/delete", delete_cookie, name="delete_cookie"),
+    path("api/cookies/<int:cookie_id>/toggle", toggle_cookie_status, name="toggle_cookie_status"),
 
     # Root endpoint
     path(
