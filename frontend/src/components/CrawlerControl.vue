@@ -358,67 +358,87 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+/* === iOS Style Base === */
 .crawler-control {
   display: flex;
   flex-direction: column;
   height: 100%;
   overflow-y: auto;
+  color: #fff;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
 }
 
 .control-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1rem;
-  border-bottom: 1px solid var(--border-color);
-  background: rgba(22, 27, 34, 0.5);
+  padding: 20px 24px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  background: rgba(0, 0, 0, 0.2);
 }
 
 .control-header h2 {
   margin: 0;
-  font-size: 1rem;
-  color: var(--primary-color);
-}
-
-.status-badge {
-  padding: 0.25rem 0.6rem;
-  border-radius: 20px;
-  font-size: 0.75rem;
+  font-size: 16px;
+  color: #ffaa00;
   font-weight: 600;
+  letter-spacing: 1px;
   text-transform: uppercase;
 }
 
+.status-badge {
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border: 1px solid;
+  transition: all 0.3s ease;
+}
+
 .status-idle {
-  background: var(--border-color);
-  color: var(--secondary-color);
+  background: rgba(108, 117, 125, 0.15);
+  color: #8899aa;
+  border-color: rgba(255, 255, 255, 0.08);
 }
 
 .status-running {
-  background: rgba(35, 134, 54, 0.3);
-  color: #3fb950;
+  background: rgba(74, 222, 128, 0.15);
+  color: #4ade80;
+  border-color: rgba(74, 222, 128, 0.3);
+  box-shadow: 0 0 15px rgba(74, 222, 128, 0.2);
+  animation: statusPulse 2s ease-in-out infinite;
+}
+
+@keyframes statusPulse {
+  0%, 100% { box-shadow: 0 0 15px rgba(74, 222, 128, 0.2); }
+  50% { box-shadow: 0 0 25px rgba(74, 222, 128, 0.4); }
 }
 
 .status-error {
-  background: rgba(218, 54, 51, 0.3);
-  color: #f85149;
+  background: rgba(255, 107, 107, 0.15);
+  color: #ff6b6b;
+  border-color: rgba(255, 107, 107, 0.3);
+  box-shadow: 0 0 15px rgba(255, 107, 107, 0.2);
 }
 
 .config-form {
-  padding: 1rem;
+  padding: 20px 24px;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 16px;
 }
 
 .form-row {
   display: flex;
-  gap: 0.75rem;
+  gap: 12px;
   flex-wrap: wrap;
 }
 
 .form-group {
   flex: 1;
-  min-width: 120px;
+  min-width: 140px;
 }
 
 .form-group.full-width {
@@ -427,110 +447,161 @@ onUnmounted(() => {
 
 .form-group label {
   display: block;
-  margin-bottom: 0.35rem;
-  font-size: 0.75rem;
-  color: var(--secondary-color);
-  font-weight: 500;
+  margin-bottom: 6px;
+  font-size: 11px;
+  color: #8899aa;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
 }
 
 .form-group input[type="text"],
 .form-group input[type="number"],
 .form-group select {
   width: 100%;
-  padding: 0.4rem 0.5rem;
-  background: var(--bg-color);
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  color: var(--text-color);
-  font-size: 0.8rem;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  color: #fff;
+  font-size: 12px;
+  transition: all 0.2s ease;
+}
+
+.form-group input[type="text"]:focus,
+.form-group input[type="number"]:focus,
+.form-group select:focus {
+  outline: none;
+  border-color: rgba(255, 170, 0, 0.4);
+  box-shadow: 0 0 15px rgba(255, 170, 0, 0.15);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.form-group input[type="text"]::placeholder,
+.form-group input[type="number"]::placeholder {
+  color: #8899aa;
+}
+
+.form-group select {
+  cursor: pointer;
+  appearance: none;
 }
 
 .form-group input:disabled,
 .form-group select:disabled {
-  opacity: 0.5;
+  opacity: 0.4;
   cursor: not-allowed;
+  border-color: rgba(255, 170, 0, 0.1);
 }
 
 .checkbox-group {
   display: flex;
-  gap: 1rem;
+  gap: 16px;
   align-items: center;
+  flex-wrap: wrap;
 }
 
 .checkbox-group label {
   display: flex;
   align-items: center;
-  gap: 0.35rem;
-  font-weight: normal;
+  gap: 8px;
+  font-weight: 500;
   cursor: pointer;
-  font-size: 0.8rem;
+  font-size: 12px;
   margin: 0;
+  color: #dbe6f5;
+  transition: all 0.2s;
+}
+
+.checkbox-group label:hover {
+  color: #ffaa00;
 }
 
 .checkbox-group input[type="checkbox"] {
   cursor: pointer;
+  width: 16px;
+  height: 16px;
+  accent-color: #ffaa00;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 170, 0, 0.2);
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .form-actions {
   display: flex;
   justify-content: flex-end;
-  padding-top: 0.5rem;
-  border-top: 1px solid var(--border-color);
-  margin-top: 0.5rem;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255,255,255,0.05);
+  margin-top: 8px;
 }
 
 .btn {
-  padding: 0.5rem 1.2rem;
-  border: none;
-  border-radius: 6px;
-  font-size: 0.85rem;
+  padding: 10px 20px;
+  border: 1px solid;
+  border-radius: 14px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.3s ease;
+  letter-spacing: 0.5px;
 }
 
 .btn:disabled {
-  opacity: 0.5;
+  opacity: 0.4;
   cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
 }
 
 .btn-start {
-  background: var(--accent-color);
-  color: white;
+  background: rgba(74, 222, 128, 0.15);
+  border-color: #4ade80;
+  color: #4ade80;
+  box-shadow: 0 4px 14px rgba(74, 222, 128, 0.3);
 }
 
 .btn-start:hover:not(:disabled) {
-  background: #2ea043;
+  background: rgba(74, 222, 128, 0.25);
+  box-shadow: 0 8px 24px rgba(74, 222, 128, 0.5);
+  transform: translateY(-2px);
 }
 
 .btn-stop {
-  background: #da3633;
-  color: white;
+  background: rgba(255, 107, 107, 0.15);
+  border-color: #ff6b6b;
+  color: #ff6b6b;
+  box-shadow: 0 4px 14px rgba(255, 107, 107, 0.3);
 }
 
 .btn-stop:hover:not(:disabled) {
-  background: #f85149;
+  background: rgba(255, 107, 107, 0.25);
+  box-shadow: 0 8px 24px rgba(255, 107, 107, 0.5);
+  transform: translateY(-2px);
 }
 
 .btn-small {
-  padding: 0.25rem 0.5rem;
-  background: var(--border-color);
-  border: none;
-  border-radius: 4px;
-  color: var(--text-color);
-  font-size: 0.75rem;
+  padding: 6px 12px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 10px;
+  color: #ffaa00;
+  font-size: 11px;
   cursor: pointer;
+  transition: all 0.2s ease;
+  font-weight: 500;
 }
 
 .btn-small:hover {
-  background: var(--hover-color);
+  background: rgba(255, 170, 0, 0.12);
+  border-color: rgba(255, 170, 0, 0.3);
+  box-shadow: 0 0 15px rgba(255, 170, 0, 0.2);
 }
 
 .logs-panel {
   display: flex;
   flex-direction: column;
-  background: rgba(0, 0, 0, 0.3);
-  border-top: 1px solid var(--border-color);
+  background: rgba(0, 0, 0, 0.4);
+  border-top: 1px solid rgba(255,255,255,0.05);
   flex: 1;
   min-height: 200px;
 }
@@ -539,64 +610,97 @@ onUnmounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.5rem 1rem;
-  background: rgba(22, 27, 34, 0.8);
-  border-bottom: 1px solid var(--border-color);
+  padding: 12px 20px;
+  background: rgba(0, 0, 0, 0.5);
+  border-bottom: 1px solid rgba(255,255,255,0.05);
 }
 
 .logs-header h3 {
   margin: 0;
-  font-size: 0.8rem;
-  color: var(--secondary-color);
+  font-size: 11px;
+  color: #8899aa;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
 }
 
 .logs-content {
   flex: 1;
   overflow-y: auto;
-  padding: 0.5rem;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 0.7rem;
+  padding: 12px;
+  font-family: 'JetBrains Mono', 'SF Mono', Monaco, 'Cascadia Code', monospace;
+  font-size: 11px;
   max-height: 300px;
+  background: rgba(0, 0, 0, 0.3);
 }
 
 .log-entry {
   display: flex;
-  gap: 0.5rem;
-  padding: 0.2rem 0;
-  line-height: 1.4;
+  gap: 10px;
+  padding: 8px 0;
+  line-height: 1.5;
+  border-bottom: 1px solid rgba(255,255,255,0.02);
+}
+
+.log-entry:last-child {
+  border-bottom: none;
 }
 
 .log-time {
-  color: var(--secondary-color);
+  color: #8899aa;
   flex-shrink: 0;
+  font-family: 'JetBrains Mono', monospace;
 }
 
 .log-message {
-  color: var(--text-color);
+  color: #dbe6f5;
   word-break: break-all;
+  flex: 1;
 }
 
 .log-entry.info .log-message {
-  color: var(--text-color);
+  color: #dbe6f5;
 }
 
 .log-entry.success .log-message {
-  color: #3fb950;
+  color: #4ade80;
+  text-shadow: 0 0 10px rgba(74, 222, 128, 0.3);
 }
 
 .log-entry.warning .log-message {
-  color: #d29922;
+  color: #ffaa00;
+  text-shadow: 0 0 10px rgba(255, 170, 0, 0.3);
 }
 
 .log-entry.error .log-message {
-  color: #f85149;
+  color: #ff6b6b;
+  text-shadow: 0 0 10px rgba(255, 107, 107, 0.3);
 }
 
 .logs-empty {
   text-align: center;
-  padding: 2rem;
-  color: var(--secondary-color);
+  padding: 32px;
+  color: #8899aa;
   font-style: italic;
-  font-size: 0.8rem;
+  font-size: 12px;
+}
+
+/* Scrollbar for logs panel */
+.logs-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.logs-content::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+}
+
+.logs-content::-webkit-scrollbar-thumb {
+  background: rgba(255, 170, 0, 0.2);
+  border-radius: 3px;
+}
+
+.logs-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 170, 0, 0.4);
 }
 </style>

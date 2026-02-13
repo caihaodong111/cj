@@ -28,6 +28,9 @@ from django.utils.decorators import method_decorator
 from django.utils.dateparse import parse_datetime, parse_date
 from django.utils import timezone
 from django.views import View
+
+# 导入情绪分析服务
+from api.sentiment_service import analyze_sentiment
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -264,23 +267,67 @@ def get_monitor_feed(request):
         rows = list(queryset)
 
         for row in rows:
+            content_text = row.get("content") or ""
+            # 进行情绪分析
+            sentiment_result = analyze_sentiment(content_text)
+
             items.append({
                 "id": str(row.get("id")),
                 "platform": row.get("platform", ""),
                 "platform_name": row.get("platform_name", ""),
                 "content_id": row.get("content_id", ""),
-                "content": row.get("content") or "",
+                "content": content_text,
                 "author": row.get("author") or "",
                 "url": row.get("url") or "",
                 "created_at": row.get("created_at") or 0,
+                "sentiment": sentiment_result.get("sentiment", "neutral"),
+                "sentiment_score": sentiment_result.get("score", 0),
+                "sentiment_labels": sentiment_result.get("labels", {}),
             })
 
     except Exception as e:
         # 如果 monitor_feed 为空，从平台表获取
         items, total_count, total_pages = _fetch_from_platform_tables_paginated(page, page_size)
 
+    # 计算统计数据
+    sentiment_stats = {
+        "total": total_count,
+        "positive": 0,
+        "negative": 0,
+        "neutral": 0,
+        "sensitive": 0
+    }
+
+    # 统计各情绪类型的数量
+    for item in items:
+        sentiment = item.get("sentiment", "neutral")
+        if sentiment in sentiment_stats:
+            sentiment_stats[sentiment] += 1
+
+    # 计算情感指数（-1到1之间，越接近1越积极）
+    sentiment_scores = [item.get("sentiment_score", 0) for item in items]
+    if sentiment_scores:
+        avg_sentiment = sum(sentiment_scores) / len(sentiment_scores)
+    else:
+        avg_sentiment = 0
+
+    # 计算热度（基于数据量和时间）
+    hot_score = min(100, (total_count / 10) if total_count > 0 else 0)
+
     return Response({
         "items": items,
+        "stats": {
+            "total": total_count,
+            "sensitive": sentiment_stats["sensitive"],
+            "sentiment_index": round(avg_sentiment * 10) / 10,  # -1到1，乘10放大
+            "hot_score": hot_score,
+        },
+        "sentiment_distribution": {
+            "positive": sentiment_stats["positive"],
+            "negative": sentiment_stats["negative"],
+            "neutral": sentiment_stats["neutral"],
+            "sensitive": sentiment_stats["sensitive"],
+        },
         "pagination": {
             "page": page,
             "page_size": page_size,
@@ -756,6 +803,57 @@ def get_file_info(file_path: Path) -> dict:
     }
 
 
+def _get_db_preview_row(platform: str, obj) -> dict:
+    config = PLATFORM_FEED_CONFIG.get(platform, {})
+    content_fields = config.get("content_fields", [])
+    time_field = config.get("time_field")
+    author_field = config.get("author_field")
+
+    content_parts = []
+    for field in content_fields:
+        val = getattr(obj, field, None)
+        if val:
+            content_parts.append(str(val))
+    content = " ".join(content_parts).strip()
+    time_value = getattr(obj, time_field, None) if time_field else None
+
+    return {
+        "create_time": time_value,
+        "created_time": time_value,
+        "content": content,
+        "desc": getattr(obj, "desc", None),
+        "title": getattr(obj, "title", None),
+        "nickname": getattr(obj, author_field, None) if author_field else None,
+        "avatar": (
+            getattr(obj, "user_avatar", None)
+            or getattr(obj, "avatar", None)
+            or getattr(obj, "avatar_url", None)
+        ),
+        "ip_location": getattr(obj, "ip_location", None),
+    }
+
+
+def _get_db_preview_data(platform: str, limit: int) -> tuple[list, int]:
+    config = PLATFORM_FEED_CONFIG.get(platform)
+    if not config:
+        return [], 0
+
+    model = config["model"]
+    time_field = config.get("time_field")
+
+    try:
+        queryset = model.objects.all()
+        if time_field:
+            queryset = queryset.order_by(f"-{time_field}")
+        else:
+            queryset = queryset.order_by("-id")
+        total = queryset.count()
+        rows = [_get_db_preview_row(platform, obj) for obj in queryset[:limit]]
+        return rows, total
+    except Exception:
+        return [], 0
+
+
 def _start_process(cmd, platform: str, crawler_type: str):
     process = subprocess.Popen(
         cmd,
@@ -794,40 +892,50 @@ def _finalize_process(process):
 @permission_classes([AllowAny])
 def list_data_files(request):
     """Get data file list"""
-    if not DATA_DIR.exists():
-        return Response({"files": []})
-
     platform = request.GET.get("platform")
     file_type = request.GET.get("file_type")
 
     files = []
     supported_extensions = {".json", ".csv", ".xlsx", ".xls"}
 
-    for root, dirs, filenames in os.walk(DATA_DIR):
-        root_path = Path(root)
-        for filename in filenames:
-            file_path = root_path / filename
-            if file_path.suffix.lower() not in supported_extensions:
-                continue
-
-            # Platform filter
-            if platform:
-                rel_path = str(file_path.relative_to(DATA_DIR)).lower()
-                aliases = PLATFORM_PATH_ALIASES.get(platform.lower(), [platform.lower()])
-                if not any(alias in rel_path for alias in aliases):
+    if DATA_DIR.exists():
+        for root, dirs, filenames in os.walk(DATA_DIR):
+            root_path = Path(root)
+            for filename in filenames:
+                file_path = root_path / filename
+                if file_path.suffix.lower() not in supported_extensions:
                     continue
 
-            # Type filter
-            if file_type and file_path.suffix[1:].lower() != file_type.lower():
-                continue
+                # Platform filter
+                if platform:
+                    rel_path = str(file_path.relative_to(DATA_DIR)).lower()
+                    aliases = PLATFORM_PATH_ALIASES.get(platform.lower(), [platform.lower()])
+                    if not any(alias in rel_path for alias in aliases):
+                        continue
 
-            try:
-                files.append(get_file_info(file_path))
-            except Exception:
-                continue
+                # Type filter
+                if file_type and file_path.suffix[1:].lower() != file_type.lower():
+                    continue
+
+                try:
+                    files.append(get_file_info(file_path))
+                except Exception:
+                    continue
 
     # Sort by modification time (newest first)
     files.sort(key=lambda x: x["modified_at"], reverse=True)
+
+    if platform and not files and not file_type:
+        db_rows, db_total = _get_db_preview_data(platform.lower(), limit=1)
+        if db_total > 0:
+            files.append({
+                "name": f"db:{platform}",
+                "path": f"db/{platform}/contents",
+                "size": 0,
+                "modified_at": time.time(),
+                "record_count": db_total,
+                "type": "db",
+            })
 
     return Response({"files": files})
 
@@ -836,6 +944,20 @@ def list_data_files(request):
 @permission_classes([AllowAny])
 def get_file_content(request, file_path: str):
     """Get file content or preview"""
+    if file_path.startswith("db/"):
+        parts = Path(file_path).parts
+        if len(parts) < 2:
+            return Response({"error": "Invalid db path"}, status=status.HTTP_400_BAD_REQUEST)
+        platform = parts[1].lower()
+        preview = request.GET.get("preview", "true").lower() == "true"
+        limit = int(request.GET.get("limit", 100))
+        if not preview:
+            return Response({"error": "DB content does not support download"}, status=status.HTTP_400_BAD_REQUEST)
+        rows, total = _get_db_preview_data(platform, limit=limit)
+        if total == 0:
+            return Response({"data": [], "total": 0})
+        return Response({"data": rows, "total": total})
+
     full_path = DATA_DIR / file_path
 
     if not full_path.exists():
@@ -966,14 +1088,6 @@ def download_file(request, file_path: str):
 @permission_classes([AllowAny])
 def get_data_stats(request):
     """Get data statistics"""
-    if not DATA_DIR.exists():
-        return Response({
-            "total_files": 0,
-            "total_size": 0,
-            "by_platform": {},
-            "by_type": {}
-        })
-
     stats = {
         "total_files": 0,
         "total_size": 0,
@@ -983,30 +1097,41 @@ def get_data_stats(request):
 
     supported_extensions = {".json", ".csv", ".xlsx", ".xls"}
 
-    for root, dirs, filenames in os.walk(DATA_DIR):
-        root_path = Path(root)
-        for filename in filenames:
-            file_path = root_path / filename
-            if file_path.suffix.lower() not in supported_extensions:
-                continue
+    if DATA_DIR.exists():
+        for root, dirs, filenames in os.walk(DATA_DIR):
+            root_path = Path(root)
+            for filename in filenames:
+                file_path = root_path / filename
+                if file_path.suffix.lower() not in supported_extensions:
+                    continue
 
-            try:
-                file_stat = file_path.stat()
-                stats["total_files"] += 1
-                stats["total_size"] += file_stat.st_size
+                try:
+                    file_stat = file_path.stat()
+                    stats["total_files"] += 1
+                    stats["total_size"] += file_stat.st_size
 
-                # Statistics by type
-                file_type = file_path.suffix[1:].lower()
-                stats["by_type"][file_type] = stats["by_type"].get(file_type, 0) + 1
+                    # Statistics by type
+                    file_type = file_path.suffix[1:].lower()
+                    stats["by_type"][file_type] = stats["by_type"].get(file_type, 0) + 1
 
-                # Statistics by platform (inferred from path)
-                rel_path = str(file_path.relative_to(DATA_DIR)).lower()
-                for platform, aliases in PLATFORM_PATH_ALIASES.items():
-                    if any(alias in rel_path for alias in aliases):
-                        stats["by_platform"][platform] = stats["by_platform"].get(platform, 0) + 1
-                        break
-            except Exception:
-                continue
+                    # Statistics by platform (inferred from path)
+                    rel_path = str(file_path.relative_to(DATA_DIR)).lower()
+                    for platform, aliases in PLATFORM_PATH_ALIASES.items():
+                        if any(alias in rel_path for alias in aliases):
+                            stats["by_platform"][platform] = stats["by_platform"].get(platform, 0) + 1
+                            break
+                except Exception:
+                    continue
+
+    for platform, config_item in PLATFORM_FEED_CONFIG.items():
+        if stats["by_platform"].get(platform, 0) > 0:
+            continue
+        try:
+            db_count = config_item["model"].objects.count()
+        except Exception:
+            db_count = 0
+        if db_count > 0:
+            stats["by_platform"][platform] = db_count
 
     return Response(stats)
 

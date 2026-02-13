@@ -465,6 +465,23 @@ class MonitorFeed(BaseModel):
     created_at = models.BigIntegerField(db_index=True, verbose_name="Original publish time")
     source_keyword = models.TextField(default='', blank=True, verbose_name="Source keyword")
     extra_data = models.JSONField(null=True, blank=True, verbose_name="Extra data")
+    # 情绪分析字段
+    sentiment = models.CharField(
+        max_length=20,
+        default='neutral',
+        db_index=True,
+        verbose_name="Sentiment type (positive/negative/neutral/sensitive)"
+    )
+    sentiment_score = models.FloatField(
+        null=True,
+        blank=True,
+        verbose_name="Sentiment score (-1 to 1)"
+    )
+    sentiment_labels = models.JSONField(
+        null=True,
+        blank=True,
+        verbose_name="Sentiment analysis labels"
+    )
 
     class Meta:
         db_table = 'monitor_feed'
@@ -473,6 +490,7 @@ class MonitorFeed(BaseModel):
         indexes = [
             models.Index(fields=['-created_at']),
             models.Index(fields=['platform', '-created_at']),
+            models.Index(fields=['sentiment', '-created_at']),
         ]
 
 

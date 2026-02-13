@@ -1,6 +1,5 @@
 <template>
   <div class="dashboard-wrapper">
-    <!-- Ambient Background Effects -->
     <div class="ambient-background">
       <div class="blue-halo"></div>
       <div class="grid-background"></div>
@@ -9,142 +8,190 @@
       </div>
     </div>
 
-    <div class="dashboard-view">
-    <!-- 顶部概览卡片 -->
-    <div class="stats-grid">
-      <div class="stat-card glass">
-        <div class="stat-icon">📊</div>
-        <div class="stat-info">
-          <span class="label">总监测数据</span>
-          <span class="value">12,458</span>
-          <span class="trend up">+15% 较昨日</span>
+    <div class="layout-wrapper">
+      <header class="page-header">
+        <div class="title-group">
+          <h1 class="page-title">舆情监测总览<span class="subtitle">Sentiment Dashboard</span></h1>
+          <div class="status-tag">最近更新：{{ lastUpdatedAt ? formatRelativeTime(lastUpdatedAt) : '暂无' }}</div>
         </div>
-      </div>
-      <div class="stat-card glass">
-        <div class="stat-icon">⚠️</div>
-        <div class="stat-info">
-          <span class="label">敏感舆情</span>
-          <span class="value warning">126</span>
-          <span class="trend down">-2% 较昨日</span>
-        </div>
-      </div>
-      <div class="stat-card glass">
-        <div class="stat-icon">❤️</div>
-        <div class="stat-info">
-          <span class="label">情感指数</span>
-          <span class="value positive">8.4</span>
-          <span class="trend up">积极向好</span>
-        </div>
-      </div>
-      <div class="stat-card glass">
-        <div class="stat-icon">⚡</div>
-        <div class="stat-info">
-          <span class="label">实时热度</span>
-          <span class="value">High</span>
-          <span class="trend">监测中</span>
-        </div>
-      </div>
-    </div>
+      </header>
 
-    <!-- 主要图表区域 -->
-    <div class="charts-grid">
-      <div class="chart-wrapper wide">
-        <ChartCard title="7日舆情声量趋势" :options="trendChartOptions" />
-      </div>
-      <div class="chart-wrapper">
-        <ChartCard title="情感分布占比" :options="pieChartOptions" />
-      </div>
-    </div>
+      <div class="dashboard-content">
+        <aside class="left-panel">
+          <ChartCard class="panel-card main-card" title="情感分布占比" :options="pieChartOptions" />
 
-    <!-- 底部列表 -->
-    <div class="recent-list glass">
-      <div class="recent-header">
-        <h3>Monitor Feed 实时动态</h3>
-        <div class="feed-controls">
-          <span class="feed-updated" v-if="lastUpdatedAt">更新于 {{ formatRelativeTime(lastUpdatedAt) }}</span>
-          <button class="refresh-btn" :disabled="feedLoading" @click="refreshMonitorFeed">
-            <span class="refresh-icon" :class="{ spinning: feedLoading }">⟳</span>
-            {{ feedLoading ? '刷新中' : '刷新' }}
-          </button>
-        </div>
-      </div>
-
-      <!-- 列表容器 -->
-      <div v-if="feedItems && feedItems.length > 0" class="list-wrapper">
-        <div class="list-item" v-for="(item, index) in feedItems" :key="item.id">
-          <span class="platform-tag">{{ item.platformLabel }}</span>
-          <span class="content">{{ item.content }}</span>
-          <span class="time">{{ item.timeLabel }}</span>
-          <span class="author" :class="{ muted: !item.authorLabel }">
-            {{ item.authorLabel || '匿名' }}
-          </span>
-        </div>
-      </div>
-
-      <!-- 加载状态 -->
-      <div v-else-if="feedLoading" class="feed-state">
-        <div class="loading-spinner"></div>
-        <p>正在获取最新动态...</p>
-      </div>
-
-      <!-- 无数据状态 -->
-      <div v-else class="feed-state">
-        <p>暂无数据动态</p>
-        <p class="hint">请先在数据采集界面生成数据</p>
-      </div>
-
-      <!-- 分页控制 -->
-      <div v-if="feedItems && feedItems.length > 0" class="pagination-wrapper">
-        <div class="pagination-info">
-          <span class="pagination-text">共 {{ totalCount }} 条数据</span>
-          <span class="pagination-divider">|</span>
-          <span class="pagination-text">第 {{ currentPage }} / {{ totalPages }} 页</span>
-        </div>
-        <div class="pagination-controls">
-          <button
-            class="pagination-btn"
-            :disabled="currentPage === 1"
-            @click="goToPage(1)"
-          >
-            首页
-          </button>
-          <button
-            class="pagination-btn"
-            :disabled="currentPage === 1"
-            @click="goToPage(currentPage - 1)"
-          >
-            上一页
-          </button>
-          <div class="pagination-numbers">
-            <button
-              v-for="page in displayedPages"
-              :key="page"
-              class="pagination-number"
-              :class="{ active: page === currentPage, ellipsis: page === '...' }"
-              :disabled="page === '...'"
-              @click="page !== '...' && goToPage(page)"
-            >
-              {{ page }}
-            </button>
+          <div class="panel-card glass sentiment-summary">
+            <div class="panel-header">情绪摘要</div>
+            <div class="summary-grid">
+              <div class="summary-item">
+                <span class="label">总监测数据</span>
+                <span class="value">{{ stats.total || 0 }}</span>
+              </div>
+              <div class="summary-item positive">
+                <span class="label">积极数据</span>
+                <span class="value">{{ sentimentCounts.positive }}</span>
+              </div>
+              <div class="summary-item negative">
+                <span class="label">消极数据</span>
+                <span class="value">{{ sentimentCounts.negative }}</span>
+              </div>
+              <div class="summary-item neutral">
+                <span class="label">中性数据</span>
+                <span class="value">{{ sentimentCounts.neutral }}</span>
+              </div>
+              <div class="summary-item sensitive">
+                <span class="label">敏感数据</span>
+                <span class="value">{{ sentimentCounts.sensitive }}</span>
+              </div>
+            </div>
           </div>
-          <button
-            class="pagination-btn"
-            :disabled="currentPage === totalPages"
-            @click="goToPage(currentPage + 1)"
-          >
-            下一页
-          </button>
-          <button
-            class="pagination-btn"
-            :disabled="currentPage === totalPages"
-            @click="goToPage(totalPages)"
-          >
-            末页
-          </button>
-        </div>
+
+          <div class="recent-list glass compact">
+            <div class="recent-header">
+              <h3>Monitor Feed 实时动态</h3>
+              <div class="feed-controls">
+                <span class="feed-updated" v-if="lastUpdatedAt">更新于 {{ formatRelativeTime(lastUpdatedAt) }}</span>
+                <button class="refresh-btn" :disabled="feedLoading" @click="refreshMonitorFeed">
+                  <span class="refresh-icon" :class="{ spinning: feedLoading }">⟳</span>
+                  {{ feedLoading ? '刷新中' : '刷新' }}
+                </button>
+              </div>
+            </div>
+
+            <div v-if="feedItems && feedItems.length > 0" class="list-wrapper">
+              <div class="list-item" v-for="(item, index) in feedItems" :key="item.id" :class="getSentimentClass(item.sentiment)">
+                <span class="platform-tag">{{ item.platformLabel }}</span>
+                <span class="content">{{ item.content }}</span>
+                <span class="sentiment-tag" :class="item.sentiment || 'neutral'">
+                  {{ getSentimentLabel(item.sentiment) }}
+                </span>
+                <span class="time">{{ item.timeLabel }}</span>
+                <span class="author" :class="{ muted: !item.authorLabel }">
+                  {{ item.authorLabel || '匿名' }}
+                </span>
+              </div>
+            </div>
+
+            <div v-else-if="feedLoading" class="feed-state">
+              <div class="loading-spinner"></div>
+              <p>正在获取最新动态...</p>
+            </div>
+
+            <div v-else class="feed-state">
+              <p>暂无数据动态</p>
+              <p class="hint">请先在数据采集界面生成数据</p>
+            </div>
+
+            <div v-if="feedItems && feedItems.length > 0" class="pagination-wrapper">
+              <div class="pagination-info">
+                <span class="pagination-text">共 {{ totalCount }} 条数据</span>
+                <span class="pagination-divider">|</span>
+                <span class="pagination-text">第 {{ currentPage }} / {{ totalPages }} 页</span>
+              </div>
+              <div class="pagination-controls">
+                <button
+                  class="pagination-btn"
+                  :disabled="currentPage === 1"
+                  @click="goToPage(1)"
+                >
+                  首页
+                </button>
+                <button
+                  class="pagination-btn"
+                  :disabled="currentPage === 1"
+                  @click="goToPage(currentPage - 1)"
+                >
+                  上一页
+                </button>
+                <div class="pagination-numbers">
+                  <button
+                    v-for="page in displayedPages"
+                    :key="page"
+                    class="pagination-number"
+                    :class="{ active: page === currentPage, ellipsis: page === '...' }"
+                    :disabled="page === '...'"
+                    @click="page !== '...' && goToPage(page)"
+                  >
+                    {{ page }}
+                  </button>
+                </div>
+                <button
+                  class="pagination-btn"
+                  :disabled="currentPage === totalPages"
+                  @click="goToPage(currentPage + 1)"
+                >
+                  下一页
+                </button>
+                <button
+                  class="pagination-btn"
+                  :disabled="currentPage === totalPages"
+                  @click="goToPage(totalPages)"
+                >
+                  末页
+                </button>
+              </div>
+            </div>
+          </div>
+        </aside>
+
+        <main class="right-panel">
+          <div class="stats-grid">
+            <div class="stat-card glass">
+              <div class="stat-icon">📊</div>
+              <div class="stat-info">
+                <span class="label">总监测数据</span>
+                <span class="value">{{ stats.total || 0 }}</span>
+                <span class="trend">共 {{ totalPages }} 页</span>
+              </div>
+            </div>
+            <div class="stat-card glass">
+              <div class="stat-icon">⚠️</div>
+              <div class="stat-info">
+                <span class="label">敏感舆情</span>
+                <span class="value sensitive">{{ stats.sensitive || 0 }}</span>
+                <span class="trend" :class="getSentimentTrendClass(stats.sensitive, stats.total)">
+                  {{ getSentimentTrendText(stats.sensitive, stats.total) }}
+                </span>
+              </div>
+            </div>
+            <div class="stat-card glass">
+              <div class="stat-icon">💚</div>
+              <div class="stat-info">
+                <span class="label">情感指数</span>
+                <span class="value" :class="getSentimentIndexClass(stats.sentimentIndex)">
+                  {{ formatSentimentIndex(stats.sentimentIndex) }}
+                </span>
+                <span class="trend">{{ getSentimentIndexText(stats.sentimentIndex) }}</span>
+              </div>
+            </div>
+            <div class="stat-card glass">
+              <div class="stat-icon">⚡</div>
+              <div class="stat-info">
+                <span class="label">实时热度</span>
+                <span class="value hot">{{ stats.hotScore || 0 }}</span>
+                <span class="trend" :class="{ up: stats.hotScore > 50 }">
+                  {{ getHotScoreText(stats.hotScore) }}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div class="chart-row">
+            <ChartCard title="7日舆情声量趋势" :options="trendChartOptions" />
+          </div>
+
+          <div class="sentiment-grid">
+            <ChartCard title="小红书情绪结构" :options="platformPieOptions.xhs" />
+            <ChartCard title="抖音情绪结构" :options="platformPieOptions.dy" />
+            <ChartCard title="快手情绪结构" :options="platformPieOptions.ks" />
+            <ChartCard title="B站情绪结构" :options="platformPieOptions.bili" />
+            <ChartCard title="微博情绪结构" :options="platformPieOptions.wb" />
+            <ChartCard title="贴吧情绪结构" :options="platformPieOptions.tieba" />
+            <ChartCard title="知乎情绪结构" :options="platformPieOptions.zhihu" />
+          </div>
+        </main>
       </div>
     </div>
-  </div>
   </div>
 </template>
 
@@ -181,7 +228,23 @@ const trendChartOptions = computed(() => ({
   },
   series: [
     {
-      name: '声量',
+      name: '积极',
+      type: 'line',
+      stack: 'Total',
+      smooth: true,
+      lineStyle: { width: 3, color: '#00ff88' },
+      areaStyle: {
+        color: {
+          type: 'linear',
+          x: 0, y: 0, x2: 0, y2: 1,
+          colorStops: [{ offset: 0, color: 'rgba(0, 255, 136, 0.5)' }, { offset: 1, color: 'rgba(0, 255, 136, 0)' }]
+        }
+      },
+      emphasis: { focus: 'series' },
+      data: [120, 132, 101, 134, 90, 230, 210]
+    },
+    {
+      name: '中性',
       type: 'line',
       stack: 'Total',
       smooth: true,
@@ -194,15 +257,32 @@ const trendChartOptions = computed(() => ({
         }
       },
       emphasis: { focus: 'series' },
-      data: [120, 132, 101, 134, 90, 230, 210]
+      data: [20, 32, 11, 34, 10, 30, 20]
     },
     {
-      name: '负面',
+      name: '消极',
       type: 'line',
       stack: 'Total',
       smooth: true,
       lineStyle: { width: 3, color: '#ff6b6b' },
       areaStyle: { opacity: 0 },
+      emphasis: { focus: 'series' },
+      data: [20, 32, 11, 34, 10, 30, 20]
+    },
+    {
+      name: '敏感',
+      type: 'line',
+      stack: 'Total',
+      smooth: true,
+      lineStyle: { width: 3, color: '#ffae00' },
+      areaStyle: {
+        color: {
+          type: 'linear',
+          x: 0, y: 0, x2: 0, y2: 1,
+          colorStops: [{ offset: 0, color: 'rgba(255, 174, 0, 0.5)' }, { offset: 1, color: 'rgba(255, 174, 0, 0)' }]
+        }
+      },
+      emphasis: { focus: 'series' },
       data: [20, 32, 11, 34, 10, 30, 20]
     }
   ]
@@ -238,8 +318,9 @@ const pieChartOptions = computed(() => ({
       labelLine: { show: false },
       data: [
         { value: 1048, name: '积极', itemStyle: { color: '#00ff88' } },
-        { value: 735, name: '中性', itemStyle: { color: '#0066ff' } },
-        { value: 580, name: '消极', itemStyle: { color: '#ff6b6b' } }
+        { value: 735, name: '中性', itemStyle: { color: '#00ccff' } },
+        { value: 580, name: '消极', itemStyle: { color: '#ff6b6b' } },
+        { value: 280, name: '敏感', itemStyle: { color: '#ffae00' } }
       ]
     }
   ]
@@ -248,6 +329,114 @@ const pieChartOptions = computed(() => ({
 const feedItems = ref([])
 const feedLoading = ref(false)
 const lastUpdatedAt = ref(null)
+
+const sentimentCounts = computed(() => {
+  const counts = { positive: 0, negative: 0, neutral: 0, sensitive: 0 }
+  for (const item of feedItems.value) {
+    const key = item?.sentiment || 'neutral'
+    if (counts[key] !== undefined) {
+      counts[key] += 1
+    } else {
+      counts.neutral += 1
+    }
+  }
+  const total = counts.positive + counts.negative + counts.neutral + counts.sensitive
+  return { ...counts, total }
+})
+
+const platformSentimentCounts = computed(() => {
+  const platforms = ['xhs', 'dy', 'ks', 'bili', 'wb', 'tieba', 'zhihu']
+  const base = { positive: 0, negative: 0, neutral: 0, sensitive: 0, total: 0 }
+  const result = {}
+
+  platforms.forEach((platform) => {
+    result[platform] = { ...base }
+  })
+
+  for (const item of feedItems.value) {
+    const platformKey = item?.platformKey
+    if (!platformKey || !result[platformKey]) continue
+    const sentimentKey = item?.sentiment || 'neutral'
+    if (result[platformKey][sentimentKey] !== undefined) {
+      result[platformKey][sentimentKey] += 1
+    } else {
+      result[platformKey].neutral += 1
+    }
+    result[platformKey].total += 1
+  }
+
+  return result
+})
+
+const pieTooltip = {
+  trigger: 'item',
+  backgroundColor: 'rgba(10, 10, 15, 0.95)',
+  borderColor: 'rgba(0, 204, 255, 0.3)',
+  textStyle: { color: '#fff' }
+}
+
+const buildPlatformPieOptions = ({ positive, negative, neutral, sensitive, total }) => ({
+  tooltip: pieTooltip,
+  legend: {
+    bottom: '4%',
+    left: 'center',
+    textStyle: { color: '#aaaaaa', fontSize: 10 }
+  },
+  series: (() => {
+    if (!total) {
+      return [
+        {
+          type: 'pie',
+          radius: ['55%', '80%'],
+          center: ['50%', '50%'],
+          label: {
+            show: true,
+            position: 'center',
+            formatter: () => '暂无数据',
+            color: '#8899aa',
+            fontSize: 12
+          },
+          data: [{ value: 1, name: '暂无数据', itemStyle: { color: 'rgba(255, 255, 255, 0.08)' } }]
+        }
+      ]
+    }
+    return [
+      {
+        type: 'pie',
+        radius: ['45%', '70%'],
+        center: ['50%', '45%'],
+        label: { show: false },
+        data: [
+          { value: positive, name: '积极', itemStyle: { color: '#00ff88' } },
+          { value: negative, name: '消极', itemStyle: { color: '#ff6b6b' } },
+          { value: neutral, name: '中性', itemStyle: { color: '#00ccff' } },
+          { value: sensitive, name: '敏感', itemStyle: { color: '#ffae00' } }
+        ]
+      }
+    ]
+  })()
+})
+
+const platformPieOptions = computed(() => {
+  const counts = platformSentimentCounts.value
+  return {
+    xhs: buildPlatformPieOptions(counts.xhs || {}),
+    dy: buildPlatformPieOptions(counts.dy || {}),
+    ks: buildPlatformPieOptions(counts.ks || {}),
+    bili: buildPlatformPieOptions(counts.bili || {}),
+    wb: buildPlatformPieOptions(counts.wb || {}),
+    tieba: buildPlatformPieOptions(counts.tieba || {}),
+    zhihu: buildPlatformPieOptions(counts.zhihu || {})
+  }
+})
+
+// 统计数据
+const stats = ref({
+  total: 0,
+  sensitive: 0,
+  sentimentIndex: 0,
+  hotScore: 0
+})
 
 // 分页状态
 const currentPage = ref(1)
@@ -372,16 +561,84 @@ const buildFeedItems = (rows) => {
     const recordTime = row?.created_at || getRecordTime(row)
     const item = {
       id: row?.id || `${platformKey || 'data'}-${index}`,
+      platformKey,
       platformLabel: row?.platform_name || getPlatformLabel(platformKey),
       content: row?.content || pickContent(row),
       timeLabel: formatRelativeTime(recordTime),
       authorLabel: row?.author || '',
       url: row?.url || '',
-      sortTime: recordTime || 0
+      sortTime: recordTime || 0,
+      // 情绪分析数据
+      sentiment: row?.sentiment || 'neutral',
+      sentimentScore: row?.sentiment_score || 0,
+      sentimentLabels: row?.sentiment_labels || {}
     }
     console.log('buildFeedItems: built item', index, item)
     return item
   })
+}
+
+// 获取情绪类型显示标签
+const getSentimentLabel = (sentiment) => {
+  const labels = {
+    positive: '积极',
+    negative: '消极',
+    neutral: '中性',
+    sensitive: '敏感'
+  }
+  return labels[sentiment] || '中性'
+}
+
+// 获取情绪类型样式类名
+const getSentimentClass = (sentiment) => {
+  return `sentiment-${sentiment || 'neutral'}`
+}
+
+// 格式化情感指数
+const formatSentimentIndex = (index) => {
+  if (index > 0.3) return '+' + index.toFixed(1)
+  if (index < -0.3) return index.toFixed(1)
+  return '0.0'
+}
+
+// 获取情感指数样式类名
+const getSentimentIndexClass = (index) => {
+  if (index > 0.3) return 'positive'
+  if (index < -0.3) return 'negative'
+  return 'neutral'
+}
+
+// 获取情感指数文本
+const getSentimentIndexText = (index) => {
+  if (index > 0.3) return '积极向好'
+  if (index < -0.3) return '需要关注'
+  return '情绪平稳'
+}
+
+// 获取敏感舆情趋势类名
+const getSentimentTrendClass = (sensitive, total) => {
+  if (total === 0) return ''
+  const ratio = (sensitive / total) * 100
+  if (ratio > 10) return 'negative'
+  if (ratio > 5) return 'neutral'
+  return 'up'
+}
+
+// 获取敏感舆情趋势文本
+const getSentimentTrendText = (sensitive, total) => {
+  if (total === 0) return '暂无数据'
+  const ratio = (sensitive / total) * 100
+  if (ratio > 10) return `占比 ${ratio.toFixed(1)}% 需警惕`
+  if (ratio > 5) return `占比 ${ratio.toFixed(1)}% 需关注`
+  return `占比 ${ratio.toFixed(1)}% 正常`
+}
+
+// 获取热度分数文本
+const getHotScoreText = (score) => {
+  if (score > 80) return '非常活跃'
+  if (score > 50) return '活跃'
+  if (score > 20) return '正常'
+  return '平淡'
 }
 
 // 分页计算属性 - 显示页码范围（带省略号）
@@ -456,6 +713,11 @@ const fetchMonitorFeedPage = async ({ withLoading = true, signal = null } = {}) 
     if (res.data?.pagination) {
       totalCount.value = res.data.pagination.total_count || 0
       totalPages.value = res.data.pagination.total_pages || 1
+    }
+
+    // 更新统计数据
+    if (res.data?.stats) {
+      stats.value = res.data.stats
     }
 
     const merged = buildFeedItems(items)
@@ -618,16 +880,165 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.dashboard-view {
+.layout-wrapper {
   position: relative;
   z-index: 1;
-  padding: 1.5rem;
+  padding: 24px 32px;
+  max-width: 1600px;
+  margin: 0 auto;
+  height: 100vh;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
-  height: 100%;
+  gap: 18px;
   overflow-y: auto;
   scroll-behavior: smooth;
+}
+
+.page-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-cyan);
+}
+
+.title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.page-title {
+  margin: 0;
+  font-size: 28px;
+  letter-spacing: 0.5px;
+  color: var(--text-white);
+  text-transform: uppercase;
+}
+
+.page-title .subtitle {
+  display: block;
+  font-size: 12px;
+  letter-spacing: 2px;
+  color: var(--orange-gold);
+  margin-top: 4px;
+}
+
+.status-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 11px;
+  color: var(--text-dim);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(0, 204, 255, 0.2);
+}
+
+.dashboard-content {
+  flex: 1;
+  display: flex;
+  gap: 20px;
+  min-height: 0;
+}
+
+.left-panel {
+  width: 360px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 0;
+}
+
+.right-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 0;
+}
+
+.panel-card {
+  flex-shrink: 0;
+}
+
+.left-panel .chart-card {
+  min-height: 240px;
+}
+
+.chart-row .chart-card {
+  min-height: 320px;
+}
+
+.sentiment-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.sentiment-grid .chart-card {
+  min-height: 220px;
+}
+
+.sentiment-summary {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.panel-header {
+  font-size: 12px;
+  color: var(--text-light);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.summary-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(0, 204, 255, 0.05);
+  border: 1px solid rgba(0, 204, 255, 0.15);
+}
+
+.summary-item .label {
+  font-size: 10px;
+  color: var(--text-dim);
+  letter-spacing: 0.5px;
+}
+
+.summary-item .value {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-white);
+}
+
+.summary-item.positive .value {
+  color: var(--green-status);
+}
+
+.summary-item.negative .value {
+  color: #ff6b6b;
+}
+
+.summary-item.neutral .value {
+  color: var(--cyan-primary);
+}
+
+.summary-item.sensitive .value {
+  color: var(--orange-gold);
 }
 
 /* Cyberpunk Scrollbar */
@@ -716,14 +1127,15 @@ onBeforeUnmount(() => {
   letter-spacing: 1px;
 }
 
-.stat-info .value.warning {
-  color: #ff6b6b;
-  text-shadow: 0 0 20px rgba(255, 107, 107, 0.5);
+.stat-info .value.sensitive {
+  color: var(--orange-gold);
+  text-shadow: 0 0 20px rgba(255, 170, 0, 0.5);
+  animation: sensitivePulse 2s ease-in-out infinite;
 }
 
-.stat-info .value.positive {
-  color: var(--green-status);
-  text-shadow: 0 0 20px rgba(0, 255, 136, 0.5);
+.stat-info .value.hot {
+  color: var(--cyan-primary);
+  text-shadow: 0 0 20px rgba(0, 204, 255, 0.5);
 }
 
 .stat-info .trend {
@@ -738,6 +1150,11 @@ onBeforeUnmount(() => {
 
 .stat-info .trend.down {
   color: #ff6b6b;
+}
+
+.stat-info .trend.negative {
+  color: #ff6b6b;
+  font-weight: 600;
 }
 
 /* Charts Grid */
@@ -762,6 +1179,15 @@ onBeforeUnmount(() => {
   box-shadow:
     0 0 40px rgba(0, 204, 255, 0.1),
     0 4px 24px rgba(0, 0, 0, 0.4);
+}
+
+.recent-list.compact {
+  min-height: 320px;
+  padding: 1.25rem;
+}
+
+.recent-list.compact .list-wrapper {
+  min-height: 160px;
 }
 
 .recent-list h3 {
@@ -921,6 +1347,72 @@ onBeforeUnmount(() => {
   color: var(--text-dim);
 }
 
+/* 情绪标签样式 */
+.sentiment-tag {
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.sentiment-tag.positive {
+  background: rgba(0, 255, 136, 0.15);
+  color: var(--green-status);
+  border: 1px solid rgba(0, 255, 136, 0.3);
+  box-shadow: 0 0 10px rgba(0, 255, 136, 0.2);
+}
+
+.sentiment-tag.negative {
+  background: rgba(255, 107, 107, 0.15);
+  color: #ff6b6b;
+  border: 1px solid rgba(255, 107, 107, 0.3);
+  box-shadow: 0 0 10px rgba(255, 107, 107, 0.2);
+}
+
+.sentiment-tag.neutral {
+  background: rgba(0, 204, 255, 0.08);
+  color: var(--cyan-primary);
+  border: 1px solid rgba(0, 204, 255, 0.2);
+}
+
+.sentiment-tag.sensitive {
+  background: rgba(255, 170, 0, 0.15);
+  color: var(--orange-gold);
+  border: 1px solid rgba(255, 170, 0, 0.3);
+  box-shadow: 0 0 15px rgba(255, 170, 0, 0.3);
+  animation: sensitivePulse 2s ease-in-out infinite;
+}
+
+@keyframes sensitivePulse {
+  0%, 100% {
+    box-shadow: 0 0 10px rgba(255, 170, 0, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(255, 170, 0, 0.5);
+  }
+}
+
+/* 情绪类型列表项样式 */
+.list-item.sentiment-positive {
+  border-left: 3px solid var(--green-status);
+}
+
+.list-item.sentiment-negative {
+  border-left: 3px solid #ff6b6b;
+}
+
+.list-item.sentiment-neutral {
+  border-left: 3px solid var(--cyan-primary);
+}
+
+.list-item.sentiment-sensitive {
+  border-left: 3px solid var(--orange-gold);
+  background: rgba(255, 170, 0, 0.03);
+}
+
 /* 加载动画 */
 .loading-spinner {
   width: 24px;
@@ -944,6 +1436,7 @@ onBeforeUnmount(() => {
   --orange-gold: #ffae00;
   --green-status: #00ff88;
   --text-white: #FFFFFF;
+  --text-color: var(--text-white);
   --text-gray: #888888;
   --text-light: #aaaaaa;
   --text-dim: #666666;
@@ -1180,6 +1673,45 @@ body {
 }
 
 /* Responsive */
+@media (max-width: 1200px) {
+  .layout-wrapper {
+    height: auto;
+    min-height: 100vh;
+  }
+
+  .dashboard-content {
+    flex-direction: column;
+  }
+
+  .left-panel {
+    width: 100%;
+  }
+
+  .sentiment-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .sentiment-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .layout-wrapper {
+    padding: 16px;
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 768px) {
   .pagination-wrapper {
     flex-direction: column;

@@ -49,17 +49,6 @@
 
     <!-- Main Content Area -->
     <div class="main-content-layout">
-      <header class="top-header glass">
-        <div class="header-left">
-          <h2>{{ currentRouteTitle }}</h2>
-        </div>
-        <div class="header-right">
-          <div class="user-profile">
-            <span class="avatar">Admin</span>
-          </div>
-        </div>
-      </header>
-
       <main class="content-wrapper">
         <router-view v-slot="{ Component }">
           <transition name="fade" mode="out-in">
@@ -72,12 +61,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
-import { useRoute } from 'vue-router'
-
-const route = useRoute()
-const currentRouteTitle = computed(() => route.meta.title || 'MediaCrawler')
-
+import { ref } from 'vue'
 const isSidebarVisible = ref(false)
 let hideTimer = null
 
@@ -251,34 +235,6 @@ const hideSidebar = () => {
   flex-direction: column;
   min-width: 0;
   width: 100%;
-}
-
-.top-header {
-  height: 64px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0 2rem;
-  border-bottom: 1px solid var(--border-color);
-  background: rgba(13, 17, 23, 0.6);
-  backdrop-filter: blur(10px);
-}
-
-.top-header h2 {
-  font-size: 1.25rem;
-  font-weight: 600;
-  color: var(--text-color);
-  letter-spacing: 0.5px;
-}
-
-.user-profile .avatar {
-  padding: 0.4rem 1rem;
-  background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
-  color: #000;
-  font-weight: bold;
-  border-radius: 20px;
-  font-size: 0.85rem;
-  box-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
 }
 
 .content-wrapper {
