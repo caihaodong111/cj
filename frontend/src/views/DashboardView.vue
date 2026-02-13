@@ -58,18 +58,26 @@
           </button>
         </div>
       </div>
-      <div class="list-wrapper" v-if="feedItems.length > 0">
-        <div class="list-item" v-for="item in feedItems" :key="item.id">
+
+      <!-- 列表容器 -->
+      <div v-if="feedItems && feedItems.length > 0" class="list-wrapper">
+        <div class="list-item" v-for="(item, index) in feedItems" :key="item.id">
           <span class="platform-tag">{{ item.platformLabel }}</span>
           <span class="content">{{ item.content }}</span>
           <span class="time">{{ item.timeLabel }}</span>
-          <span class="sentiment" :class="item.sentimentClass">{{ item.sentimentLabel }}</span>
+          <span class="author" :class="{ muted: !item.authorLabel }">
+            {{ item.authorLabel || '匿名' }}
+          </span>
         </div>
       </div>
+
+      <!-- 加载状态 -->
       <div v-else-if="feedLoading" class="feed-state">
         <div class="loading-spinner"></div>
         <p>正在获取最新动态...</p>
       </div>
+
+      <!-- 无数据状态 -->
       <div v-else class="feed-state">
         <p>暂无数据动态</p>
         <p class="hint">请先在数据采集界面生成数据</p>
@@ -79,7 +87,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import axios from 'axios'
 import ChartCard from '../components/ChartCard.vue'
 
@@ -87,7 +95,7 @@ import ChartCard from '../components/ChartCard.vue'
 const trendChartOptions = computed(() => ({
   tooltip: {
     trigger: 'axis',
-    backgroundColor: 'rgba(0,0,0,0.7)',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
     textStyle: { color: '#fff' }
   },
   grid: {
@@ -175,6 +183,11 @@ const feedItems = ref([])
 const feedLoading = ref(false)
 const lastUpdatedAt = ref(null)
 
+// 请求管理：使用 AbortController 控制请求取消
+const abortController = ref(null)
+const refreshRequestId = ref(0)
+const isMounted = ref(true)
+
 const platformLabels = {
   xhs: '小红书',
   dy: '抖音',
@@ -204,10 +217,6 @@ const normalizePlatform = (value) => {
     }
   }
   return normalized
-}
-
-const inferPlatformFromPath = (path) => {
-  return normalizePlatform(path)
 }
 
 const getPlatformLabel = (platformKey) => {
@@ -250,6 +259,7 @@ const pickContent = (row) => {
     'content',
     'title',
     'desc',
+    'content_text',
     'text',
     'note_desc',
     'summary',
@@ -268,24 +278,8 @@ const pickContent = (row) => {
   }
 }
 
-const parseSentiment = (row) => {
-  const raw = row?.sentiment || row?.sentiment_label || row?.emotion || row?.sentimentType
-  if (!raw) return { label: '未知', klass: 'neutral' }
-  const value = String(raw).toLowerCase()
-  if (value.includes('positive') || value.includes('积极') || value.includes('正面')) {
-    return { label: '积极', klass: 'positive' }
-  }
-  if (value.includes('negative') || value.includes('消极') || value.includes('负面')) {
-    return { label: '消极', klass: 'negative' }
-  }
-  if (value.includes('neutral') || value.includes('中性')) {
-    return { label: '中性', klass: 'neutral' }
-  }
-  return { label: String(raw), klass: 'neutral' }
-}
-
 const getRecordTime = (row, fallbackSeconds) => {
-  const candidates = ['created_time', 'created_at', 'publish_time', 'time', 'timestamp']
+  const candidates = ['created_time', 'create_time', 'created_at', 'publish_time', 'time', 'timestamp']
   for (const key of candidates) {
     if (row && row[key]) {
       const parsed = toMillis(row[key])
@@ -295,59 +289,67 @@ const getRecordTime = (row, fallbackSeconds) => {
   return toMillis(fallbackSeconds)
 }
 
-const buildFeedItems = (file, rows) => {
-  const platformKey = normalizePlatform(rows?.[0]?.platform || inferPlatformFromPath(file?.path || ''))
+const buildFeedItems = (rows) => {
+  if (!rows || !Array.isArray(rows)) {
+    console.log('buildFeedItems: invalid rows', rows)
+    return []
+  }
+  console.log('buildFeedItems: processing', rows.length, 'items')
   return rows.map((row, index) => {
-    const sentiment = parseSentiment(row)
-    const recordTime = getRecordTime(row, file?.modified_at)
-    return {
-      id: row?.id || `${file?.path || 'data'}-${index}`,
-      platformLabel: getPlatformLabel(platformKey),
-      content: pickContent(row),
+    const platformKey = normalizePlatform(row?.platform)
+    const recordTime = row?.created_at || getRecordTime(row)
+    const item = {
+      id: row?.id || `${platformKey || 'data'}-${index}`,
+      platformLabel: row?.platform_name || getPlatformLabel(platformKey),
+      content: row?.content || pickContent(row),
       timeLabel: formatRelativeTime(recordTime),
-      sentimentLabel: sentiment.label,
-      sentimentClass: sentiment.klass,
+      authorLabel: row?.author || '',
+      url: row?.url || '',
       sortTime: recordTime || 0
     }
+    console.log('buildFeedItems: built item', index, item)
+    return item
   })
 }
 
-const fetchMonitorFeed = async ({ withLoading = true } = {}) => {
+const fetchMonitorFeed = async ({ withLoading = true, signal = null } = {}) => {
+  // 如果请求已被取消，直接返回
+  if (signal?.aborted) return
+
   if (withLoading) {
     feedLoading.value = true
   }
   try {
-    const filesRes = await axios.get('/api/data/files')
-    const files = Array.isArray(filesRes.data?.files) ? filesRes.data.files : []
-    if (files.length === 0) {
-      feedItems.value = []
-      lastUpdatedAt.value = new Date()
-      return
-    }
-    const targetFiles = files.slice(0, 3)
-    const previews = await Promise.all(
-      targetFiles.map(async (file) => {
-        try {
-          const res = await axios.get(`/api/data/files/${file.path}`, {
-            params: { preview: true, limit: 5 }
-          })
-          const data = Array.isArray(res.data?.data) ? res.data.data : [res.data?.data].filter(Boolean)
-          return { file, data }
-        } catch (e) {
-          return { file, data: [] }
-        }
-      })
-    )
-    const merged = previews.flatMap(({ file, data }) => buildFeedItems(file, data))
+    const res = await axios.get('/api/monitor/feed', {
+      params: { limit: 20, per_platform: 10 },
+      signal
+    })
+    // 请求完成后再次检查是否被取消
+    if (signal?.aborted) return
+
+    const items = Array.isArray(res.data?.items) ? res.data.items : []
+    console.log('API Response success:', items.length, 'items')
+
+    const merged = buildFeedItems(items)
+    console.log('buildFeedItems result:', merged.length, 'items')
+
     feedItems.value = merged
       .sort((a, b) => b.sortTime - a.sortTime)
-      .slice(0, 6)
-    lastUpdatedAt.value = new Date()
+      .slice(0, 20)
+
+    lastUpdatedAt.value = res.data?.fetched_at || new Date()
+    console.log('fetchMonitorFeed complete, feedItems.value.length:', feedItems.value.length)
   } catch (e) {
+    // 如果是主动取消的错误，不处理
+    if (e.name === 'CanceledError' || e.code === 'ERR_CANCELED') return
+    if (signal?.aborted) return
+
+    // 只在组件未卸载时更新状态
     feedItems.value = []
     lastUpdatedAt.value = new Date()
+    console.log('fetchMonitorFeed error:', e.message)
   } finally {
-    if (withLoading) {
+    if (withLoading && !signal?.aborted) {
       feedLoading.value = false
     }
   }
@@ -357,15 +359,17 @@ const batchPlatforms = ['xhs', 'dy', 'ks', 'bili', 'wb', 'tieba', 'zhihu']
 
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms))
 
-const waitForCrawlerIdle = async (timeoutMs = 180000) => {
+const waitForCrawlerIdle = async (timeoutMs = 180000, signal = null) => {
   const startedAt = Date.now()
   while (Date.now() - startedAt < timeoutMs) {
+    if (signal?.aborted) return false
     try {
-      const res = await axios.get('/api/crawler/status')
+      const res = await axios.get('/api/crawler/status', { signal })
       if (res.data?.status === 'idle') {
         return true
       }
     } catch (e) {
+      if (e.name === 'CanceledError' || e.code === 'ERR_CANCELED') return false
       return false
     }
     await sleep(2000)
@@ -373,29 +377,109 @@ const waitForCrawlerIdle = async (timeoutMs = 180000) => {
   return false
 }
 
-const startBatchCrawler = async () => {
+const startBatchCrawler = async (signal = null) => {
   await axios.post('/api/crawler/start', {
     platforms: batchPlatforms,
-    crawler_type: 'search'
-  })
+    crawler_type: 'search',
+    login_type: 'cookie',
+    headless: true
+  }, { signal })
 }
 
 const refreshMonitorFeed = async () => {
   if (feedLoading.value) return
+
+  // 创建新的 AbortController 和请求 ID
+  const controller = new AbortController()
+  abortController.value = controller
+  const currentRequestId = ++refreshRequestId.value
+
   feedLoading.value = true
+  console.log('refreshMonitorFeed started')
+
   try {
-    await startBatchCrawler()
-    await waitForCrawlerIdle()
-    await fetchMonitorFeed({ withLoading: false })
+    // 启动爬虫
+    await startBatchCrawler(controller.signal)
+    if (controller.signal.aborted) return
+
+    // 等待爬虫完成
+    await waitForCrawlerIdle(180000, controller.signal)
+    if (controller.signal.aborted) return
+
+    // 获取最新数据
+    await fetchMonitorFeed({ withLoading: false, signal: controller.signal })
   } catch (e) {
-    await fetchMonitorFeed({ withLoading: false })
+    // 如果是取消操作，不处理
+    if (e.name === 'CanceledError' || e.code === 'ERR_CANCELED') return
+    if (controller.signal.aborted) return
+
+    // 其他错误，仍然尝试获取数据
+    await fetchMonitorFeed({ withLoading: false, signal: controller.signal })
   } finally {
-    feedLoading.value = false
+    // 只有当前请求且组件仍挂载时才清理状态
+    if (currentRequestId === refreshRequestId.value && !controller.signal.aborted && isMounted.value) {
+      feedLoading.value = false
+      abortController.value = null
+      // 只有刷新完成时才清理 localStorage
+      localStorage.removeItem('dashboard-refresh-running')
+      localStorage.removeItem('dashboard-refresh-start-time')
+    }
+  }
+}
+
+const checkCrawlerAndFetch = async () => {
+  try {
+    const res = await axios.get('/api/crawler/status')
+    if (res.data?.status === 'idle') {
+      // 爬虫已完成，获取数据
+      await fetchMonitorFeed()
+    } else {
+      // 爬虫还在运行，继续等待
+      feedLoading.value = true
+      const controller = new AbortController()
+      abortController.value = controller
+      const currentRequestId = ++refreshRequestId.value
+
+      try {
+        await waitForCrawlerIdle(180000, controller.signal)
+        if (!controller.signal.aborted) {
+          await fetchMonitorFeed({ withLoading: false, signal: controller.signal })
+        }
+      } catch (e) {
+        // 忽略错误
+      } finally {
+        if (currentRequestId === refreshRequestId.value && !controller.signal.aborted) {
+          feedLoading.value = false
+          abortController.value = null
+        }
+      }
+    }
+  } catch (e) {
+    // 出错则重新获取
+    await fetchMonitorFeed()
   }
 }
 
 onMounted(() => {
+  isMounted.value = true
+  // 重置加载状态，防止被旧状态阻塞
+  feedLoading.value = false
+  abortController.value = null
+
+  // 先展示已有 monitor_feed 数据
   fetchMonitorFeed()
+})
+
+onBeforeUnmount(() => {
+  isMounted.value = false
+  // 保存当前刷新状态到 localStorage，以便返回时恢复
+  if (feedLoading.value) {
+    localStorage.setItem('dashboard-refresh-running', 'true')
+    localStorage.setItem('dashboard-refresh-start-time', Date.now().toString())
+  } else {
+    localStorage.removeItem('dashboard-refresh-running')
+    localStorage.removeItem('dashboard-refresh-start-time')
+  }
 })
 </script>
 
@@ -407,6 +491,32 @@ onMounted(() => {
   gap: 1.5rem;
   height: 100%;
   overflow-y: auto;
+  /* 优化滚动体验 */
+  scroll-behavior: smooth;
+}
+
+/* 定义滚动条样式 */
+.scrollbar-width: thin;
+.scrollbar-color: rgba(255, 215, 0, 0.3) rgba(255, 255, 255, 0.05);
+
+/* Webkit 滚动条样式 */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 215, 0, 0.3);
+  border-radius: 4px;
+  transition: background 0.2s;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 215, 0, 0.5);
 }
 
 /* Stats Grid */
@@ -466,6 +576,7 @@ onMounted(() => {
   font-size: 0.75rem;
   color: var(--secondary-color);
 }
+
 .stat-info .trend.up { color: #91CC75; }
 .stat-info .trend.down { color: #EE6666; }
 
@@ -484,7 +595,7 @@ onMounted(() => {
   flex: 1;
   display: flex;
   flex-direction: column;
-  min-height: 0;
+  min-height: 300px;
 }
 
 .recent-list h3 {
@@ -527,7 +638,7 @@ onMounted(() => {
 
 .refresh-btn:hover:not(:disabled) {
   background: rgba(255, 215, 0, 0.2);
-  box-shadow: 0 0 10px rgba(255, 215, 0, 0.2);
+  box-shadow: 0 10px rgba(255, 215, 0, 0.2);
 }
 
 .refresh-btn:disabled {
@@ -564,6 +675,7 @@ onMounted(() => {
   flex-direction: column;
   gap: 0.5rem;
   flex: 1;
+  min-height: 200px;
   overflow-y: auto;
   padding-right: 0.35rem;
 }
@@ -576,6 +688,16 @@ onMounted(() => {
   background: rgba(255, 255, 255, 0.02);
   border-radius: 8px;
   border: 1px solid transparent;
+  opacity: 0;
+  transform: translateX(-20px);
+  animation: fadeSlideIn 0.4s ease-out forwards;
+}
+
+@keyframes fadeSlideIn {
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 .list-item:hover {
@@ -605,10 +727,49 @@ onMounted(() => {
   color: var(--secondary-color);
 }
 
-.sentiment {
+.author {
   font-size: 0.8rem;
+  color: var(--text-color);
 }
-.sentiment.positive { color: #91CC75; }
-.sentiment.neutral { color: #5470C6; }
-.sentiment.negative { color: #EE6666; }
+
+.author.muted {
+  color: var(--secondary-color);
+}
+
+/* 加载动画 */
+.loading-spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--primary-color);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* 全局样式 */
+:root {
+  --primary-color: #FFD700;
+  --secondary-color: #aaa;
+  --text-color: #fff;
+  --bg-glass: rgba(255, 255, 255, 0.05);
+  --border-color: rgba(255, 215, 0, 0.15);
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 0%);
+  color: var(--text-color);
+}
+
+.glass {
+  background: var(--bg-glass);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--border-color);
+}
 </style>

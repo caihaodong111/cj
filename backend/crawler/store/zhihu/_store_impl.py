@@ -119,6 +119,13 @@ class ZhihuDbStoreImplement(AbstractStore):
                 session.add(new_content)
             await session.commit()
 
+        # Sync to monitor_feed table
+        try:
+            from api.monitor_feed_sync import sync_to_monitor_feed
+            sync_to_monitor_feed("zhihu", content_item)
+        except Exception:
+            pass
+
     async def store_comment(self, comment_item: Dict):
         """
         Zhihu content DB storage implementation

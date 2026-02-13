@@ -15,20 +15,35 @@ import sys
 import time
 import threading
 from collections import deque
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
 from django.conf import settings
+from django.db import connection
 from django.http import JsonResponse, FileResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.utils.decorators import method_decorator
+from django.utils.dateparse import parse_datetime, parse_date
+from django.utils import timezone
 from django.views import View
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
+from media_platform.models import (
+    XhsNote,
+    DouyinAweme,
+    KuaishouVideo,
+    BilibiliVideo,
+    WeiboNote,
+    TiebaNote,
+    ZhihuContent,
+    MonitorFeed,
+)
+from .models import CookieConfig
 
 # Data directory
 DATA_DIR = Path(__file__).parent.parent.parent / "data"
@@ -54,6 +69,58 @@ PLATFORM_PATH_ALIASES = {
     "wb": ["weibo", "wb"],
     "tieba": ["tieba"],
     "zhihu": ["zhihu"],
+}
+
+PLATFORM_FEED_CONFIG = {
+    "xhs": {
+        "model": XhsNote,
+        "id_field": "note_id",
+        "time_field": "time",
+        "content_fields": ["title", "desc"],
+        "author_field": "nickname",
+    },
+    "dy": {
+        "model": DouyinAweme,
+        "id_field": "aweme_id",
+        "time_field": "create_time",
+        "content_fields": ["title", "desc"],
+        "author_field": "nickname",
+    },
+    "ks": {
+        "model": KuaishouVideo,
+        "id_field": "video_id",
+        "time_field": "create_time",
+        "content_fields": ["title", "desc"],
+        "author_field": "nickname",
+    },
+    "bili": {
+        "model": BilibiliVideo,
+        "id_field": "video_id",
+        "time_field": "create_time",
+        "content_fields": ["title", "desc"],
+        "author_field": "nickname",
+    },
+    "wb": {
+        "model": WeiboNote,
+        "id_field": "note_id",
+        "time_field": "create_time",
+        "content_fields": ["content"],
+        "author_field": "nickname",
+    },
+    "tieba": {
+        "model": TiebaNote,
+        "id_field": "note_id",
+        "time_field": "publish_time",
+        "content_fields": ["title", "desc"],
+        "author_field": "user_nickname",
+    },
+    "zhihu": {
+        "model": ZhihuContent,
+        "id_field": "content_id",
+        "time_field": "created_time",
+        "content_fields": ["title", "desc", "content_text"],
+        "author_field": "user_nickname",
+    },
 }
 
 
@@ -126,6 +193,151 @@ def _stream_pipe(pipe, level: str):
             pipe.close()
         except Exception:
             pass
+
+
+def _to_millis(value):
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        ts = int(value)
+        return ts if ts > 1_000_000_000_000 else ts * 1000
+    if isinstance(value, datetime):
+        return int(value.timestamp() * 1000)
+    raw = str(value).strip()
+    if not raw:
+        return None
+    if raw.isdigit():
+        ts = int(raw)
+        return ts if ts > 1_000_000_000_000 else ts * 1000
+    parsed = parse_datetime(raw)
+    if parsed is None:
+        parsed_date = parse_date(raw)
+        if parsed_date:
+            parsed = datetime(parsed_date.year, parsed_date.month, parsed_date.day)
+    if parsed is None:
+        return None
+    if timezone.is_naive(parsed):
+        parsed = timezone.make_aware(parsed, timezone.get_current_timezone())
+    return int(parsed.timestamp() * 1000)
+
+
+def _pick_first_value(row: dict, fields):
+    for field in fields:
+        value = row.get(field)
+        if value is None:
+            continue
+        if isinstance(value, str) and not value.strip():
+            continue
+        return value
+    return None
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def get_monitor_feed(request):
+    """Get latest feed items from monitor_feed table, fallback to platform tables."""
+    try:
+        limit = max(1, int(request.GET.get("limit", 50)))
+    except ValueError:
+        limit = 50
+
+    items = []
+    try:
+        # First try to get from monitor_feed table
+        rows = list(
+            MonitorFeed.objects.order_by("-created_at")
+            .values("id", "platform", "platform_name", "content_id", "content", "author", "url", "created_at")[:limit]
+        )
+
+        for row in rows:
+            items.append({
+                "id": str(row.get("id")),
+                "platform": row.get("platform", ""),
+                "platform_name": row.get("platform_name", ""),
+                "content_id": row.get("content_id", ""),
+                "content": row.get("content") or "",
+                "author": row.get("author") or "",
+                "url": row.get("url") or "",
+                "created_at": row.get("created_at") or 0,
+            })
+
+    except Exception as e:
+        items = []
+
+    # Fallback: if monitor_feed is empty, fetch from platform tables directly
+    if not items:
+        items = _fetch_from_platform_tables(limit)
+
+    return Response({
+        "items": items,
+        "fetched_at": int(time.time() * 1000),
+    })
+
+
+def _fetch_from_platform_tables(limit: int) -> list:
+    """Fetch items from platform tables when monitor_feed is empty"""
+    items = []
+    try:
+        try:
+            limit = max(1, int(limit))
+        except (TypeError, ValueError):
+            limit = 50
+
+        # Fetch from all platform tables and merge
+        queries = [
+            # xhs
+            "SELECT 'xhs' as platform, '小红书' as platform_name, CAST(note_id AS CHAR) as content_id, "
+            "CONCAT_WS(' ', IFNULL(`title`, ''), IFNULL(`desc`, '')) as content, nickname as author, "
+            "note_url as url, `time` as created_at, COALESCE(source_keyword, '') as source_keyword FROM xhs_note",
+            # douyin
+            "SELECT 'dy' as platform, '抖音' as platform_name, CAST(aweme_id AS CHAR) as content_id, "
+            "CONCAT_WS(' ', IFNULL(`title`, ''), IFNULL(`desc`, '')) as content, nickname as author, "
+            "aweme_url as url, create_time as created_at, COALESCE(source_keyword, '') as source_keyword FROM douyin_aweme",
+            # bilibili
+            "SELECT 'bili' as platform, 'B站' as platform_name, CAST(video_id AS CHAR) as content_id, "
+            "CONCAT_WS(' ', IFNULL(`title`, ''), IFNULL(`desc`, '')) as content, nickname as author, "
+            "video_url as url, create_time as created_at, COALESCE(source_keyword, '') as source_keyword FROM bilibili_video",
+            # weibo
+            "SELECT 'wb' as platform, '微博' as platform_name, CAST(note_id AS CHAR) as content_id, "
+            "IFNULL(`content`, '') as content, nickname as author, "
+            "note_url as url, create_time as created_at, COALESCE(source_keyword, '') as source_keyword FROM weibo_note",
+            # tieba
+            "SELECT 'tieba' as platform, '贴吧' as platform_name, note_id as content_id, "
+            "CONCAT_WS(' ', IFNULL(`title`, ''), IFNULL(`desc`, '')) as content, user_nickname as author, "
+            "note_url as url, 0 as created_at, COALESCE(source_keyword, '') as source_keyword FROM tieba_note",
+            # zhihu
+            "SELECT 'zhihu' as platform, '知乎' as platform_name, content_id as content_id, "
+            "CONCAT_WS(' ', IFNULL(`title`, ''), IFNULL(`desc`, ''), IFNULL(`content_text`, '')) as content, user_nickname as author, "
+            "content_url as url, 0 as created_at, COALESCE(source_keyword, '') as source_keyword FROM zhihu_content",
+        ]
+
+        all_rows = []
+        with connection.cursor() as cursor:
+            for query in queries:
+                cursor.execute(f"{query} ORDER BY created_at DESC LIMIT %s", [limit])
+                columns = [col[0] for col in cursor.description]
+                for row in cursor.fetchall():
+                    all_rows.append(dict(zip(columns, row)))
+
+        # Sort by created_at descending
+        all_rows.sort(key=lambda x: (_to_millis(x.get("created_at")) or 0), reverse=True)
+
+        for row in all_rows[:limit]:
+            items.append({
+                "id": str(hash(row.get("content_id", ""))),
+                "platform": row.get("platform", ""),
+                "platform_name": row.get("platform_name", ""),
+                "content_id": str(row.get("content_id", "")),
+                "content": row.get("content") or "",
+                "author": row.get("author") or "",
+                "url": row.get("url") or "",
+                "created_at": row.get("created_at") or 0,
+            })
+
+    except Exception as e:
+        items = []
+
+    return items
 
 
 # ============== Health Check ==============
@@ -293,7 +505,10 @@ class CrawlerView(APIView):
                     cmd_args.extend(["--save_data_option", save_option])
                 if start_page := data.get("start_page"):
                     cmd_args.extend(["--start", str(start_page)])
-                if cookies := data.get("cookies"):
+                cookies = data.get("cookies")
+                if not cookies and login_type == "cookie":
+                    cookies = CookieConfig.get_active_cookie(target_platform)
+                if cookies:
                     cmd_args.extend(["--cookies", cookies])
                 if specified_ids := data.get("specified_ids"):
                     cmd_args.extend(["--specified_id", specified_ids])
@@ -429,6 +644,15 @@ def get_file_info(file_path: Path) -> dict:
     except Exception:
         pass
 
+    return {
+        "name": file_path.name,
+        "path": str(file_path.relative_to(DATA_DIR)),
+        "size": stat.st_size,
+        "modified_at": stat.st_mtime,
+        "record_count": record_count,
+        "type": file_path.suffix[1:] if file_path.suffix else "unknown"
+    }
+
 
 def _start_process(cmd, platform: str, crawler_type: str):
     process = subprocess.Popen(
@@ -462,15 +686,6 @@ def _finalize_process(process):
     _append_log(level, f"Crawler exited with code {exit_code}")
     _set_process(None)
     return exit_code
-
-    return {
-        "name": file_path.name,
-        "path": str(file_path.relative_to(DATA_DIR)),
-        "size": stat.st_size,
-        "modified_at": stat.st_mtime,
-        "record_count": record_count,
-        "type": file_path.suffix[1:] if file_path.suffix else "unknown"
-    }
 
 
 @api_view(['GET'])
@@ -696,9 +911,6 @@ def get_data_stats(request):
 
 # ============== Cookie Management ==============
 
-from django.utils import timezone
-from .models import CookieConfig
-
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
@@ -898,4 +1110,3 @@ def get_active_cookie(request):
         'cookies': cookies,
         'exists': bool(cookies)
     })
-

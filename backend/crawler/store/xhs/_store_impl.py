@@ -115,6 +115,13 @@ class XhsDbStoreImplement(AbstractStore):
             else:
                 await self.add_content(session, content_item)
 
+        # Sync to monitor_feed table
+        try:
+            from api.monitor_feed_sync import sync_to_monitor_feed
+            sync_to_monitor_feed("xhs", content_item)
+        except Exception:
+            pass
+
     async def add_content(self, session: AsyncSession, content_item: Dict):
         add_ts = int(get_current_timestamp())
         last_modify_ts = int(get_current_timestamp())

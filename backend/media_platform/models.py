@@ -452,6 +452,30 @@ class TiebaCreator(BaseModel):
         verbose_name_plural = "Tieba Creators"
 
 
+# ============== Monitor Feed Models ==============
+
+class MonitorFeed(BaseModel):
+    """Monitor feed for real-time data display from all platforms"""
+    platform = models.CharField(max_length=20, db_index=True, verbose_name="Platform code")
+    platform_name = models.CharField(max_length=50, verbose_name="Platform name")
+    content_id = models.CharField(max_length=255, db_index=True, verbose_name="Original content ID")
+    content = models.TextField(verbose_name="Content text")
+    author = models.TextField(null=True, blank=True, verbose_name="Author nickname")
+    url = models.TextField(null=True, blank=True, verbose_name="Content URL")
+    created_at = models.BigIntegerField(db_index=True, verbose_name="Original publish time")
+    source_keyword = models.TextField(default='', blank=True, verbose_name="Source keyword")
+    extra_data = models.JSONField(null=True, blank=True, verbose_name="Extra data")
+
+    class Meta:
+        db_table = 'monitor_feed'
+        verbose_name = "Monitor Feed"
+        verbose_name_plural = "Monitor Feeds"
+        indexes = [
+            models.Index(fields=['-created_at']),
+            models.Index(fields=['platform', '-created_at']),
+        ]
+
+
 # ============== Zhihu Models ==============
 
 class ZhihuContent(BaseModel):

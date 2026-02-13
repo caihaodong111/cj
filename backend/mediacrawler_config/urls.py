@@ -23,6 +23,7 @@ from api.views import (
     get_file_content,
     download_file,
     get_data_stats,
+    get_monitor_feed,
     CrawlerView,
     # Cookie Management
     list_cookies,
@@ -52,6 +53,7 @@ urlpatterns = [
     path("api/data/stats", get_data_stats, name="get_data_stats"),
     path("api/data/files/<path:file_path>", get_file_content, name="get_file_content"),
     path("api/data/download/<path:file_path>", download_file, name="download_file"),
+    path("api/monitor/feed", get_monitor_feed, name="get_monitor_feed"),
 
     # API: Cookie Management
     path("api/cookies", list_cookies, name="list_cookies"),

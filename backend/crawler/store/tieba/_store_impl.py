@@ -117,6 +117,13 @@ class TieBaDbStoreImplement(AbstractStore):
                 session.add(db_note)
             await session.commit()
 
+        # Sync to monitor_feed table
+        try:
+            from api.monitor_feed_sync import sync_to_monitor_feed
+            sync_to_monitor_feed("tieba", content_item)
+        except Exception:
+            pass
+
     async def store_comment(self, comment_item: Dict):
         """
         tieba content DB storage implementation
