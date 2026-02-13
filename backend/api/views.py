@@ -44,6 +44,16 @@ CRAWLER_STATE = {
     "crawler_type": "search",
 }
 
+PLATFORM_PATH_ALIASES = {
+    "xhs": ["xhs"],
+    "dy": ["douyin", "dy"],
+    "ks": ["kuaishou", "ks"],
+    "bili": ["bilibili", "bili"],
+    "wb": ["weibo", "wb"],
+    "tieba": ["tieba"],
+    "zhihu": ["zhihu"],
+}
+
 
 def _build_run_cmd(args):
     """Build command to run main.py via the current Python executable."""
@@ -410,8 +420,9 @@ def list_data_files(request):
 
             # Platform filter
             if platform:
-                rel_path = str(file_path.relative_to(DATA_DIR))
-                if platform.lower() not in rel_path.lower():
+                rel_path = str(file_path.relative_to(DATA_DIR)).lower()
+                aliases = PLATFORM_PATH_ALIASES.get(platform.lower(), [platform.lower()])
+                if not any(alias in rel_path for alias in aliases):
                     continue
 
             # Type filter
@@ -597,9 +608,9 @@ def get_data_stats(request):
                 stats["by_type"][file_type] = stats["by_type"].get(file_type, 0) + 1
 
                 # Statistics by platform (inferred from path)
-                rel_path = str(file_path.relative_to(DATA_DIR))
-                for platform in ["xhs", "dy", "ks", "bili", "wb", "tieba", "zhihu"]:
-                    if platform in rel_path.lower():
+                rel_path = str(file_path.relative_to(DATA_DIR)).lower()
+                for platform, aliases in PLATFORM_PATH_ALIASES.items():
+                    if any(alias in rel_path for alias in aliases):
                         stats["by_platform"][platform] = stats["by_platform"].get(platform, 0) + 1
                         break
             except Exception:
