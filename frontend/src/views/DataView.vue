@@ -31,8 +31,7 @@
           <div class="border-glow gold-tint"></div>
           <div class="active-glow"></div>
           <div class="kpi-icon-box" :class="{ 'is-brand-logo': isBrandLogo(currentPlatform) }">
-            <span v-if="currentPlatform === 'xhs'" class="xhs-logo">小红书</span>
-            <span v-else-if="currentPlatform === 'dy'" class="douyin-logo" aria-label="抖音"></span>
+            <img v-if="getPlatformLogo(currentPlatform)" :src="getPlatformLogo(currentPlatform)" :alt="getPlatformLabel(currentPlatform)" class="platform-logo-img" />
             <span v-else class="status-icon">{{ getPlatformIcon(currentPlatform) }}</span>
           </div>
           <div class="kpi-content">
@@ -112,9 +111,8 @@
               <span class="platform-count">{{ platform.count }} 条</span>
             </div>
             <span class="platform-icon">
-              <span v-if="platform.value === 'xhs'" class="xhs-logo small">小红书</span>
-              <span v-else-if="platform.value === 'dy'" class="douyin-logo small" aria-label="抖音"></span>
-              <span v-else>{{ getPlatformIcon(platform.value) }}</span>
+              <img v-if="getPlatformLogo(platform.value)" :src="getPlatformLogo(platform.value)" :alt="getPlatformLabel(platform.value)" class="platform-logo-img small" />
+              <span v-else class="status-icon">{{ getPlatformIcon(platform.value) }}</span>
             </span>
           </div>
         </div>
@@ -140,6 +138,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import axios from 'axios'
 import CrawlerControl from '../components/CrawlerControl.vue'
+import { getPlatformLogo } from '../assets/platform-logos/index.js'
 
 // State
 const platforms = ref([])
@@ -313,6 +312,29 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+/* === 官方平台Logo图片样式 === */
+.platform-logo-img {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  border-radius: 8px;
+  padding: 2px;
+  background: rgba(255, 255, 255, 0.1);
+  transition: all 0.3s ease;
+}
+
+.platform-logo-img:hover {
+  transform: scale(1.05);
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.platform-logo-img.small {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  padding: 2px;
+}
+
 /* === iOS Style Base === */
 .data-wrapper {
   min-height: 100vh;
