@@ -1,31 +1,47 @@
 <template>
   <div class="dashboard-wrapper">
     <div class="ambient-background">
-      <div class="blue-halo"></div>
-      <div class="grid-background"></div>
+      <div class="nebula blue"></div>
+      <div class="nebula gold"></div>
+      <div class="breathing-line gold-1"></div>
+      <div class="breathing-line gold-2"></div>
+      <div class="scan-grid"></div>
       <div class="particles">
         <div class="particle" v-for="i in 8" :key="i" :style="{ animationDelay: `${i * 1.5}s` }"></div>
       </div>
     </div>
 
     <div class="layout-wrapper">
-      <header class="page-header">
+      <header class="page-header entrance-slide-in">
         <div class="title-group">
-          <h1 class="page-title">舆情监测总览<span class="subtitle">Sentiment Dashboard</span></h1>
-          <div class="status-tag">最近更新：{{ lastUpdatedAt ? formatRelativeTime(lastUpdatedAt) : '暂无' }}</div>
+          <h1 class="ios-title">舆情监测总览<span class="subtitle">Sentiment Dashboard</span></h1>
+          <div class="status-tag">
+            <span class="dot pulse"></span> 最近更新：{{ lastUpdatedAt ? formatRelativeTime(lastUpdatedAt) : '暂无' }}
+          </div>
         </div>
       </header>
 
       <div class="dashboard-content">
         <aside class="left-panel">
-          <ChartCard class="panel-card main-card" title="情感分布占比" :options="pieChartOptions" />
+          <div class="panel-card ios-glass main-card entrance-scale-up">
+            <div class="border-glow entrance-border-glow"></div>
+            <div class="cell-header">
+              <span class="accent-bar"></span>
+              情感分布占比
+            </div>
+            <div ref="mainChartRef" class="main-chart-box entrance-chart-fade"></div>
+          </div>
 
-          <div class="panel-card glass sentiment-summary">
-            <div class="panel-header">情绪摘要</div>
-            <div class="summary-grid">
+          <div class="panel-card ios-glass sentiment-summary entrance-scale-up-delay-1">
+            <div class="border-glow blue-tint entrance-border-glow"></div>
+            <div class="cell-header">
+              <span class="accent-bar blue"></span>
+              情绪摘要
+            </div>
+            <div class="summary-grid entrance-content-fade">
               <div class="summary-item">
                 <span class="label">总监测数据</span>
-                <span class="value">{{ stats.total || 0 }}</span>
+                <span class="value">{{ sentimentCounts.total }}</span>
               </div>
               <div class="summary-item positive">
                 <span class="label">积极数据</span>
@@ -46,16 +62,18 @@
             </div>
           </div>
 
-          <div class="recent-list glass compact">
-            <div class="recent-header">
-              <h3>Monitor Feed 实时动态</h3>
-              <div class="feed-controls">
-                <span class="feed-updated" v-if="lastUpdatedAt">更新于 {{ formatRelativeTime(lastUpdatedAt) }}</span>
-                <button class="refresh-btn" :disabled="feedLoading" @click="refreshMonitorFeed">
-                  <span class="refresh-icon" :class="{ spinning: feedLoading }">⟳</span>
-                  {{ feedLoading ? '刷新中' : '刷新' }}
-                </button>
-              </div>
+          <div class="recent-list ios-glass compact entrance-scale-up-delay-2">
+            <div class="border-glow purple-tint entrance-border-glow"></div>
+            <div class="cell-header">
+              <span class="accent-bar purple"></span>
+              Monitor Feed 实时动态
+            </div>
+            <div class="feed-controls">
+              <span class="feed-updated" v-if="lastUpdatedAt">更新于 {{ formatRelativeTime(lastUpdatedAt) }}</span>
+              <button class="refresh-btn" :disabled="feedLoading" @click="refreshMonitorFeed">
+                <span class="refresh-icon" :class="{ spinning: feedLoading }">⟳</span>
+                {{ feedLoading ? '刷新中' : '刷新' }}
+              </button>
             </div>
 
             <div v-if="feedItems && feedItems.length > 0" class="list-wrapper">
@@ -181,13 +199,139 @@
           </div>
 
           <div class="sentiment-grid">
-            <ChartCard title="小红书情绪结构" :options="platformPieOptions.xhs" />
-            <ChartCard title="抖音情绪结构" :options="platformPieOptions.dy" />
-            <ChartCard title="快手情绪结构" :options="platformPieOptions.ks" />
-            <ChartCard title="B站情绪结构" :options="platformPieOptions.bili" />
-            <ChartCard title="微博情绪结构" :options="platformPieOptions.wb" />
-            <ChartCard title="贴吧情绪结构" :options="platformPieOptions.tieba" />
-            <ChartCard title="知乎情绪结构" :options="platformPieOptions.zhihu" />
+            <div class="platform-card ios-glass entrance-scale-up" style="animation-delay: 0.3s">
+              <div class="cell-header compact">
+                <span class="accent-bar small"></span>
+                小红书情绪结构
+              </div>
+              <div class="platform-chart-wrapper">
+                <div class="platform-mini-chart" :ref="el => setChartRef('xhs', el)"></div>
+                <div class="platform-data-col">
+                  <div class="mini-stat-row">
+                    <label>High Risk</label>
+                    <span class="value">0</span>
+                  </div>
+                  <div class="mini-stat-row">
+                    <label>Total</label>
+                    <span class="value normal">{{ (platformSentimentCounts.xhs?.total || 0) }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="platform-card ios-glass entrance-scale-up" style="animation-delay: 0.35s">
+              <div class="cell-header compact">
+                <span class="accent-bar small"></span>
+                抖音情绪结构
+              </div>
+              <div class="platform-chart-wrapper">
+                <div class="platform-mini-chart" :ref="el => setChartRef('dy', el)"></div>
+                <div class="platform-data-col">
+                  <div class="mini-stat-row">
+                    <label>High Risk</label>
+                    <span class="value">0</span>
+                  </div>
+                  <div class="mini-stat-row">
+                    <label>Total</label>
+                    <span class="value normal">{{ (platformSentimentCounts.dy?.total || 0) }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="platform-card ios-glass entrance-scale-up" style="animation-delay: 0.4s">
+              <div class="cell-header compact">
+                <span class="accent-bar small"></span>
+                快手情绪结构
+              </div>
+              <div class="platform-chart-wrapper">
+                <div class="platform-mini-chart" :ref="el => setChartRef('ks', el)"></div>
+                <div class="platform-data-col">
+                  <div class="mini-stat-row">
+                    <label>High Risk</label>
+                    <span class="value">0</span>
+                  </div>
+                  <div class="mini-stat-row">
+                    <label>Total</label>
+                    <span class="value normal">{{ (platformSentimentCounts.ks?.total || 0) }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="platform-card ios-glass entrance-scale-up" style="animation-delay: 0.45s">
+              <div class="cell-header compact">
+                <span class="accent-bar small"></span>
+                B站情绪结构
+              </div>
+              <div class="platform-chart-wrapper">
+                <div class="platform-mini-chart" :ref="el => setChartRef('bili', el)"></div>
+                <div class="platform-data-col">
+                  <div class="mini-stat-row">
+                    <label>High Risk</label>
+                    <span class="value">0</span>
+                  </div>
+                  <div class="mini-stat-row">
+                    <label>Total</label>
+                    <span class="value normal">{{ (platformSentimentCounts.bili?.total || 0) }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="platform-card ios-glass entrance-scale-up" style="animation-delay: 0.5s">
+              <div class="cell-header compact">
+                <span class="accent-bar small"></span>
+                微博情绪结构
+              </div>
+              <div class="platform-chart-wrapper">
+                <div class="platform-mini-chart" :ref="el => setChartRef('wb', el)"></div>
+                <div class="platform-data-col">
+                  <div class="mini-stat-row">
+                    <label>High Risk</label>
+                    <span class="value">0</span>
+                  </div>
+                  <div class="mini-stat-row">
+                    <label>Total</label>
+                    <span class="value normal">{{ (platformSentimentCounts.wb?.total || 0) }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="platform-card ios-glass entrance-scale-up" style="animation-delay: 0.55s">
+              <div class="cell-header compact">
+                <span class="accent-bar small"></span>
+                贴吧情绪结构
+              </div>
+              <div class="platform-chart-wrapper">
+                <div class="platform-mini-chart" :ref="el => setChartRef('tieba', el)"></div>
+                <div class="platform-data-col">
+                  <div class="mini-stat-row">
+                    <label>High Risk</label>
+                    <span class="value">0</span>
+                  </div>
+                  <div class="mini-stat-row">
+                    <label>Total</label>
+                    <span class="value normal">{{ (platformSentimentCounts.tieba?.total || 0) }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="platform-card ios-glass entrance-scale-up" style="animation-delay: 0.6s">
+              <div class="cell-header compact">
+                <span class="accent-bar small"></span>
+                知乎情绪结构
+              </div>
+              <div class="platform-chart-wrapper">
+                <div class="platform-mini-chart" :ref="el => setChartRef('zhihu', el)"></div>
+                <div class="platform-data-col">
+                  <div class="mini-stat-row">
+                    <label>High Risk</label>
+                    <span class="value">0</span>
+                  </div>
+                  <div class="mini-stat-row">
+                    <label>Total</label>
+                    <span class="value normal">{{ (platformSentimentCounts.zhihu?.total || 0) }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </main>
       </div>
@@ -196,9 +340,62 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import axios from 'axios'
-import ChartCard from '../components/ChartCard.vue'
+import * as echarts from 'echarts'
+
+// Chart refs
+const mainChartRef = ref(null)
+const chartInstances = new Map()
+const platformChartRefs = new Map()
+
+const setChartRef = (key, el) => {
+  if (el) platformChartRefs.set(key, el)
+}
+
+// Initialize chart instance
+const initChart = (key, el) => {
+  if (!el) return null
+  const chartKey = `chart-${key}`
+  if (!chartInstances.has(chartKey)) {
+    chartInstances.set(chartKey, echarts.init(el))
+  }
+  return chartInstances.get(chartKey)
+}
+
+// Render platform charts
+const renderPlatformCharts = () => {
+  const platforms = ['xhs', 'dy', 'ks', 'bili', 'wb', 'tieba', 'zhihu']
+  platforms.forEach(platform => {
+    const el = platformChartRefs.get(platform)
+    if (!el) return
+
+    const chartInstance = initChart(platform, el)
+    const counts = platformSentimentCounts.value[platform] || {}
+    const total = counts.total || 0
+    const positive = counts.positive || 0
+    const negative = counts.negative || 0
+    const neutral = counts.neutral || 0
+    const sensitive = counts.sensitive || 0
+
+    chartInstance.setOption({
+      series: [
+        {
+          type: 'pie',
+          radius: ['50%', '75%'],
+          center: ['50%', '45%'],
+          label: { show: false },
+          data: [
+            { value: positive, name: '积极', itemStyle: { color: '#00ffa3' } },
+            { value: neutral, name: '中性', itemStyle: { color: '#00ccff' } },
+            { value: negative, name: '消极', itemStyle: { color: '#ff6b6b' } },
+            { value: sensitive, name: '敏感', itemStyle: { color: '#ffcc00' } }
+          ]
+        }
+      ]
+    })
+  })
+}
 
 // Mock Data Options for Charts
 const trendChartOptions = computed(() => ({
@@ -856,14 +1053,20 @@ const checkCrawlerAndFetch = async () => {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
   isMounted.value = true
   // 重置加载状态，防止被旧状态阻塞
   feedLoading.value = false
   abortController.value = null
 
   // 先展示已有 monitor_feed 数据
-  fetchMonitorFeed()
+  await fetchMonitorFeed()
+
+  nextTick(() => {
+    renderPlatformCharts()
+  })
+
+  window.addEventListener('resize', () => chartInstances.forEach(c => c?.resize()))
 })
 
 onBeforeUnmount(() => {
@@ -876,6 +1079,7 @@ onBeforeUnmount(() => {
     localStorage.removeItem('dashboard-refresh-running')
     localStorage.removeItem('dashboard-refresh-start-time')
   }
+  chartInstances.forEach(c => c?.dispose())
 })
 </script>
 
@@ -1472,15 +1676,65 @@ body {
   pointer-events: none;
 }
 
-/* Blue Halo - Top Left Corner */
-.blue-halo {
+/* Nebula Effects */
+.nebula {
   position: absolute;
-  top: -100px;
-  left: -100px;
-  width: 500px;
-  height: 500px;
-  background: radial-gradient(ellipse, rgba(0, 102, 255, 0.5) 0%, transparent 70%);
-  animation: bluePulse 4s ease-in-out infinite alternate;
+  width: 80vw;
+  height: 70vh;
+  filter: blur(120px);
+  opacity: 0.28;
+  mix-blend-mode: screen;
+}
+.nebula.blue {
+  background: radial-gradient(circle, #0066ff, transparent 75%);
+  top: -10%;
+  left: -5%;
+}
+.nebula.gold {
+  background: radial-gradient(circle, #ffaa00, transparent 75%);
+  bottom: -10%;
+  right: -5%;
+}
+
+/* Breathing Line Effects */
+.breathing-line {
+  position: absolute;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #ffaa00, transparent);
+  filter: blur(1px);
+  opacity: 0.3;
+  animation: breathe 8s infinite ease-in-out;
+}
+.gold-1 {
+  width: 100%;
+  top: 30%;
+  left: -50%;
+  transform: rotate(-5deg);
+}
+.gold-2 {
+  width: 100%;
+  bottom: 20%;
+  right: -50%;
+  transform: rotate(3deg);
+  animation-delay: -4s;
+}
+
+/* Scan Grid Effect */
+.scan-grid {
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+  background-size: 50px 50px;
+  mask-image: linear-gradient(to bottom, black, transparent);
+  animation: gridMove 25s linear infinite;
+}
+@keyframes gridMove {
+  from { background-position: 0 0; }
+  to { background-position: 0 50px; }
+}
+@keyframes breathe {
+  0%, 100% { opacity: 0.1; transform: scaleX(0.8) translateY(0); }
+  50% { opacity: 0.5; transform: scaleX(1.2) translateY(-20px); }
 }
 
 @keyframes bluePulse {
@@ -1562,6 +1816,288 @@ body {
   box-shadow:
     0 0 40px rgba(0, 204, 255, 0.1),
     0 4px 24px rgba(0, 0, 0, 0.4);
+}
+
+/* iOS Glass Card Style */
+.ios-glass {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(50px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.8);
+}
+
+/* Border Glow Animation */
+.border-glow {
+  position: absolute;
+  inset: 0;
+  border-radius: 20px;
+  padding: 1px;
+  background: linear-gradient(135deg, rgba(255, 170, 0, 0.4), transparent 40%, rgba(255, 170, 0, 0.1));
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  animation: borderBreathe 6s infinite ease-in-out;
+}
+.border-glow.blue-tint {
+  background: linear-gradient(135deg, rgba(0, 195, 255, 0.55), transparent 45%, rgba(0, 195, 255, 0.15));
+}
+.border-glow.purple-tint {
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.55), transparent 45%, rgba(168, 85, 247, 0.15));
+}
+.border-glow.slow {
+  animation-duration: 8s;
+}
+@keyframes borderBreathe {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.8; box-shadow: inset 0 0 15px rgba(255, 170, 0, 0.2); }
+}
+
+/* Entrance Animations */
+.entrance-slide-in {
+  animation: slideInFade 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  opacity: 0;
+  transform: translateX(-40px);
+}
+@keyframes slideInFade {
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.entrance-scale-up {
+  animation: scaleUpFade 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.2s forwards;
+  opacity: 0;
+  transform: scale(0.92) translateY(30px);
+}
+.entrance-scale-up-delay-1 {
+  animation-delay: 0.35s;
+}
+.entrance-scale-up-delay-2 {
+  animation-delay: 0.5s;
+}
+@keyframes scaleUpFade {
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.entrance-border-glow {
+  animation: borderBreathe 6s infinite ease-in-out, borderGlowEnter 1.2s ease-out forwards;
+  opacity: 0;
+}
+@keyframes borderGlowEnter {
+  0% { opacity: 0; transform: scale(0.95); }
+  50% { opacity: 0.6; }
+  100% { opacity: 0.3; transform: scale(1); }
+}
+
+.entrance-chart-fade {
+  animation: chartFadeIn 1s cubic-bezier(0.16, 1, 0.3, 1) 0.6s forwards;
+  opacity: 0;
+  transform: scale(0.95);
+}
+@keyframes chartFadeIn {
+  to { opacity: 1; transform: scale(1); }
+}
+
+.entrance-content-fade {
+  animation: contentFadeIn 0.8s ease-out 0.8s forwards;
+  opacity: 0;
+}
+@keyframes contentFadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Cell Header */
+.cell-header {
+  padding: 12px 15px;
+  font-size: 12px;
+  color: #c0ccda;
+  font-weight: bold;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  letter-spacing: 1px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.cell-header.compact {
+  padding: 12px 16px;
+  font-size: 12px;
+}
+
+/* Accent Bar */
+.accent-bar {
+  width: 4px;
+  height: 16px;
+  background: #ffaa00;
+  border-radius: 10px;
+  box-shadow: 0 0 10px #ffaa00;
+}
+.accent-bar.small {
+  width: 3px;
+  height: 12px;
+}
+.accent-bar.blue {
+  background: #00c3ff;
+  box-shadow: 0 0 10px #00c3ff;
+}
+.accent-bar.purple {
+  background: #a855f7;
+  box-shadow: 0 0 10px #a855f7;
+}
+.accent-bar.risk {
+  background: #ff4d4f;
+  box-shadow: 0 0 10px #ff4d4f;
+}
+.accent-bar.safe {
+  background: #00c3ff;
+  box-shadow: 0 0 10px #00c3ff;
+}
+
+/* iOS Title */
+.ios-title {
+  font-size: 32px;
+  letter-spacing: -0.5px;
+  background: linear-gradient(180deg, #fff 40%, rgba(255,255,255,0.6));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin: 0;
+}
+.ios-title .subtitle {
+  font-size: 14px;
+  color: #ffaa00;
+  margin-left: 10px;
+  font-weight: 300;
+  letter-spacing: 2px;
+  display: block;
+  margin-top: 4px;
+}
+
+/* Status Tag Dot */
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #00ffcc;
+  box-shadow: 0 0 10px rgba(0, 255, 204, 0.8);
+}
+.pulse {
+  animation: pulseDot 2s ease-in-out infinite;
+}
+@keyframes pulseDot {
+  0%, 100% { transform: scale(1); opacity: 0.8; }
+  50% { transform: scale(1.5); opacity: 1; }
+}
+
+/* Platform Cards */
+.platform-card {
+  display: flex;
+  flex-direction: column;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+.platform-card:hover {
+  transform: translateY(-4px);
+  background: rgba(255, 255, 255, 0.06);
+}
+.platform-chart-wrapper {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  padding: 0 16px 10px;
+}
+.platform-mini-chart {
+  width: 90px;
+  height: 90px;
+  flex-shrink: 0;
+}
+.platform-data-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-left: 12px;
+}
+.mini-stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 6px 10px;
+  border-radius: 6px;
+}
+.mini-stat-row label {
+  font-size: 10px;
+  color: #8899aa;
+}
+.mini-stat-row .value {
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+  font-family: 'SF Mono', monospace;
+}
+.mini-stat-row .value.has-risk {
+  color: #ff4d4f;
+  text-shadow: 0 0 8px rgba(255, 77, 79, 0.6);
+}
+.mini-stat-row .value.normal {
+  color: #00c3ff;
+}
+
+/* Main Chart Box */
+.main-chart-box {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+}
+
+/* Sentiment Summary */
+.sentiment-summary {
+  flex: 0 0 auto;
+  min-height: auto;
+}
+.summary-grid {
+  padding: 16px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.summary-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(0, 204, 255, 0.05);
+  border: 1px solid rgba(0, 204, 255, 0.15);
+}
+.summary-item .label {
+  font-size: 10px;
+  color: #666666;
+  letter-spacing: 0.5px;
+}
+.summary-item .value {
+  font-size: 18px;
+  font-weight: 700;
+  color: #FFFFFF;
+}
+
+/* Feed Panel */
+.recent-list {
+  flex: 1 1 auto;
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+}
+.feed-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 12px 16px 8px;
+}
+.feed-updated {
+  font-size: 0.75rem;
+  color: #8899aa;
+  letter-spacing: 0.5px;
 }
 
 /* Pagination Styles */
