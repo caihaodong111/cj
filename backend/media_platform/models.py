@@ -492,6 +492,7 @@ class MonitorFeed(BaseModel):
         db_table = 'monitor_feed'
         verbose_name = "Monitor Feed"
         verbose_name_plural = "Monitor Feeds"
+        unique_together = [['platform', 'content_id']]  # 防止重复数据
         indexes = [
             models.Index(fields=['-created_at']),
             models.Index(fields=['platform', '-created_at']),

@@ -34,6 +34,7 @@
 
           <div class="sentiment-grid">
             <div class="platform-card ios-glass entrance-scale-up clickable" style="animation-delay: 0.3s" @click="handlePlatformJump('xhs')">
+              <div class="border-glow entrance-border-glow"></div>
               <div class="cell-header compact">
                 <span class="accent-bar small"></span>
                 小红书
@@ -43,6 +44,7 @@
               </div>
             </div>
             <div class="platform-card ios-glass entrance-scale-up clickable" style="animation-delay: 0.35s" @click="handlePlatformJump('dy')">
+              <div class="border-glow entrance-border-glow"></div>
               <div class="cell-header compact">
                 <span class="accent-bar small"></span>
                 抖音
@@ -52,6 +54,7 @@
               </div>
             </div>
             <div class="platform-card ios-glass entrance-scale-up clickable" style="animation-delay: 0.4s" @click="handlePlatformJump('ks')">
+              <div class="border-glow entrance-border-glow"></div>
               <div class="cell-header compact">
                 <span class="accent-bar small"></span>
                 快手
@@ -61,6 +64,7 @@
               </div>
             </div>
             <div class="platform-card ios-glass entrance-scale-up clickable" style="animation-delay: 0.45s" @click="handlePlatformJump('bili')">
+              <div class="border-glow entrance-border-glow"></div>
               <div class="cell-header compact">
                 <span class="accent-bar small"></span>
                 B站
@@ -70,6 +74,7 @@
               </div>
             </div>
             <div class="platform-card ios-glass entrance-scale-up clickable" style="animation-delay: 0.5s" @click="handlePlatformJump('wb')">
+              <div class="border-glow entrance-border-glow"></div>
               <div class="cell-header compact">
                 <span class="accent-bar small"></span>
                 微博
@@ -79,6 +84,7 @@
               </div>
             </div>
             <div class="platform-card ios-glass entrance-scale-up clickable" style="animation-delay: 0.55s" @click="handlePlatformJump('tieba')">
+              <div class="border-glow entrance-border-glow"></div>
               <div class="cell-header compact">
                 <span class="accent-bar small"></span>
                 贴吧
@@ -88,6 +94,7 @@
               </div>
             </div>
             <div class="platform-card ios-glass entrance-scale-up clickable" style="animation-delay: 0.6s" @click="handlePlatformJump('zhihu')">
+              <div class="border-glow entrance-border-glow"></div>
               <div class="cell-header compact">
                 <span class="accent-bar small"></span>
                 知乎
@@ -155,7 +162,18 @@
                   <option :value="50">50条/页</option>
                   <option :value="100">100条/页</option>
                 </select>
-                <span class="pagination-text">{{ currentPage }} / {{ totalPages }}</span>
+                <div class="pagination-numbers">
+                  <button
+                    v-for="page in displayedPages"
+                    :key="page"
+                    class="pagination-number"
+                    :class="{ active: page === currentPage, ellipsis: page === '...' }"
+                    :disabled="page === '...'"
+                    @click="page !== '...' && goToPage(page)"
+                  >
+                    {{ page }}
+                  </button>
+                </div>
                 <button
                   class="pagination-btn icon-btn"
                   :disabled="currentPage === totalPages"
@@ -174,11 +192,15 @@
     </div>
 
     <div v-if="sensitiveModalOpen" class="modal-overlay" @click.self="closeSensitiveModal">
-      <div class="modal-card">
+      <div class="modal-card ios-glass">
+        <div class="border-glow purple-tint entrance-border-glow"></div>
         <div class="modal-header">
-          <div class="modal-title">
-            {{ sensitiveModalPlatformLabel }} 敏感数据
-            <span class="modal-subtitle">共 {{ sensitiveModalTotalCount }} 条</span>
+          <div class="modal-title-group">
+            <span class="accent-bar purple"></span>
+            <div class="modal-title">
+              {{ sensitiveModalPlatformLabel }} 敏感数据
+              <span class="modal-subtitle">共 {{ sensitiveModalTotalCount }} 条</span>
+            </div>
           </div>
           <button class="modal-close" @click="closeSensitiveModal">×</button>
         </div>
@@ -296,12 +318,23 @@ const renderMainPieChart = () => {
   }))
 
   const sensitiveTotal = chartData.reduce((sum, item) => sum + item.value, 0)
+  const allTotal = totalCount.value || feedItems.value.length || 0
   console.log('5. 主饼图数据：', chartData)
   console.log('6. 敏感总数：', sensitiveTotal)
+  console.log('7. 所有数据总数：', allTotal)
 
   // 如果没有敏感数据，显示提示
   if (sensitiveTotal === 0) {
     chart.setOption({
+      tooltip: {
+        trigger: 'item',
+        backgroundColor: 'rgba(10, 10, 15, 0.95)',
+        borderColor: 'rgba(0, 204, 255, 0.3)',
+        textStyle: { color: '#fff' },
+        formatter: params => `${params.name}<br/>敏感: ${params.value}`,
+        confine: true,
+        appendToBody: true
+      },
       series: [{
         type: 'pie',
         radius: ['45%', '70%'],
@@ -335,17 +368,21 @@ const renderMainPieChart = () => {
         type: 'pie',
         radius: [0, '35%'],
         center: ['50%', '50%'],
-        silent: true,
+        silent: false,
+        cursor: 'default',
         label: {
           show: true,
           position: 'center',
-          formatter: [`{v|0}`, `{l|敏感总数}`].join('\n'),
+          formatter: () => {
+            return [`{numerator|0}`, `{line|/}`, `{denominator|${allTotal}}`].join('\n')
+          },
           rich: {
-            v: { fontSize: 28, fontWeight: 900, color: '#8899aa' },
-            l: { fontSize: 11, color: '#666666', paddingTop: 4 }
+            numerator: { fontSize: 32, fontWeight: 900, color: '#8899aa' },
+            line: { fontSize: 24, fontWeight: 700, color: '#666666', padding: [0, 0] },
+            denominator: { fontSize: 20, fontWeight: 700, color: '#8899aa' }
           }
         },
-        data: [{ value: 1, itemStyle: { color: 'transparent' } }]
+        data: [{ value: 1, itemStyle: { color: 'transparent' }, name: '总计' }]
       }]
     })
     console.log('主饼图渲染完成：暂无敏感数据')
@@ -353,40 +390,107 @@ const renderMainPieChart = () => {
   }
 
   // 有敏感数据则正常显示
+  // 平台颜色配置（带发光效果）
+  const platformColors = {
+    xhs: { main: '#00ffa3', glow: 'rgba(0, 255, 163, 0.8)', gradient: ['#00ffa3', '#00cc66'] },
+    dy: { main: '#ff6b9e', glow: 'rgba(255, 107, 158, 0.8)', gradient: ['#ff6b9e', '#cc1144'] },
+    ks: { main: '#4dc9ff', glow: 'rgba(77, 201, 255, 0.8)', gradient: ['#4dc9ff', '#0099ff'] },
+    bili: { main: '#ff89a9', glow: 'rgba(255, 137, 169, 0.8)', gradient: ['#ff89a9', '#ff4488'] },
+    wb: { main: '#ffa726', glow: 'rgba(255, 167, 38, 0.8)', gradient: ['#ffa726', '#ff6600'] },
+    tieba: { main: '#00ccff', glow: 'rgba(0, 204, 255, 0.8)', gradient: ['#00ccff', '#0066ff'] },
+    zhihu: { main: '#a855f7', glow: 'rgba(168, 85, 247, 0.8)', gradient: ['#a855f7', '#7c22c9'] }
+  }
+
+  const enhancedChartData = chartData.map((item, index) => {
+    const platformKey = ['xhs', 'dy', 'ks', 'bili', 'wb', 'tieba', 'zhihu'][index]
+    const colors = platformColors[platformKey] || platformColors.xhs
+    return {
+      ...item,
+      itemStyle: {
+        color: {
+          type: 'linear',
+          x: 0, y: 0, x2: 1, y2: 1,
+          colorStops: [
+            { offset: 0, color: colors.gradient[0] },
+            { offset: 1, color: colors.gradient[1] }
+          ]
+        },
+        borderColor: 'rgba(255, 255, 255, 0.3)',
+        borderWidth: 2,
+        shadowBlur: 20,
+        shadowColor: colors.glow
+      },
+      emphasis: {
+        itemStyle: {
+          shadowBlur: 35,
+          shadowColor: colors.glow,
+          borderWidth: 3,
+          scale: true,
+          scaleSize: 5
+        }
+      }
+    }
+  })
+
   chart.setOption({
     tooltip: {
       trigger: 'item',
-      backgroundColor: 'rgba(10, 10, 15, 0.95)',
+      backgroundColor: 'rgba(10, 10, 15, 0.85)',
       borderColor: 'rgba(0, 204, 255, 0.3)',
+      borderWidth: 1,
+      borderRadius: 12,
+      padding: [14, 18],
       textStyle: { color: '#fff' },
-      formatter: params => `${params.name}<br/>敏感: ${params.value}`
+      extraCssText: 'box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);',
+      appendToBody: true,
+      confine: false,
+      renderer: true,
+      formatter: params => {
+        const platformKey = ['xhs', 'dy', 'ks', 'bili', 'wb', 'tieba', 'zhihu'].find(k =>
+                          platformNameToKey[params?.name] === k || params?.name === platformNameToKey[k])
+                        || Object.keys(platformNameToKey).find(k => platformNameToKey[k] === params?.name)
+        const colors = platformColors[platformKey] || platformColors.xhs
+                        const percent = params.percent
+                        return `<div style="font-size: 14px; font-weight: 600; color: #e6f0ff; margin-bottom: 6px;">${params.name}</div>
+                                <div style="display: flex; align-items: center; gap: 12px;">
+                                  <span style="font-size: 11px; color: #8899aa;">敏感数据</span>
+                                  <span style="font-size: 24px; font-weight: 700; color: ${colors.main};">${params.value}</span>
+                                  <span style="font-size: 14px; color: #8899aa;">(${percent}%)</span>
+                                </div>`
+      }
     },
     series: [{
       type: 'pie',
-      radius: ['45%', '70%'],
+      radius: ['42%', '72%'],
       center: ['50%', '50%'],
       roseType: 'radius',
-      padAngle: 3,
-      itemStyle: { borderRadius: 8 },
+      padAngle: 4,
+      itemStyle: { borderRadius: 12 },
       label: { show: false },
-      data: chartData
+      data: enhancedChartData,
+      emphasis: {
+        scale: true,
+        scaleSize: 8
+      }
     }, {
       type: 'pie',
-      radius: [0, '35%'],
+      radius: [0, '32%'],
       center: ['50%', '50%'],
-      silent: true,
+      silent: false,
+      cursor: 'default',
       label: {
         show: true,
         position: 'center',
         formatter: () => {
-          return [`{v|${sensitiveTotal}}`, `{l|敏感总数}`].join('\n')
+          return [`{numerator|${sensitiveTotal}}`, `{line|/}`, `{denominator|${allTotal}}`].join('\n')
         },
         rich: {
-          v: { fontSize: 28, fontWeight: 900, color: '#ff4d4f', textShadow: '0 0 20px rgba(255, 77, 79, 0.8)' },
-          l: { fontSize: 11, color: '#8899aa', paddingTop: 4 }
+          numerator: { fontSize: 34, fontWeight: 900, color: '#ff4d4f', textShadow: '0 0 25px rgba(255, 77, 79, 0.9)' },
+          line: { fontSize: 26, fontWeight: 700, color: '#8899aa', padding: [0, 0] },
+          denominator: { fontSize: 22, fontWeight: 700, color: '#ffcc00', textShadow: '0 0 18px rgba(255, 204, 0, 0.6)' }
         }
       },
-      data: [{ value: 1, itemStyle: { color: 'transparent' } }]
+      data: [{ value: 1, itemStyle: { color: 'transparent' }, name: '总计' }]
     }]
   })
   chart.off('click')
@@ -437,7 +541,7 @@ const renderPlatformCharts = () => {
       chartInstance.setOption({
         series: [{
           type: 'pie',
-          radius: ['55%', '80%'],
+          radius: ['52%', '82%'],
           center: ['50%', '50%'],
           label: {
             show: true,
@@ -452,40 +556,111 @@ const renderPlatformCharts = () => {
       return
     }
 
-    // 有数据则显示情绪分布饼图
+    // 平台颜色配置
+    const platformColors = {
+      xhs: { main: '#00ffa3', glow: 'rgba(0, 255, 163, 0.8)', gradient: ['#00ffa3', '#00cc66'] },
+      dy: { main: '#ff6b9e', glow: 'rgba(255, 107, 158, 0.8)', gradient: ['#ff6b9e', '#cc1144'] },
+      ks: { main: '#4dc9ff', glow: 'rgba(77, 201, 255, 0.8)', gradient: ['#4dc9ff', '#0099ff'] },
+      bili: { main: '#ff89a9', glow: 'rgba(255, 137, 169, 0.8)', gradient: ['#ff89a9', '#ff4488'] },
+      wb: { main: '#ffa726', glow: 'rgba(255, 167, 38, 0.8)', gradient: ['#ffa726', '#ff6600'] },
+      tieba: { main: '#00ccff', glow: 'rgba(0, 204, 255, 0.8)', gradient: ['#00ccff', '#0066ff'] },
+      zhihu: { main: '#a855f7', glow: 'rgba(168, 85, 247, 0.8)', gradient: ['#a855f7', '#7c22c9'] }
+    }
+
+    const colors = platformColors[platform] || platformColors.xhs
+    const platformLabel = platform === 'zhihu' ? '知乎' :
+                          platform === 'xhs' ? '小红书' :
+                          platform === 'dy' ? '抖音' :
+                          platform === 'ks' ? '快手' :
+                          platform === 'bili' ? 'B站' :
+                          platform === 'wb' ? '微博' : '贴吧'
+
+    // 有数据则显示敏感数据饼图
     chartInstance.setOption({
       tooltip: {
         trigger: 'item',
-        backgroundColor: 'rgba(10, 10, 15, 0.95)',
+        backgroundColor: 'rgba(10, 10, 15, 0.85)',
         borderColor: 'rgba(0, 204, 255, 0.3)',
+        borderWidth: 1,
+        borderRadius: 12,
+        padding: [12, 16],
         textStyle: { color: '#fff' },
+        extraCssText: 'box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);',
         appendToBody: true,
         confine: false,
-        extraCssText: 'z-index: 9999; max-width: 220px; white-space: normal; pointer-events: none;'
+        renderer: true,
+        formatter: params => {
+          const percent = params.percent
+          return `<div style="font-size: 13px; font-weight: 500; color: #e6f0ff; margin-bottom: 4px;">${platformLabel}</div>
+                  <div style="display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 10px; color: #8899aa;">敏感数据</span>
+                    <span style="font-size: 20px; font-weight: 700; color: #ff4d4f;">${params.value}</span>
+                    <span style="font-size: 13px; color: #8899aa;">(${percent}%)</span>
+                  </div>`
+        }
       },
       series: [
         {
           type: 'pie',
-          radius: ['45%', '70%'],
-        center: ['50%', '50%'],
+          radius: ['48%', '78%'],
+          center: ['50%', '50%'],
           label: { show: false },
           data: [
-            { value: sensitive, name: '敏感', itemStyle: { color: '#ff4d4f' } },
-            { value: nonSensitive, name: '非敏感', itemStyle: { color: '#3b82f6' } }
+            {
+              value: sensitive,
+              name: '敏感',
+              itemStyle: {
+                color: {
+                  type: 'linear',
+                  x: 0, y: 0, x2: 1, y2: 1,
+                  colorStops: [
+                    { offset: 0, color: '#ff6b6b' },
+                    { offset: 1, color: '#ff4d4f' }
+                  ]
+                },
+                borderColor: 'rgba(255, 255, 255, 0.25)',
+                borderWidth: 1.5,
+                shadowBlur: 15,
+                shadowColor: 'rgba(255, 77, 79, 0.6)'
+              },
+              emphasis: {
+                itemStyle: {
+                  shadowBlur: 25,
+                  shadowColor: 'rgba(255, 77, 79, 0.8)',
+                  borderWidth: 2
+                }
+              }
+            },
+            {
+              value: Math.max(0, total - sensitive),
+              name: '其他',
+              itemStyle: {
+                color: 'rgba(255, 255, 255, 0.05)',
+                borderColor: 'rgba(255, 255, 255, 0.08)',
+                borderWidth: 1,
+                shadowBlur: 0
+              },
+              emphasis: {
+                itemStyle: {
+                  shadowBlur: 0
+                }
+              },
+              label: { show: false }
+            }
           ]
         },
         {
           type: 'pie',
-          radius: [0, '35%'],
-        center: ['50%', '50%'],
+          radius: [0, '32%'],
+          center: ['50%', '50%'],
           silent: true,
           label: {
             show: true,
             position: 'center',
             formatter: () => [`{v|${sensitive}}`, `{l|/ ${total}}`].join('\n'),
             rich: {
-              v: { fontSize: 18, fontWeight: 800, color: '#ff4d4f' },
-              l: { fontSize: 10, color: '#8899aa', paddingTop: 2 }
+              v: { fontSize: 20, fontWeight: 800, color: '#ff4d4f', textShadow: '0 0 12px rgba(255, 77, 79, 0.6)' },
+              l: { fontSize: 11, color: '#8899aa', paddingTop: 3 }
             }
           },
           data: [{ value: 1, itemStyle: { color: 'transparent' } }]
@@ -1005,11 +1180,19 @@ const buildFeedItems = (rows) => {
     return []
   }
   console.log('buildFeedItems: processing', rows.length, 'items')
-  return rows.map((row, index) => {
+
+  // 使用 Map 进行去重，以 id 为唯一标识
+  const uniqueItemsMap = new Map()
+
+  rows.forEach((row, index) => {
     const platformKey = normalizePlatform(row?.platform)
     const recordTime = row?.created_at || getRecordTime(row)
     const isSensitive = row?.is_sensitive ?? row?.isSensitive ?? row?.sentiment === 'sensitive'
     const sentiment = isSensitive ? 'sensitive' : (row?.sentiment || 'neutral')
+
+    // 生成唯一标识：优先使用 id，否则用 url+content+platform 组合
+    const uniqueKey = row?.id || `${row?.url || ''}-${row?.content || ''}-${platformKey}`
+
     const item = {
       id: row?.id || `${platformKey || 'data'}-${index}`,
       platformKey,
@@ -1025,9 +1208,17 @@ const buildFeedItems = (rows) => {
       sentimentLabels: row?.sentiment_labels || {},
       isSensitive
     }
-    console.log('buildFeedItems: built item', index, item)
-    return item
+
+    // 如果该 key 已存在，保留时间较新的数据
+    if (!uniqueItemsMap.has(uniqueKey) || item.sortTime > uniqueItemsMap.get(uniqueKey).sortTime) {
+      uniqueItemsMap.set(uniqueKey, item)
+    }
   })
+
+  const result = Array.from(uniqueItemsMap.values())
+  console.log('buildFeedItems: after deduplication', result.length, 'items (removed', rows.length - result.length, 'duplicates)')
+
+  return result
 }
 
 // 获取情绪类型显示标签
@@ -1447,44 +1638,65 @@ watch(feedItems, () => {
 .modal-card {
   width: min(900px, 92vw);
   max-height: 80vh;
-  background: rgba(14, 18, 28, 0.95);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 18px;
-  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.45);
   display: flex;
   flex-direction: column;
+}
+
+.modal-card > :not(.border-glow) {
+  position: relative;
+  z-index: 1;
 }
 
 .modal-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 18px 22px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 12px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.modal-title-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .modal-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: #e6f0ff;
+  font-size: 12px;
+  font-weight: bold;
+  color: #c0ccda;
+  letter-spacing: 1px;
 }
 
 .modal-subtitle {
-  margin-left: 10px;
+  margin-left: 8px;
   font-size: 12px;
-  color: #8fa3c1;
+  color: var(--text-dim);
 }
 
 .modal-close {
   background: transparent;
   border: none;
-  font-size: 22px;
-  color: #b8c6e1;
+  font-size: 24px;
+  color: #8899aa;
   cursor: pointer;
+  transition: all 0.2s;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+}
+
+.modal-close:hover {
+  color: var(--cyan-primary);
+  background: rgba(0, 204, 255, 0.08);
+  transform: none;
 }
 
 .modal-body {
-  padding: 16px 22px;
+  padding: 16px 18px 18px;
   overflow-y: auto;
 }
 
@@ -1505,17 +1717,24 @@ watch(feedItems, () => {
 }
 
 .modal-item {
-  background: rgba(12, 16, 26, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(0, 204, 255, 0.03);
+  border: 1px solid rgba(0, 204, 255, 0.12);
   border-radius: 12px;
   padding: 12px 14px;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.modal-item:hover {
+  background: rgba(0, 204, 255, 0.08);
+  border-color: var(--border-cyan);
+  box-shadow: 0 0 20px rgba(0, 204, 255, 0.15);
 }
 
 .modal-item-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
 
 .modal-content {
@@ -1528,7 +1747,7 @@ watch(feedItems, () => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-top: 8px;
+  margin-top: 10px;
   font-size: 12px;
   color: #8fa3c1;
 }
@@ -1536,6 +1755,12 @@ watch(feedItems, () => {
 .modal-footer a {
   color: #4fd1ff;
   text-decoration: none;
+  transition: all 0.2s;
+}
+
+.modal-footer a:hover {
+  color: #00ccff;
+  text-shadow: 0 0 8px rgba(0, 204, 255, 0.5);
 }
 
 .modal-pagination {
@@ -1614,17 +1839,39 @@ watch(feedItems, () => {
 
 .panel-card {
   flex-shrink: 0;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
+
+.panel-card:hover {
+  transform: scale(1.01) translateY(-1px);
+  box-shadow: 0 0 25px rgba(255, 204, 0, 0.1),
+              0 0 50px rgba(255, 204, 0, 0.05);
+}
+
 .panel-card.main-card {
   min-height: 300px;
 }
 
 .left-panel .chart-card {
   min-height: 240px;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.left-panel .chart-card:hover {
+  transform: scale(1.01) translateY(-1px);
+  box-shadow: 0 0 20px rgba(255, 204, 0, 0.08),
+              0 0 40px rgba(255, 204, 0, 0.04);
 }
 
 .chart-row .chart-card {
   min-height: 320px;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.chart-row .chart-card:hover {
+  transform: scale(1.01) translateY(-1px);
+  box-shadow: 0 0 20px rgba(255, 204, 0, 0.08),
+              0 0 40px rgba(255, 204, 0, 0.04);
 }
 
 .sentiment-grid {
@@ -1635,6 +1882,13 @@ watch(feedItems, () => {
 
 .sentiment-grid .chart-card {
   min-height: 220px;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.sentiment-grid .chart-card:hover {
+  transform: scale(1.01) translateY(-1px);
+  box-shadow: 0 0 20px rgba(255, 204, 0, 0.08),
+              0 0 40px rgba(255, 204, 0, 0.04);
 }
 
 .sentiment-summary {
@@ -1833,6 +2087,15 @@ watch(feedItems, () => {
   box-shadow:
     0 0 40px rgba(0, 204, 255, 0.1),
     0 4px 24px rgba(0, 0, 0, 0.4);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.recent-list:hover {
+  transform: scale(1.01) translateY(-1px);
+  box-shadow:
+    0 0 45px rgba(0, 204, 255, 0.12),
+    0 4px 24px rgba(0, 0, 0, 0.4),
+    0 0 25px rgba(255, 204, 0, 0.08);
 }
 
 .recent-list.compact {
@@ -2296,20 +2559,30 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 20px;
   position: relative;
-  overflow: hidden;
+  overflow: visible;
   box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.8);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.ios-glass:hover {
+  transform: scale(1.01) translateY(-1px);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.8),
+              0 0 30px rgba(255, 204, 0, 0.12),
+              0 0 60px rgba(255, 204, 0, 0.06);
 }
 
 /* Border Glow Animation */
 .border-glow {
   position: absolute;
   inset: 0;
+  z-index: 0;
   border-radius: 20px;
   padding: 1px;
   background: linear-gradient(135deg, rgba(255, 170, 0, 0.4), transparent 40%, rgba(255, 170, 0, 0.1));
   mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   mask-composite: exclude;
   animation: borderBreathe 6s infinite ease-in-out;
+  pointer-events: none;
 }
 .border-glow.blue-tint {
   background: linear-gradient(135deg, rgba(0, 195, 255, 0.55), transparent 45%, rgba(0, 195, 255, 0.15));
@@ -2338,7 +2611,6 @@ body {
 .entrance-scale-up {
   animation: scaleUpFade 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.2s forwards;
   opacity: 0;
-  transform: scale(0.92) translateY(30px);
 }
 .entrance-scale-up-delay-1 {
   animation-delay: 0.35s;
@@ -2347,7 +2619,7 @@ body {
   animation-delay: 0.5s;
 }
 @keyframes scaleUpFade {
-  to { opacity: 1; transform: scale(1) translateY(0); }
+  to { opacity: 1; transform: none; }
 }
 
 .entrance-border-glow {
@@ -2355,18 +2627,18 @@ body {
   opacity: 0;
 }
 @keyframes borderGlowEnter {
-  0% { opacity: 0; transform: scale(0.95); }
+  0% { opacity: 0; }
   50% { opacity: 0.6; }
-  100% { opacity: 0.3; transform: scale(1); }
+  100% { opacity: 0.3; }
 }
 
 .entrance-chart-fade {
   animation: chartFadeIn 1s cubic-bezier(0.16, 1, 0.3, 1) 0.6s forwards;
   opacity: 1;
-  transform: scale(0.95);
+  transform: none;
 }
 @keyframes chartFadeIn {
-  to { opacity: 1; transform: scale(1); }
+  to { opacity: 1; transform: none; }
 }
 
 .entrance-content-fade {
@@ -2465,11 +2737,29 @@ body {
   display: flex;
   flex-direction: column;
   cursor: pointer;
-  transition: transform 0.2s;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
+
+.platform-card > :not(.border-glow) {
+  position: relative;
+  z-index: 1;
+}
+
 .platform-card:hover {
-  transform: translateY(-4px);
-  background: rgba(255, 255, 255, 0.06);
+  transform: scale(1.01) translateY(-1px);
+  box-shadow:
+    0 0 45px rgba(0, 204, 255, 0.12),
+    0 4px 24px rgba(0, 0, 0, 0.4),
+    0 0 25px rgba(255, 204, 0, 0.08);
+}
+
+/* 确保 ios-glass 元素也能放大 */
+.ios-glass.platform-card:hover {
+  transform: scale(1.01) translateY(-1px);
+  box-shadow:
+    0 0 45px rgba(0, 204, 255, 0.12),
+    0 4px 24px rgba(0, 0, 0, 0.4),
+    0 0 25px rgba(255, 204, 0, 0.08);
 }
 .platform-chart-wrapper {
   flex: 1;
@@ -2483,12 +2773,15 @@ body {
 
 .platform-card.clickable {
   cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .platform-card.clickable:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+  transform: scale(1.01) translateY(-1px);
+  box-shadow:
+    0 0 45px rgba(0, 204, 255, 0.12),
+    0 4px 24px rgba(0, 0, 0, 0.4),
+    0 0 25px rgba(255, 204, 0, 0.08);
 }
 .platform-mini-chart {
   width: 96px;

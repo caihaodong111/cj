@@ -238,7 +238,15 @@ def _pick_first_value(row: dict, fields):
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def get_monitor_feed(request):
-    """Get latest feed items from monitor_feed table with pagination support."""
+    """Get latest feed items from monitor_feed table with pagination support.
+
+    优化版本：
+    1. 使用数据库聚合计算统计数据，避免全表扫描
+    2. 仅对需要的数据进行情绪分析（sentiment_score为None时）
+    3. 使用更高效的分页查询
+    """
+    from django.db.models import Count, Avg, Case, When, IntegerField, F
+
     # 获取分页参数
     try:
         page = max(1, int(request.GET.get("page", 1)))
@@ -251,13 +259,32 @@ def get_monitor_feed(request):
     offset = (page - 1) * page_size
 
     items = []
-    total_count = 0
-    total_pages = 0
 
-    # 只从 monitor_feed 表获取
-    total_count = MonitorFeed.objects.count()
+    # ============== 优化1: 使用数据库聚合获取全局统计数据 ==============
+    # 一次性获取所有统计信息，避免多次查询
+    global_stats = MonitorFeed.objects.aggregate(
+        total_count=Count('id'),
+        sensitive_count=Count(Case(When(is_sensitive=True, then=1), output_field=IntegerField())),
+        positive_count=Count(Case(When(sentiment='positive', then=1), output_field=IntegerField())),
+        negative_count=Count(Case(When(sentiment='negative', then=1), output_field=IntegerField())),
+        neutral_count=Count(Case(When(sentiment='neutral', then=1), output_field=IntegerField())),
+        avg_sentiment_score=Avg('sentiment_score'),
+    )
+
+    total_count = global_stats['total_count'] or 0
     total_pages = (total_count + page_size - 1) // page_size if total_count > 0 else 1
 
+    # 获取全局情绪分布统计
+    sentiment_distribution = {
+        "positive": global_stats['positive_count'] or 0,
+        "negative": global_stats['negative_count'] or 0,
+        "neutral": global_stats['neutral_count'] or 0,
+        "sensitive": global_stats['sensitive_count'] or 0,
+    }
+
+    # ============== 优化2: 分页查询，只获取当前页数据 ==============
+    # 使用 select_related/prefetch_related 如果有外键关系（当前没有）
+    # 只查询需要的字段
     queryset = MonitorFeed.objects.order_by("-created_at").values(
         "id",
         "platform",
@@ -278,15 +305,26 @@ def get_monitor_feed(request):
         content_text = row.get("content") or ""
         sentiment = row.get("sentiment") or "neutral"
         sentiment_score = row.get("sentiment_score")
-        sentiment_labels = row.get("sentiment_labels") or {}
+        sentiment_labels = row.get("sentiment_labels")
         is_sensitive = row.get("is_sensitive")
 
-        if sentiment_score is None or sentiment_labels == {}:
+        # ============== 优化3: 仅对需要的数据进行情绪分析 ==============
+        # 只有当 sentiment_score 为 None 时才进行分析
+        if sentiment_score is None:
             sentiment_result = analyze_sentiment(content_text)
             sentiment = sentiment_result.get("sentiment", sentiment)
-            sentiment_score = sentiment_result.get("score", sentiment_score or 0)
-            sentiment_labels = sentiment_result.get("labels", sentiment_labels)
-            is_sensitive = sentiment_labels.get("sensitive") if isinstance(sentiment_labels, dict) else False
+            sentiment_score = sentiment_result.get("score", 0)
+            sentiment_labels = sentiment_result.get("labels", {})
+
+            # 可选：异步更新数据库，下次查询时就不需要再分析了
+            try:
+                MonitorFeed.objects.filter(id=row.get("id")).update(
+                    sentiment=sentiment,
+                    sentiment_score=sentiment_score,
+                    sentiment_labels=sentiment_labels,
+                )
+            except Exception:
+                pass  # 更新失败不影响返回数据
 
         if is_sensitive is None:
             is_sensitive = bool(sentiment_labels.get("sensitive")) or sentiment == "sensitive"
@@ -304,31 +342,12 @@ def get_monitor_feed(request):
             "created_at": row.get("created_at") or 0,
             "sentiment": sentiment,
             "sentiment_score": sentiment_score or 0,
-            "sentiment_labels": sentiment_labels,
+            "sentiment_labels": sentiment_labels or {},
             "is_sensitive": bool(is_sensitive),
         })
 
-    # 计算统计数据
-    sentiment_stats = {
-        "total": total_count,
-        "positive": 0,
-        "negative": 0,
-        "neutral": 0,
-        "sensitive": 0
-    }
-
-    # 统计各情绪类型的数量
-    for item in items:
-        sentiment = item.get("sentiment", "neutral")
-        if sentiment in sentiment_stats:
-            sentiment_stats[sentiment] += 1
-
-    # 计算情感指数（-1到1之间，越接近1越积极）
-    sentiment_scores = [item.get("sentiment_score", 0) for item in items]
-    if sentiment_scores:
-        avg_sentiment = sum(sentiment_scores) / len(sentiment_scores)
-    else:
-        avg_sentiment = 0
+    # 计算情感指数（使用全局平均值而不是当前页）
+    avg_sentiment = global_stats['avg_sentiment_score'] or 0
 
     # 计算热度（基于数据量和时间）
     hot_score = min(100, (total_count / 10) if total_count > 0 else 0)
@@ -337,16 +356,11 @@ def get_monitor_feed(request):
         "items": items,
         "stats": {
             "total": total_count,
-            "sensitive": sentiment_stats["sensitive"],
+            "sensitive": sentiment_distribution["sensitive"],
             "sentiment_index": round(avg_sentiment * 10) / 10,  # -1到1，乘10放大
             "hot_score": hot_score,
         },
-        "sentiment_distribution": {
-            "positive": sentiment_stats["positive"],
-            "negative": sentiment_stats["negative"],
-            "neutral": sentiment_stats["neutral"],
-            "sensitive": sentiment_stats["sensitive"],
-        },
+        "sentiment_distribution": sentiment_distribution,
         "pagination": {
             "page": page,
             "page_size": page_size,
