@@ -21,8 +21,8 @@
         </div>
       </header>
 
-      <div class="dashboard-content">
-        <aside class="left-panel">
+      <div class="dashboard-main-grid">
+        <aside class="side-panel left">
           <div class="panel-card ios-glass main-card entrance-scale-up">
             <div class="border-glow entrance-border-glow"></div>
             <div class="cell-header">
@@ -32,15 +32,80 @@
             <div ref="mainChartRef" class="main-chart-box entrance-chart-fade"></div>
           </div>
 
-          <div class="recent-list ios-glass compact entrance-scale-up-delay-2">
+          <div class="sentiment-grid">
+            <div class="platform-card ios-glass entrance-scale-up clickable" style="animation-delay: 0.3s" @click="handlePlatformJump('xhs')">
+              <div class="cell-header compact">
+                <span class="accent-bar small"></span>
+                小红书
+              </div>
+              <div class="platform-chart-wrapper">
+                <div class="platform-mini-chart" :ref="el => setChartRef('xhs', el)"></div>
+              </div>
+            </div>
+            <div class="platform-card ios-glass entrance-scale-up clickable" style="animation-delay: 0.35s" @click="handlePlatformJump('dy')">
+              <div class="cell-header compact">
+                <span class="accent-bar small"></span>
+                抖音
+              </div>
+              <div class="platform-chart-wrapper">
+                <div class="platform-mini-chart" :ref="el => setChartRef('dy', el)"></div>
+              </div>
+            </div>
+            <div class="platform-card ios-glass entrance-scale-up clickable" style="animation-delay: 0.4s" @click="handlePlatformJump('ks')">
+              <div class="cell-header compact">
+                <span class="accent-bar small"></span>
+                快手
+              </div>
+              <div class="platform-chart-wrapper">
+                <div class="platform-mini-chart" :ref="el => setChartRef('ks', el)"></div>
+              </div>
+            </div>
+            <div class="platform-card ios-glass entrance-scale-up clickable" style="animation-delay: 0.45s" @click="handlePlatformJump('bili')">
+              <div class="cell-header compact">
+                <span class="accent-bar small"></span>
+                B站
+              </div>
+              <div class="platform-chart-wrapper">
+                <div class="platform-mini-chart" :ref="el => setChartRef('bili', el)"></div>
+              </div>
+            </div>
+            <div class="platform-card ios-glass entrance-scale-up clickable" style="animation-delay: 0.5s" @click="handlePlatformJump('wb')">
+              <div class="cell-header compact">
+                <span class="accent-bar small"></span>
+                微博
+              </div>
+              <div class="platform-chart-wrapper">
+                <div class="platform-mini-chart" :ref="el => setChartRef('wb', el)"></div>
+              </div>
+            </div>
+            <div class="platform-card ios-glass entrance-scale-up clickable" style="animation-delay: 0.55s" @click="handlePlatformJump('tieba')">
+              <div class="cell-header compact">
+                <span class="accent-bar small"></span>
+                贴吧
+              </div>
+              <div class="platform-chart-wrapper">
+                <div class="platform-mini-chart" :ref="el => setChartRef('tieba', el)"></div>
+              </div>
+            </div>
+            <div class="platform-card ios-glass entrance-scale-up clickable" style="animation-delay: 0.6s" @click="handlePlatformJump('zhihu')">
+              <div class="cell-header compact">
+                <span class="accent-bar small"></span>
+                知乎
+              </div>
+              <div class="platform-chart-wrapper">
+                <div class="platform-mini-chart" :ref="el => setChartRef('zhihu', el)"></div>
+              </div>
+            </div>
+          </div>
+        </aside>
+
+        <section class="center-panel">
+          <div class="recent-list ios-glass compact entrance-scale-up-delay-2 feed-panel">
             <div class="border-glow purple-tint entrance-border-glow"></div>
             <div class="cell-header">
               <span class="accent-bar purple"></span>
               Monitor Feed 实时动态
-            </div>
-            <div class="feed-controls">
-              <span class="feed-updated" v-if="lastUpdatedAt">更新于 {{ formatRelativeTime(lastUpdatedAt) }}</span>
-              <button class="refresh-btn" :disabled="feedLoading" @click="refreshMonitorFeed">
+              <button class="refresh-btn header-refresh" :disabled="feedLoading" @click="refreshMonitorFeed">
                 <span class="refresh-icon" :class="{ spinning: feedLoading }">⟳</span>
                 {{ feedLoading ? '刷新中' : '刷新' }}
               </button>
@@ -70,195 +135,41 @@
               <p class="hint">请先在数据采集界面生成数据</p>
             </div>
 
-            <div v-if="feedItems && feedItems.length > 0" class="pagination-wrapper">
-              <div class="pagination-info">
-                <span class="pagination-text">共 {{ totalCount }} 条数据</span>
-                <span class="pagination-divider">|</span>
-                <span class="pagination-text">第 {{ currentPage }} / {{ totalPages }} 页</span>
-              </div>
+            <div v-if="feedItems && feedItems.length > 0" class="pagination-wrapper centered">
               <div class="pagination-controls">
                 <button
-                  class="pagination-btn"
-                  :disabled="currentPage === 1"
-                  @click="goToPage(1)"
-                >
-                  首页
-                </button>
-                <button
-                  class="pagination-btn"
+                  class="pagination-btn icon-btn"
                   :disabled="currentPage === 1"
                   @click="goToPage(currentPage - 1)"
+                  title="上一页"
                 >
-                  上一页
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="15 18 9 12 15 6"></polyline>
+                  </svg>
                 </button>
-                <div class="pagination-numbers">
-                  <button
-                    v-for="page in displayedPages"
-                    :key="page"
-                    class="pagination-number"
-                    :class="{ active: page === currentPage, ellipsis: page === '...' }"
-                    :disabled="page === '...'"
-                    @click="page !== '...' && goToPage(page)"
-                  >
-                    {{ page }}
-                  </button>
-                </div>
+                <select
+                  class="page-size-select"
+                  :value="pageSize"
+                  @change="setPageSize(Number($event.target.value))"
+                >
+                  <option :value="50">50条/页</option>
+                  <option :value="100">100条/页</option>
+                </select>
+                <span class="pagination-text">{{ currentPage }} / {{ totalPages }}</span>
                 <button
-                  class="pagination-btn"
+                  class="pagination-btn icon-btn"
                   :disabled="currentPage === totalPages"
                   @click="goToPage(currentPage + 1)"
+                  title="下一页"
                 >
-                  下一页
-                </button>
-                <button
-                  class="pagination-btn"
-                  :disabled="currentPage === totalPages"
-                  @click="goToPage(totalPages)"
-                >
-                  末页
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="9 18 15 12 9 6"></polyline>
+                  </svg>
                 </button>
               </div>
             </div>
           </div>
-        </aside>
-
-        <main class="right-panel">
-          <div class="sentiment-grid">
-            <div class="platform-card ios-glass entrance-scale-up clickable" style="animation-delay: 0.3s" @click="handlePlatformJump('xhs')">
-              <div class="cell-header compact">
-                <span class="accent-bar small"></span>
-                小红书情绪结构
-              </div>
-              <div class="platform-chart-wrapper">
-                <div class="platform-mini-chart" :ref="el => setChartRef('xhs', el)"></div>
-                <div class="platform-data-col">
-                  <div class="mini-stat-row">
-                    <label>High Risk</label>
-                    <span class="value">{{ (platformSentimentCounts.xhs?.sensitive || 0) }}</span>
-                  </div>
-                  <div class="mini-stat-row">
-                    <label>Total</label>
-                    <span class="value normal">{{ (platformSentimentCounts.xhs?.total || 0) }}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div class="platform-card ios-glass entrance-scale-up clickable" style="animation-delay: 0.35s" @click="handlePlatformJump('dy')">
-              <div class="cell-header compact">
-                <span class="accent-bar small"></span>
-                抖音情绪结构
-              </div>
-              <div class="platform-chart-wrapper">
-                <div class="platform-mini-chart" :ref="el => setChartRef('dy', el)"></div>
-                <div class="platform-data-col">
-                  <div class="mini-stat-row">
-                    <label>High Risk</label>
-                    <span class="value">{{ (platformSentimentCounts.dy?.sensitive || 0) }}</span>
-                  </div>
-                  <div class="mini-stat-row">
-                    <label>Total</label>
-                    <span class="value normal">{{ (platformSentimentCounts.dy?.total || 0) }}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div class="platform-card ios-glass entrance-scale-up clickable" style="animation-delay: 0.4s" @click="handlePlatformJump('ks')">
-              <div class="cell-header compact">
-                <span class="accent-bar small"></span>
-                快手情绪结构
-              </div>
-              <div class="platform-chart-wrapper">
-                <div class="platform-mini-chart" :ref="el => setChartRef('ks', el)"></div>
-                <div class="platform-data-col">
-                  <div class="mini-stat-row">
-                    <label>High Risk</label>
-                    <span class="value">{{ (platformSentimentCounts.ks?.sensitive || 0) }}</span>
-                  </div>
-                  <div class="mini-stat-row">
-                    <label>Total</label>
-                    <span class="value normal">{{ (platformSentimentCounts.ks?.total || 0) }}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div class="platform-card ios-glass entrance-scale-up clickable" style="animation-delay: 0.45s" @click="handlePlatformJump('bili')">
-              <div class="cell-header compact">
-                <span class="accent-bar small"></span>
-                B站情绪结构
-              </div>
-              <div class="platform-chart-wrapper">
-                <div class="platform-mini-chart" :ref="el => setChartRef('bili', el)"></div>
-                <div class="platform-data-col">
-                  <div class="mini-stat-row">
-                    <label>High Risk</label>
-                    <span class="value">{{ (platformSentimentCounts.bili?.sensitive || 0) }}</span>
-                  </div>
-                  <div class="mini-stat-row">
-                    <label>Total</label>
-                    <span class="value normal">{{ (platformSentimentCounts.bili?.total || 0) }}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div class="platform-card ios-glass entrance-scale-up clickable" style="animation-delay: 0.5s" @click="handlePlatformJump('wb')">
-              <div class="cell-header compact">
-                <span class="accent-bar small"></span>
-                微博情绪结构
-              </div>
-              <div class="platform-chart-wrapper">
-                <div class="platform-mini-chart" :ref="el => setChartRef('wb', el)"></div>
-                <div class="platform-data-col">
-                  <div class="mini-stat-row">
-                    <label>High Risk</label>
-                    <span class="value">{{ (platformSentimentCounts.wb?.sensitive || 0) }}</span>
-                  </div>
-                  <div class="mini-stat-row">
-                    <label>Total</label>
-                    <span class="value normal">{{ (platformSentimentCounts.wb?.total || 0) }}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div class="platform-card ios-glass entrance-scale-up clickable" style="animation-delay: 0.55s" @click="handlePlatformJump('tieba')">
-              <div class="cell-header compact">
-                <span class="accent-bar small"></span>
-                贴吧情绪结构
-              </div>
-              <div class="platform-chart-wrapper">
-                <div class="platform-mini-chart" :ref="el => setChartRef('tieba', el)"></div>
-                <div class="platform-data-col">
-                  <div class="mini-stat-row">
-                    <label>High Risk</label>
-                    <span class="value">{{ (platformSentimentCounts.tieba?.sensitive || 0) }}</span>
-                  </div>
-                  <div class="mini-stat-row">
-                    <label>Total</label>
-                    <span class="value normal">{{ (platformSentimentCounts.tieba?.total || 0) }}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div class="platform-card ios-glass entrance-scale-up clickable" style="animation-delay: 0.6s" @click="handlePlatformJump('zhihu')">
-              <div class="cell-header compact">
-                <span class="accent-bar small"></span>
-                知乎情绪结构
-              </div>
-              <div class="platform-chart-wrapper">
-                <div class="platform-mini-chart" :ref="el => setChartRef('zhihu', el)"></div>
-                <div class="platform-data-col">
-                  <div class="mini-stat-row">
-                    <label>High Risk</label>
-                    <span class="value">{{ (platformSentimentCounts.zhihu?.sensitive || 0) }}</span>
-                  </div>
-                  <div class="mini-stat-row">
-                    <label>Total</label>
-                    <span class="value normal">{{ (platformSentimentCounts.zhihu?.total || 0) }}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </main>
+        </section>
       </div>
     </div>
 
@@ -394,7 +305,7 @@ const renderMainPieChart = () => {
       series: [{
         type: 'pie',
         radius: ['45%', '70%'],
-        center: ['40%', '50%'],
+        center: ['50%', '50%'],
         roseType: 'radius',
         label: {
           show: true,
@@ -423,7 +334,7 @@ const renderMainPieChart = () => {
       }, {
         type: 'pie',
         radius: [0, '35%'],
-        center: ['40%', '50%'],
+        center: ['50%', '50%'],
         silent: true,
         label: {
           show: true,
@@ -453,7 +364,7 @@ const renderMainPieChart = () => {
     series: [{
       type: 'pie',
       radius: ['45%', '70%'],
-      center: ['40%', '50%'],
+      center: ['50%', '50%'],
       roseType: 'radius',
       padAngle: 3,
       itemStyle: { borderRadius: 8 },
@@ -462,7 +373,7 @@ const renderMainPieChart = () => {
     }, {
       type: 'pie',
       radius: [0, '35%'],
-      center: ['40%', '50%'],
+      center: ['50%', '50%'],
       silent: true,
       label: {
         show: true,
@@ -556,7 +467,7 @@ const renderPlatformCharts = () => {
         {
           type: 'pie',
           radius: ['45%', '70%'],
-          center: ['50%', '45%'],
+        center: ['50%', '50%'],
           label: { show: false },
           data: [
             { value: sensitive, name: '敏感', itemStyle: { color: '#ff4d4f' } },
@@ -566,7 +477,7 @@ const renderPlatformCharts = () => {
         {
           type: 'pie',
           radius: [0, '35%'],
-          center: ['50%', '45%'],
+        center: ['50%', '50%'],
           silent: true,
           label: {
             show: true,
@@ -703,7 +614,7 @@ const pieChartOptions = computed(() => {
       {
         type: 'pie',
         radius: ['45%', '70%'],
-        center: ['40%', '50%'],
+        center: ['50%', '50%'],
         roseType: 'radius',
         padAngle: 3,
         itemStyle: { borderRadius: 8 },
@@ -726,7 +637,7 @@ const pieChartOptions = computed(() => {
       {
         type: 'pie',
         radius: [0, '35%'],
-        center: ['40%', '50%'],
+        center: ['50%', '50%'],
         silent: true,
         label: {
           show: true,
@@ -913,7 +824,7 @@ const buildPlatformPieOptions = ({ sensitive = 0, total = 0 }) => ({
       {
         type: 'pie',
         radius: ['45%', '70%'],
-        center: ['50%', '45%'],
+        center: ['50%', '50%'],
         label: { show: false },
         data: [
           { value: sensitive, name: '敏感', itemStyle: { color: '#ff4d4f' } },
@@ -923,7 +834,7 @@ const buildPlatformPieOptions = ({ sensitive = 0, total = 0 }) => ({
       {
         type: 'pie',
         radius: [0, '35%'],
-        center: ['50%', '45%'],
+          center: ['50%', '50%'],
         silent: true,
         label: {
           show: true,
@@ -1228,6 +1139,13 @@ const goToPage = async (page) => {
   await fetchMonitorFeedPage()
 }
 
+const setPageSize = async (size) => {
+  if (pageSize.value === size) return
+  pageSize.value = size
+  currentPage.value = 1
+  await fetchMonitorFeedPage()
+}
+
 // 获取指定页的数据
 const fetchMonitorFeedPage = async ({ withLoading = true, signal = null } = {}) => {
   // 如果请求已被取消，直接返回
@@ -1465,7 +1383,8 @@ watch(feedItems, () => {
   position: relative;
   z-index: 1;
   padding: 24px 32px;
-  max-width: 1600px;
+  max-width: 100%;
+  width: 100%;
   margin: 0 auto;
   height: 100vh;
   box-sizing: border-box;
@@ -1474,6 +1393,44 @@ watch(feedItems, () => {
   gap: 18px;
   overflow-y: auto;
   scroll-behavior: smooth;
+}
+
+.dashboard-main-grid {
+  display: grid;
+  grid-template-columns: 360px 1fr;
+  gap: 20px;
+  height: calc(100vh - 120px);
+  align-items: stretch;
+}
+
+.side-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+}
+
+.center-panel {
+  min-width: 0;
+  display: flex;
+  height: 100%;
+}
+
+.feed-panel {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  max-height: 900px;
+}
+
+.feed-panel .list-wrapper {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: 680px;
+  overflow-y: auto;
+  padding-right: 0.5rem;
 }
 
 .modal-overlay {
@@ -1872,14 +1829,14 @@ watch(feedItems, () => {
   flex: 1;
   display: flex;
   flex-direction: column;
-  min-height: 300px;
+  min-height: 0;
   box-shadow:
     0 0 40px rgba(0, 204, 255, 0.1),
     0 4px 24px rgba(0, 0, 0, 0.4);
 }
 
 .recent-list.compact {
-  min-height: 320px;
+  min-height: 0;
   padding: 1.25rem;
 }
 
@@ -1974,10 +1931,31 @@ watch(feedItems, () => {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  flex: 1;
-  min-height: 200px;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
   padding-right: 0.35rem;
+  scroll-behavior: smooth;
+}
+
+/* 内部滚动条样式 */
+.list-wrapper::-webkit-scrollbar {
+  width: 6px;
+}
+
+.list-wrapper::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 3px;
+}
+
+.list-wrapper::-webkit-scrollbar-thumb {
+  background: rgba(0, 204, 255, 0.3);
+  border-radius: 3px;
+  transition: all 0.3s;
+}
+
+.list-wrapper::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 204, 255, 0.5);
 }
 
 .list-item {
@@ -2462,8 +2440,8 @@ body {
   margin-left: 10px;
   font-weight: 300;
   letter-spacing: 2px;
-  display: block;
-  margin-top: 4px;
+  display: inline-block;
+  margin-top: 0;
 }
 
 /* Status Tag Dot */
@@ -2496,8 +2474,11 @@ body {
 .platform-chart-wrapper {
   flex: 1;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  padding: 0 16px 10px;
+  justify-content: center;
+  gap: 8px;
+  padding: 6px 16px 16px;
 }
 
 .platform-card.clickable {
@@ -2510,16 +2491,19 @@ body {
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
 }
 .platform-mini-chart {
-  width: 90px;
-  height: 90px;
+  width: 96px;
+  height: 96px;
   flex-shrink: 0;
 }
 .platform-data-col {
-  flex: 1;
+  width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding-left: 12px;
+  gap: 6px;
+  padding-left: 0;
+}
+.header-refresh {
+  margin-left: auto;
 }
 .mini-stat-row {
   display: flex;
@@ -2611,18 +2595,34 @@ body {
   justify-content: space-between;
   align-items: center;
   gap: 1rem;
-  margin-top: 1rem;
-  padding-top: 1rem;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
   border-top: 1px solid var(--border-cyan);
   flex-wrap: wrap;
+  position: relative;
+  z-index: 2;
+  flex-shrink: 0;
+}
+
+.pagination-wrapper.compact {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  gap: 0.75rem;
+}
+
+.pagination-wrapper.centered {
+  justify-content: center;
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
 }
 
 .pagination-info {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.4rem;
   color: var(--text-dim);
-  font-size: 0.85rem;
+  font-size: 0.8rem;
+  flex-wrap: wrap;
 }
 
 .pagination-divider {
@@ -2632,12 +2632,110 @@ body {
 .pagination-text {
   color: var(--text-light);
   font-weight: 500;
+  font-size: 0.85rem;
 }
 
 .pagination-controls {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+}
+
+.pagination-controls .pagination-text {
+  padding: 0 0.5rem;
+  font-size: 0.85rem;
+  min-width: 50px;
+  text-align: center;
+}
+
+/* 图标按钮样式 */
+.pagination-btn.icon-btn {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  border: 1px solid var(--border-cyan);
+  background: rgba(0, 204, 255, 0.08);
+  color: var(--cyan-primary);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.pagination-btn.icon-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.pagination-btn.icon-btn:hover:not(:disabled) {
+  background: rgba(0, 204, 255, 0.2);
+  border-color: var(--glow-cyan);
+  box-shadow: 0 0 15px rgba(0, 204, 255, 0.3);
+  transform: translateY(-1px);
+}
+
+.pagination-btn.icon-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* 下拉选择框样式 */
+.page-size-select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  padding: 0.4rem 2rem 0.4rem 0.7rem;
+  border-radius: 8px;
+  border: 1px solid var(--border-cyan);
+  background: rgba(0, 204, 255, 0.08) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2300ccff' stroke-width='3'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") no-repeat right 8px center;
+  color: var(--text-light);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  min-width: 80px;
+}
+
+.page-size-select:hover {
+  background-color: rgba(0, 204, 255, 0.12);
+  border-color: var(--glow-cyan);
+}
+
+.page-size-select:focus {
+  outline: none;
+  border-color: var(--glow-cyan);
+  box-shadow: 0 0 10px rgba(0, 204, 255, 0.3);
+}
+
+.page-size-select option {
+  background: rgba(10, 10, 15, 0.98);
+  color: var(--text-light);
+  padding: 0.4rem 0.7rem;
+}
+
+.page-size-toggle {
+  display: inline-flex;
+  gap: 0.25rem;
+  align-items: center;
+}
+
+.page-size-btn {
+  min-width: 38px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid var(--border-cyan);
+  background: rgba(0, 204, 255, 0.05);
+  color: var(--text-light);
+  cursor: pointer;
+  font-size: 0.75rem;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.page-size-btn.active {
+  background: linear-gradient(135deg, rgba(0, 102, 255, 0.4), rgba(0, 204, 255, 0.25));
+  border-color: var(--glow-cyan);
+  color: var(--text-white);
 }
 
 .pagination-btn {
