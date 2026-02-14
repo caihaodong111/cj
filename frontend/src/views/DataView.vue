@@ -671,7 +671,8 @@ onUnmounted(() => {
 }
 
 .kpi-icon-box.is-brand-logo {
-  background: rgba(255, 100, 0, 0.2);
+  background: transparent;
+  box-shadow: none;
 }
 
 .status-icon {
