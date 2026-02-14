@@ -2378,7 +2378,7 @@ watch(feedItems, () => {
   --text-gray: #888888;
   --text-light: #aaaaaa;
   --text-dim: #666666;
-  --bg-pure-black: #000000;
+  --bg-pure-black: #050510;
   --bg-glass: rgba(255, 255, 255, 0.03);
   --border-cyan: rgba(0, 204, 255, 0.2);
   --glow-cyan: rgba(0, 204, 255, 0.4);

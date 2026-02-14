@@ -1,122 +1,149 @@
 <template>
-  <div class="settings-view">
-    <div class="settings-container glass">
-      <h3>系统设置</h3>
+  <div class="settings-wrapper">
+    <div class="ambient-background">
+      <div class="nebula blue"></div>
+      <div class="nebula gold"></div>
+      <div class="breathing-line gold-1"></div>
+      <div class="breathing-line gold-2"></div>
+      <div class="scan-grid"></div>
+      <div class="particles">
+        <div class="particle" v-for="i in 8" :key="i" :style="{ animationDelay: `${i * 1.5}s` }"></div>
+      </div>
+    </div>
 
-      <!-- Cookie 管理 -->
-      <div class="settings-group">
-        <div class="group-header">
-          <h4>Cookie 配置管理</h4>
-          <button class="btn-secondary" @click="openAddModal">+ 添加配置</button>
+    <div class="settings-view">
+      <header class="page-header entrance-slide-in">
+        <div class="title-area">
+          <h1 class="ios-title">系统设置<span class="subtitle">System Settings</span></h1>
         </div>
+      </header>
 
-        <div class="cookie-list">
-          <div v-if="loading" class="loading">加载中...</div>
-          <div v-else-if="cookies.length === 0" class="empty-state">暂无 Cookie 配置</div>
-          <div v-else class="cookie-items">
-            <div v-for="cookie in cookies" :key="cookie.id" class="cookie-item" :class="{ active: cookie.is_active }">
-              <div class="cookie-info">
-                <span class="platform-badge" :class="'platform-' + cookie.platform">{{ cookie.platform_display }}</span>
-                <span class="cookie-name">{{ cookie.name }}</span>
-                <span v-if="!cookie.is_valid" class="invalid-badge">无效</span>
-              </div>
-              <div class="cookie-actions">
-                <button class="btn-icon" @click="editCookie(cookie)" title="编辑">✏️</button>
-                <button class="btn-icon" @click="toggleActive(cookie)" :title="cookie.is_active ? '禁用' : '启用'">
-                  {{ cookie.is_active ? '🔒' : '🔓' }}
-                </button>
-                <button class="btn-icon danger" @click="deleteCookie(cookie)" title="删除">🗑️</button>
+      <div class="settings-container ios-glass entrance-scale-up">
+        <div class="border-glow"></div>
+        <!-- Cookie 管理 -->
+        <div class="settings-group">
+          <div class="group-header">
+            <div class="group-title">
+              <span class="accent-bar"></span>
+              <h4>Cookie 配置管理</h4>
+            </div>
+            <button class="btn-secondary" @click="openAddModal">+ 添加配置</button>
+          </div>
+
+          <div class="cookie-list">
+            <div v-if="loading" class="loading">加载中...</div>
+            <div v-else-if="cookies.length === 0" class="empty-state">暂无 Cookie 配置</div>
+            <div v-else class="cookie-items">
+              <div v-for="cookie in cookies" :key="cookie.id" class="cookie-item" :class="{ active: cookie.is_active }">
+                <div class="cookie-info">
+                  <span class="platform-badge" :class="'platform-' + cookie.platform">{{ cookie.platform_display }}</span>
+                  <span class="cookie-name">{{ cookie.name }}</span>
+                  <span v-if="!cookie.is_valid" class="invalid-badge">无效</span>
+                </div>
+                <div class="cookie-actions">
+                  <button class="btn-icon" @click="editCookie(cookie)" title="编辑">✏️</button>
+                  <button class="btn-icon" @click="toggleActive(cookie)" :title="cookie.is_active ? '禁用' : '启用'">
+                    {{ cookie.is_active ? '🔒' : '🔓' }}
+                  </button>
+                  <button class="btn-icon danger" @click="deleteCookie(cookie)" title="删除">🗑️</button>
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <div class="settings-group">
-        <h4>爬虫配置 (Crawler Config)</h4>
-        <div class="config-item">
-          <label>并发线程数</label>
-          <input type="number" value="4" />
-        </div>
-        <div class="config-item">
-          <label>请求间隔 (ms)</label>
-          <input type="number" value="1000" />
-        </div>
-        <div class="config-item">
-          <label>包含图片下载</label>
-          <label class="switch">
-            <input type="checkbox" checked>
-            <span class="slider round"></span>
-          </label>
-        </div>
-      </div>
-
-      <div class="settings-group">
-        <h4>显示设置 (Appearance)</h4>
-        <div class="config-item">
-          <label>主题色</label>
-          <div class="color-picker">
-            <div class="color-circle gold active"></div>
-            <div class="color-circle blue"></div>
-            <div class="color-circle green"></div>
+        <div class="settings-group">
+          <div class="group-title">
+            <span class="accent-bar"></span>
+            <h4>爬虫配置 (Crawler Config)</h4>
           </div>
-        </div>
-        <div class="config-item">
-          <label>呼吸动画</label>
-          <label class="switch">
-            <input type="checkbox" checked>
-            <span class="slider round"></span>
-          </label>
-        </div>
-      </div>
-
-      <div class="actions">
-        <button class="btn-primary">保存配置</button>
-      </div>
-    </div>
-
-    <!-- 添加/编辑 Cookie 弹窗 -->
-    <div v-if="showAddModal || showEditModal" class="modal-overlay" @click.self="closeModal">
-      <div class="modal glass">
-        <h3>{{ showEditModal ? '编辑 Cookie 配置' : '添加 Cookie 配置' }}</h3>
-        <form @submit.prevent="saveCookie" class="cookie-form">
-          <div class="form-group">
-            <label>平台 *</label>
-            <select v-model="formData.platform" required>
-              <option value="">请选择平台</option>
-              <option value="xhs">小红书</option>
-              <option value="dy">抖音</option>
-              <option value="ks">快手</option>
-              <option value="bili">哔哩哔哩</option>
-              <option value="wb">微博</option>
-              <option value="tieba">百度贴吧</option>
-              <option value="zhihu">知乎</option>
-            </select>
+          <div class="config-item">
+            <label>并发线程数</label>
+            <input type="number" value="4" />
           </div>
-          <div class="form-group">
-            <label>配置名称 *</label>
-            <input v-model="formData.name" type="text" placeholder="如: 账号1" required />
+          <div class="config-item">
+            <label>请求间隔 (ms)</label>
+            <input type="number" value="1000" />
           </div>
-          <div class="form-group">
-            <label>Cookie 字符串 *</label>
-            <textarea v-model="formData.cookies" rows="5" placeholder="格式: key1=value1;key2=value2" required></textarea>
-            <small>格式: key1=value1;key2=value2</small>
-          </div>
-          <div class="form-group">
-            <label>备注</label>
-            <input v-model="formData.remark" type="text" placeholder="可选备注信息" />
-          </div>
-          <div class="form-group checkbox-group">
-            <label>
-              <input v-model="formData.is_active" type="checkbox" />
-              <span>启用此配置</span>
+          <div class="config-item">
+            <label>包含图片下载</label>
+            <label class="switch">
+              <input type="checkbox" checked>
+              <span class="slider round"></span>
             </label>
           </div>
-          <div class="modal-actions">
-            <button type="button" class="btn-secondary" @click="closeModal">取消</button>
-            <button type="submit" class="btn-primary">保存</button>
+        </div>
+
+        <div class="settings-group">
+          <div class="group-title">
+            <span class="accent-bar"></span>
+            <h4>显示设置 (Appearance)</h4>
           </div>
-        </form>
+          <div class="config-item">
+            <label>主题色</label>
+            <div class="color-picker">
+              <div class="color-circle gold active"></div>
+              <div class="color-circle blue"></div>
+              <div class="color-circle green"></div>
+            </div>
+          </div>
+          <div class="config-item">
+            <label>呼吸动画</label>
+            <label class="switch">
+              <input type="checkbox" checked>
+              <span class="slider round"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button class="btn-primary">保存配置</button>
+        </div>
+      </div>
+
+      <div v-if="showAddModal || showEditModal" class="modal-overlay" @click.self="closeModal">
+        <div class="modal ios-glass">
+          <div class="border-glow purple-tint"></div>
+          <h3>{{ showEditModal ? '编辑 Cookie 配置' : '添加 Cookie 配置' }}</h3>
+          <form @submit.prevent="saveCookie" class="cookie-form">
+            <div class="form-group">
+              <label>平台 *</label>
+              <select v-model="formData.platform" required>
+                <option value="">请选择平台</option>
+                <option value="xhs">小红书</option>
+                <option value="dy">抖音</option>
+                <option value="ks">快手</option>
+                <option value="bili">哔哩哔哩</option>
+                <option value="wb">微博</option>
+                <option value="tieba">百度贴吧</option>
+                <option value="zhihu">知乎</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>配置名称 *</label>
+              <input v-model="formData.name" type="text" placeholder="如: 账号1" required />
+            </div>
+            <div class="form-group">
+              <label>Cookie 字符串 *</label>
+              <textarea v-model="formData.cookies" rows="5" placeholder="格式: key1=value1;key2=value2" required></textarea>
+              <small>格式: key1=value1;key2=value2</small>
+            </div>
+            <div class="form-group">
+              <label>备注</label>
+              <input v-model="formData.remark" type="text" placeholder="可选备注信息" />
+            </div>
+            <div class="form-group checkbox-group">
+              <label>
+                <input v-model="formData.is_active" type="checkbox" />
+                <span>启用此配置</span>
+              </label>
+            </div>
+            <div class="modal-actions">
+              <button type="button" class="btn-secondary" @click="closeModal">取消</button>
+              <button type="submit" class="btn-primary">保存</button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   </div>
@@ -250,23 +277,241 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.settings-wrapper {
+  min-height: 100vh;
+  background: #050510;
+  position: relative;
+  overflow: hidden;
+  color: #fff;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+}
+
+.ambient-background {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.nebula {
+  position: absolute;
+  width: 80vw;
+  height: 70vh;
+  filter: blur(120px);
+  opacity: 0.28;
+  mix-blend-mode: screen;
+}
+
+.nebula.blue {
+  background: radial-gradient(circle, #0066ff, transparent 75%);
+  top: -10%;
+  left: -5%;
+}
+
+.nebula.gold {
+  background: radial-gradient(circle, #ffaa00, transparent 75%);
+  bottom: -10%;
+  right: -5%;
+}
+
+.breathing-line {
+  position: absolute;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #ffaa00, transparent);
+  filter: blur(1px);
+  opacity: 0.3;
+  animation: breathe 8s infinite ease-in-out;
+}
+
+.gold-1 { width: 100%; top: 30%; left: -50%; transform: rotate(-5deg); }
+.gold-2 { width: 100%; bottom: 20%; right: -50%; transform: rotate(3deg); animation-delay: -4s; }
+
+@keyframes breathe {
+  0%, 100% { opacity: 0.1; transform: scaleX(0.8) translateY(0); }
+  50% { opacity: 0.5; transform: scaleX(1.2) translateY(-20px); }
+}
+
+.scan-grid {
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+                    linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+  background-size: 50px 50px;
+  mask-image: linear-gradient(to bottom, black, transparent);
+  animation: gridMove 25s linear infinite;
+}
+
+@keyframes gridMove {
+  from { background-position: 0 0; }
+  to { background-position: 0 50px; }
+}
+
+.particles {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+}
+
+.particle {
+  position: absolute;
+  bottom: -10px;
+  width: 3px;
+  height: 3px;
+  background: #00ccff;
+  border-radius: 50%;
+  opacity: 0;
+  animation: particleFloat 15s linear infinite;
+}
+
+@keyframes particleFloat {
+  0% {
+    opacity: 0;
+    transform: translateY(0) translateX(0);
+  }
+  10% {
+    opacity: 0.8;
+  }
+  90% {
+    opacity: 0.8;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-100vh) translateX(50px);
+  }
+}
+
+.particle:nth-child(1) { left: 10%; }
+.particle:nth-child(2) { left: 20%; }
+.particle:nth-child(3) { left: 30%; }
+.particle:nth-child(4) { left: 40%; }
+.particle:nth-child(5) { left: 50%; }
+.particle:nth-child(6) { left: 60%; }
+.particle:nth-child(7) { left: 70%; }
+.particle:nth-child(8) { left: 80%; }
+
 .settings-view {
-  padding: 2rem;
-  max-width: 900px;
-  margin: 0 auto;
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+  padding: 32px 40px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.page-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  position: relative;
+  z-index: 3;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(0, 204, 255, 0.2);
+}
+
+.title-area {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ios-title {
+  font-size: 32px;
+  letter-spacing: -0.5px;
+  background: linear-gradient(180deg, #fff 40%, rgba(255, 255, 255, 0.6));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin: 0;
+}
+
+.ios-title .subtitle {
+  font-size: 14px;
+  color: #ffaa00;
+  margin-left: 10px;
+  font-weight: 300;
+  letter-spacing: 2px;
+  display: inline-block;
+  margin-top: 0;
+}
+
+.ios-glass {
+  background: rgba(255,255,255,0.03);
+  backdrop-filter: blur(50px) saturate(180%);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 20px;
+  position: relative;
+  overflow: visible;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.8);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.ios-glass > :not(.border-glow) {
+  position: relative;
+  z-index: 1;
+}
+
+.ios-glass:hover {
+  transform: scale(1.01) translateY(-1px);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.8),
+              0 0 30px rgba(255, 204, 0, 0.12),
+              0 0 60px rgba(255, 204, 0, 0.06);
+}
+
+.border-glow {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: 20px;
+  padding: 1px;
+  background: linear-gradient(135deg, rgba(255, 170, 0, 0.4), transparent 40%, rgba(255, 170, 0, 0.1));
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  animation: borderBreathe 6s infinite ease-in-out;
+  pointer-events: none;
+}
+
+.border-glow.purple-tint {
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.55), transparent 45%, rgba(168, 85, 247, 0.15));
+}
+
+@keyframes borderBreathe {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.8; box-shadow: inset 0 0 15px rgba(255, 170, 0, 0.2); }
+}
+
+.entrance-slide-in {
+  animation: slideInFade 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  opacity: 0;
+  transform: translateX(-40px);
+}
+
+.entrance-scale-up {
+  animation: scaleUpFade 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.2s forwards;
+  opacity: 0;
+  transform: scale(0.95) translateY(20px);
+}
+
+@keyframes slideInFade {
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes scaleUpFade {
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
 }
 
 .settings-container {
-  padding: 2rem;
-  border-radius: 12px;
-}
-
-.settings-container h3 {
-  margin: 0 0 2rem 0;
-  color: var(--primary-color);
-  font-size: 1.5rem;
-  border-bottom: 1px solid var(--border-color);
-  padding-bottom: 1rem;
+  padding: 24px;
+  width: min(980px, 100%);
+  margin: 0 auto;
 }
 
 .settings-group {
@@ -280,13 +525,25 @@ onMounted(() => {
   margin-bottom: 1rem;
 }
 
-.settings-group h4 {
+.group-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.group-title h4 {
   margin: 0;
-  color: var(--text-color);
+  color: rgba(255, 255, 255, 0.85);
   font-weight: 600;
 }
 
-/* Cookie 列表 */
+.accent-bar {
+  width: 4px;
+  height: 18px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #ffaa00, #ff6a00);
+}
+
 .cookie-list {
   min-height: 100px;
 }
@@ -294,7 +551,7 @@ onMounted(() => {
 .loading, .empty-state {
   text-align: center;
   padding: 2rem;
-  color: var(--secondary-color);
+  color: rgba(255, 255, 255, 0.55);
 }
 
 .cookie-items {
@@ -309,8 +566,8 @@ onMounted(() => {
   align-items: center;
   padding: 1rem;
   background: rgba(255, 255, 255, 0.03);
-  border-radius: 8px;
-  border: 1px solid transparent;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
   transition: all 0.3s;
 }
 
@@ -319,8 +576,8 @@ onMounted(() => {
 }
 
 .cookie-item.active {
-  border-color: var(--primary-color);
-  box-shadow: 0 0 10px rgba(255, 215, 0, 0.1);
+  border-color: rgba(255, 170, 0, 0.5);
+  box-shadow: 0 0 10px rgba(255, 215, 0, 0.12);
 }
 
 .cookie-info {
@@ -337,16 +594,16 @@ onMounted(() => {
   text-transform: uppercase;
 }
 
-.platform-xhs { background: rgba(255, 60, 60, 0.2); color: #FF3C3C; }
-.platform-dy { background: rgba(0, 0, 0, 0.3); color: #fff; }
+.platform-xhs { background: rgba(255, 100, 0, 0.2); color: #FF6400; }
+.platform-dy { background: rgba(255, 100, 0, 0.2); color: #FF6400; }
 .platform-ks { background: rgba(255, 100, 0, 0.2); color: #FF6400; }
-.platform-bili { background: rgba(0, 160, 233, 0.2); color: #00A0E9; }
-.platform-wb { background: rgba(230, 57, 71, 0.2); color: #E63947; }
-.platform-tieba { background: rgba(0, 122, 255, 0.2); color: #007AFF; }
-.platform-zhihu { background: rgba(0, 153, 153, 0.2); color: #009999; }
+.platform-bili { background: rgba(255, 100, 0, 0.2); color: #FF6400; }
+.platform-wb { background: rgba(255, 100, 0, 0.2); color: #FF6400; }
+.platform-tieba { background: rgba(255, 100, 0, 0.2); color: #FF6400; }
+.platform-zhihu { background: rgba(255, 100, 0, 0.2); color: #FF6400; }
 
 .cookie-name {
-  color: var(--text-color);
+  color: rgba(255, 255, 255, 0.85);
   font-weight: 500;
 }
 
@@ -365,32 +622,31 @@ onMounted(() => {
 
 .btn-icon {
   background: transparent;
-  border: 1px solid var(--border-color);
+  border: 1px solid rgba(255, 255, 255, 0.2);
   padding: 0.5rem;
-  border-radius: 6px;
+  border-radius: 8px;
   cursor: pointer;
   font-size: 1rem;
   transition: all 0.3s;
+  color: rgba(255, 255, 255, 0.8);
 }
 
 .btn-icon:hover {
   background: rgba(255, 255, 255, 0.1);
-  transform: scale(1.1);
+  transform: scale(1.05);
 }
 
 .btn-icon.danger:hover {
   background: rgba(255, 68, 68, 0.2);
   border-color: #FF4444;
+  color: #FFBBBB;
 }
 
-/* Modal */
 .modal-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
+  inset: 0;
+  background: rgba(6, 8, 14, 0.7);
+  backdrop-filter: blur(10px);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -399,14 +655,13 @@ onMounted(() => {
 
 .modal {
   width: 90%;
-  max-width: 500px;
+  max-width: 520px;
   padding: 2rem;
-  border-radius: 12px;
 }
 
 .modal h3 {
   margin: 0 0 1.5rem 0;
-  color: var(--primary-color);
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .cookie-form {
@@ -422,18 +677,18 @@ onMounted(() => {
 }
 
 .form-group label {
-  color: var(--text-color);
+  color: rgba(255, 255, 255, 0.7);
   font-weight: 500;
 }
 
 .form-group input,
 .form-group select,
 .form-group textarea {
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid var(--border-color);
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   padding: 0.8rem;
-  border-radius: 6px;
-  color: var(--text-color);
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.85);
   font-size: 0.9rem;
 }
 
@@ -443,7 +698,7 @@ onMounted(() => {
 }
 
 .form-group small {
-  color: var(--secondary-color);
+  color: rgba(255, 255, 255, 0.45);
   font-size: 0.8rem;
 }
 
@@ -465,13 +720,12 @@ onMounted(() => {
   margin-top: 1rem;
 }
 
-/* Buttons */
 .btn-primary {
-  background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+  background: linear-gradient(135deg, #ffaa00, #ff6a00);
   color: #000;
   border: none;
   padding: 0.8rem 1.5rem;
-  border-radius: 8px;
+  border-radius: 999px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s;
@@ -484,10 +738,10 @@ onMounted(() => {
 
 .btn-secondary {
   background: transparent;
-  color: var(--text-color);
-  border: 1px solid var(--border-color);
+  color: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.2);
   padding: 0.6rem 1.2rem;
-  border-radius: 8px;
+  border-radius: 999px;
   cursor: pointer;
   transition: all 0.3s;
 }
@@ -496,7 +750,6 @@ onMounted(() => {
   background: rgba(255, 255, 255, 0.1);
 }
 
-/* 原有样式 */
 .config-item {
   display: flex;
   justify-content: space-between;
@@ -506,15 +759,15 @@ onMounted(() => {
 }
 
 .config-item label {
-  color: var(--secondary-color);
+  color: rgba(255, 255, 255, 0.6);
 }
 
 .config-item input[type="number"] {
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid var(--border-color);
-  padding: 0.5rem;
-  border-radius: 4px;
-  color: var(--text-color);
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.85);
   width: 100px;
 }
 
@@ -554,11 +807,11 @@ onMounted(() => {
 }
 
 input:checked + .slider {
-  background-color: var(--primary-color);
+  background-color: #ffaa00;
 }
 
 input:focus + .slider {
-  box-shadow: 0 0 1px var(--primary-color);
+  box-shadow: 0 0 1px rgba(255, 170, 0, 0.8);
 }
 
 input:checked + .slider:before {

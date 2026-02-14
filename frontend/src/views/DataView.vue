@@ -7,6 +7,9 @@
       <div class="breathing-line gold-1"></div>
       <div class="breathing-line gold-2"></div>
       <div class="scan-grid"></div>
+      <div class="particles">
+        <div class="particle" v-for="i in 8" :key="i" :style="{ animationDelay: `${i * 1.5}s` }"></div>
+      </div>
     </div>
 
     <div class="data-view">
@@ -318,27 +321,27 @@ onUnmounted(() => {
   height: 40px;
   object-fit: contain;
   border-radius: 8px;
-  padding: 2px;
-  background: rgba(255, 255, 255, 0.1);
+  padding: 0;
+  background: transparent;
   transition: all 0.3s ease;
 }
 
 .platform-logo-img:hover {
   transform: scale(1.05);
-  background: rgba(255, 255, 255, 0.15);
+  background: transparent;
 }
 
 .platform-logo-img.small {
   width: 32px;
   height: 32px;
   border-radius: 6px;
-  padding: 2px;
+  padding: 0;
 }
 
 /* === iOS Style Base === */
 .data-wrapper {
   min-height: 100vh;
-  background: #030508;
+  background: #050510;
   position: relative;
   overflow: hidden;
   color: #fff;
@@ -347,30 +350,31 @@ onUnmounted(() => {
 
 /* === Ambient Background Effects === */
 .ambient-background {
-  position: absolute;
-  inset: 0;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
   pointer-events: none;
   z-index: 0;
 }
 
 .nebula {
   position: absolute;
+  width: 80vw;
+  height: 70vh;
   filter: blur(120px);
   opacity: 0.28;
   mix-blend-mode: screen;
 }
 
 .nebula.blue {
-  width: 80vw;
-  height: 70vh;
   background: radial-gradient(circle, #0066ff, transparent 75%);
   top: -10%;
   left: -5%;
 }
 
 .nebula.gold {
-  width: 80vw;
-  height: 70vh;
   background: radial-gradient(circle, #ffaa00, transparent 75%);
   bottom: -10%;
   right: -5%;
@@ -396,9 +400,9 @@ onUnmounted(() => {
 .scan-grid {
   position: absolute;
   inset: 0;
-  background-image: linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
-                    linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
-  background-size: 40px 40px;
+  background-image: linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+                    linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+  background-size: 50px 50px;
   mask-image: linear-gradient(to bottom, black, transparent);
   animation: gridMove 25s linear infinite;
 }
@@ -407,6 +411,49 @@ onUnmounted(() => {
   from { background-position: 0 0; }
   to { background-position: 0 50px; }
 }
+
+.particles {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+}
+
+.particle {
+  position: absolute;
+  bottom: -10px;
+  width: 3px;
+  height: 3px;
+  background: #00ccff;
+  border-radius: 50%;
+  opacity: 0;
+  animation: particleFloat 15s linear infinite;
+}
+
+@keyframes particleFloat {
+  0% {
+    opacity: 0;
+    transform: translateY(0) translateX(0);
+  }
+  10% {
+    opacity: 0.8;
+  }
+  90% {
+    opacity: 0.8;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-100vh) translateX(50px);
+  }
+}
+
+.particle:nth-child(1) { left: 10%; }
+.particle:nth-child(2) { left: 20%; }
+.particle:nth-child(3) { left: 30%; }
+.particle:nth-child(4) { left: 40%; }
+.particle:nth-child(5) { left: 50%; }
+.particle:nth-child(6) { left: 60%; }
+.particle:nth-child(7) { left: 70%; }
+.particle:nth-child(8) { left: 80%; }
 
 /* === Layout === */
 .data-view {
@@ -421,25 +468,37 @@ onUnmounted(() => {
 
 .page-header {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
   position: relative;
   z-index: 3;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(0, 204, 255, 0.2);
+}
+
+.title-area {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .ios-title {
-  font-size: 1.6rem;
-  font-weight: 600;
-  letter-spacing: 1px;
+  font-size: 32px;
+  letter-spacing: -0.5px;
+  background: linear-gradient(180deg, #fff 40%, rgba(255, 255, 255, 0.6));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
   margin: 0;
 }
 
-.subtitle {
-  display: block;
-  font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.6);
-  letter-spacing: 1px;
-  margin-top: 6px;
+.ios-title .subtitle {
+  font-size: 14px;
+  color: #ffaa00;
+  margin-left: 10px;
+  font-weight: 300;
+  letter-spacing: 2px;
+  display: inline-block;
+  margin-top: 0;
 }
 
 .crawler-btn {
@@ -473,16 +532,18 @@ onUnmounted(() => {
   background: rgba(255,255,255,0.03);
   backdrop-filter: blur(50px) saturate(180%);
   border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 24px;
+  border-radius: 20px;
   position: relative;
-  overflow: hidden;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.8);
-  transition: all 0.3s ease;
+  overflow: visible;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.8);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .ios-glass:hover {
-  border-color: rgba(255, 170, 0, 0.15);
-  box-shadow: 0 15px 40px rgba(0,0,0,0.5), 0 0 20px rgba(255, 170, 0, 0.1);
+  transform: scale(1.01) translateY(-1px);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.8),
+              0 0 30px rgba(255, 204, 0, 0.12),
+              0 0 60px rgba(255, 204, 0, 0.06);
 }
 
 /* === Entrance Animations === */
@@ -522,12 +583,14 @@ onUnmounted(() => {
 .border-glow {
   position: absolute;
   inset: 0;
-  border-radius: 24px;
+  z-index: 0;
+  border-radius: 20px;
   padding: 1px;
   background: linear-gradient(135deg, rgba(255, 170, 0, 0.4), transparent 40%, rgba(255, 170, 0, 0.1));
   mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   mask-composite: exclude;
   animation: borderBreathe 6s infinite ease-in-out;
+  pointer-events: none;
 }
 
 .border-glow.gold-tint {
@@ -603,83 +666,16 @@ onUnmounted(() => {
   justify-content: center;
   font-size: 26px;
   flex-shrink: 0;
-  background: rgba(255, 170, 0, 0.12);
+  background: rgba(255, 100, 0, 0.2);
   color: #ffaa00;
 }
 
 .kpi-icon-box.is-brand-logo {
-  background: transparent;
+  background: rgba(255, 100, 0, 0.2);
 }
 
 .status-icon {
   font-size: 26px;
-}
-
-.xhs-logo {
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
-  background: #ff2442;
-  color: #fff;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-  user-select: none;
-  box-shadow: none;
-}
-
-.xhs-logo.small {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  font-size: 10px;
-  letter-spacing: 0.4px;
-  box-shadow: none;
-}
-
-.douyin-logo {
-  width: 40px;
-  aspect-ratio: 0.87;
-  padding: 6px calc(6px + 40px / 0.87 * 0.13 / 2);
-  background-color: #000;
-  display: grid;
-  position: relative;
-  border-radius: 10px;
-}
-
-.douyin-logo::before,
-.douyin-logo::after {
-  content: '';
-  grid-area: 1 / 1;
-}
-
-.douyin-logo::before {
-  background:
-    radial-gradient(100% 100% at 100% 100%, transparent 0 50%, #08fff9 50% 100%, transparent) left 52%/41% 36% no-repeat,
-    radial-gradient(50% 100% at top, transparent 44%, #08fff9 45% 98%, transparent) 0 100%/73% 31% no-repeat,
-    linear-gradient(#08fff9, #08fff9) 66% 0/20% 70% no-repeat,
-    radial-gradient(100% 100% at 100% 0, transparent 0 58%, #08fff9 58.5% 99%, transparent) 100% 0/47% 41.8% no-repeat;
-}
-
-.douyin-logo::after {
-  --color: #f00044;
-  background:
-    radial-gradient(100% 100% at 100% 100%, transparent 0 50%, var(--color) 50% 100%, transparent) left 52%/41% 36% no-repeat,
-    radial-gradient(50% 100% at top, transparent 44%, var(--color) 45% 98%, transparent) 0 100%/73% 31% no-repeat,
-    linear-gradient(var(--color), var(--color)) 66% 0/20% 70% no-repeat,
-    radial-gradient(100% 100% at 100% 0, transparent 0 58%, var(--color) 58.5% 99%, transparent) 100% 0/47% 41.8% no-repeat;
-  transform: translate(3%, 3%);
-  mix-blend-mode: lighten;
-}
-
-.douyin-logo.small {
-  width: 32px;
-  padding: 5px calc(5px + 32px / 0.87 * 0.13 / 2);
-  border-radius: 8px;
 }
 
 .kpi-content {

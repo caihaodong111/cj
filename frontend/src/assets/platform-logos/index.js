@@ -31,13 +31,13 @@ export function getPlatformLogo(platform) {
  */
 export function getPlatformColor(platform) {
   const colors = {
-    xhs: '#ff2442',
-    dy: '#000000',
+    xhs: '#ff6600',
+    dy: '#ff6600',
     ks: '#ff6600',
-    bili: '#fb7299',
-    wb: '#e6162d',
-    tieba: '#3385ff',
-    zhihu: '#0084ff'
+    bili: '#ff6600',
+    wb: '#ff6600',
+    tieba: '#ff6600',
+    zhihu: '#ff6600'
   }
   return colors[platform] || '#888888'
 }
