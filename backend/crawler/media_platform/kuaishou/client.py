@@ -36,10 +36,10 @@ if TYPE_CHECKING:
     from proxy.proxy_ip_pool import ProxyIpPool
 
 from .exception import DataFetchError
-from .graphql import KuaiShouGraphQL
+from .graphql import KuaishouGraphQL
 
 
-class KuaiShouClient(AbstractApiClient, ProxyRefreshMixin):
+class KuaishouClient(AbstractApiClient, ProxyRefreshMixin):
     def __init__(
         self,
         timeout=10,
@@ -57,7 +57,7 @@ class KuaiShouClient(AbstractApiClient, ProxyRefreshMixin):
         self._rest_host = "https://www.kuaishou.com"
         self.playwright_page = playwright_page
         self.cookie_dict = cookie_dict
-        self.graphql = KuaiShouGraphQL()
+        self.graphql = KuaishouGraphQL()
         # Initialize proxy pool (from ProxyRefreshMixin)
         self.init_proxy_pool(proxy_ip_pool)
 

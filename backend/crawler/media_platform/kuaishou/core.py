@@ -42,7 +42,7 @@ from tools import utils
 from tools.cdp_browser import CDPBrowserManager
 from var import comment_tasks_var, crawler_type_var, source_keyword_var
 
-from .client import KuaiShouClient
+from .client import KuaishouClient
 from .exception import DataFetchError
 from .help import parse_video_info_from_url, parse_creator_info_from_url
 from .login import KuaishouLogin
@@ -50,7 +50,7 @@ from .login import KuaishouLogin
 
 class KuaishouCrawler(AbstractCrawler):
     context_page: Page
-    ks_client: KuaiShouClient
+    ks_client: KuaishouClient
     browser_context: BrowserContext
     cdp_manager: Optional[CDPBrowserManager]
 
@@ -299,7 +299,7 @@ class KuaishouCrawler(AbstractCrawler):
                     browser_context=self.browser_context
                 )
 
-    async def create_ks_client(self, httpx_proxy: Optional[str]) -> KuaiShouClient:
+    async def create_ks_client(self, httpx_proxy: Optional[str]) -> KuaishouClient:
         """Create ks client"""
         utils.logger.info(
             "[KuaishouCrawler.create_ks_client] Begin create kuaishou API client ..."
@@ -307,7 +307,7 @@ class KuaishouCrawler(AbstractCrawler):
         cookie_str, cookie_dict = utils.convert_cookies(
             await self.browser_context.cookies()
         )
-        ks_client_obj = KuaiShouClient(
+        ks_client_obj = KuaishouClient(
             proxy=httpx_proxy,
             headers={
                 "User-Agent": self.user_agent,
@@ -392,13 +392,13 @@ class KuaishouCrawler(AbstractCrawler):
     async def get_creators_and_videos(self) -> None:
         """Get creator's videos and retrieve their comment information."""
         utils.logger.info(
-            "[KuaiShouCrawler.get_creators_and_videos] Begin get kuaishou creators"
+            "[KuaishouCrawler.get_creators_and_videos] Begin get kuaishou creators"
         )
         for creator_url in config.KS_CREATOR_ID_LIST:
             try:
                 # Parse creator URL to get user_id
                 creator_info: CreatorUrlInfo = parse_creator_info_from_url(creator_url)
-                utils.logger.info(f"[KuaiShouCrawler.get_creators_and_videos] Parse creator URL info: {creator_info}")
+                utils.logger.info(f"[KuaishouCrawler.get_creators_and_videos] Parse creator URL info: {creator_info}")
                 user_id = creator_info.user_id
 
                 # get creator detail info from web html content
@@ -406,7 +406,7 @@ class KuaishouCrawler(AbstractCrawler):
                 if createor_info:
                     await kuaishou_store.save_creator(user_id, creator=createor_info)
             except ValueError as e:
-                utils.logger.error(f"[KuaiShouCrawler.get_creators_and_videos] Failed to parse creator URL: {e}")
+                utils.logger.error(f"[KuaishouCrawler.get_creators_and_videos] Failed to parse creator URL: {e}")
                 continue
 
             # Get all video information of the creator

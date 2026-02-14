@@ -361,6 +361,10 @@ def _fetch_from_platform_tables(limit: int = None) -> list:
             "SELECT 'dy' as platform, '抖音' as platform_name, CAST(aweme_id AS CHAR) as content_id, "
             "CONCAT_WS(' ', IFNULL(`title`, ''), IFNULL(`desc`, '')) as content, nickname as author, "
             "aweme_url as url, create_time as created_at, COALESCE(source_keyword, '') as source_keyword FROM douyin_aweme",
+            # kuaishou
+            "SELECT 'ks' as platform, '快手' as platform_name, video_id as content_id, "
+            "CONCAT_WS(' ', IFNULL(`title`, ''), IFNULL(`desc`, '')) as content, nickname as author, "
+            "video_url as url, create_time as created_at, COALESCE(source_keyword, '') as source_keyword FROM kuaishou_video",
             # bilibili
             "SELECT 'bili' as platform, 'B站' as platform_name, CAST(video_id AS CHAR) as content_id, "
             "CONCAT_WS(' ', IFNULL(`title`, ''), IFNULL(`desc`, '')) as content, nickname as author, "
@@ -432,6 +436,10 @@ def _fetch_from_platform_tables_paginated(page: int = 1, page_size: int = 100) -
             "SELECT 'dy' as platform, '抖音' as platform_name, CAST(aweme_id AS CHAR) as content_id, "
             "CONCAT_WS(' ', IFNULL(`title`, ''), IFNULL(`desc`, '')) as content, nickname as author, "
             "aweme_url as url, create_time as created_at, COALESCE(source_keyword, '') as source_keyword FROM douyin_aweme",
+            # kuaishou
+            "SELECT 'ks' as platform, '快手' as platform_name, video_id as content_id, "
+            "CONCAT_WS(' ', IFNULL(`title`, ''), IFNULL(`desc`, '')) as content, nickname as author, "
+            "video_url as url, create_time as created_at, COALESCE(source_keyword, '') as source_keyword FROM kuaishou_video",
             # bilibili
             "SELECT 'bili' as platform, 'B站' as platform_name, CAST(video_id AS CHAR) as content_id, "
             "CONCAT_WS(' ', IFNULL(`title`, ''), IFNULL(`desc`, '')) as content, nickname as author, "
@@ -1337,3 +1345,59 @@ def get_active_cookie(request):
         'cookies': cookies,
         'exists': bool(cookies)
     })
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def get_platform_sentiment_stats(request):
+    """获取各平台的情绪统计数据（用于饼图展示）"""
+    from api.sentiment_service import analyze_sentiment
+
+    stats = {
+        "xhs": {"positive": 0, "negative": 0, "neutral": 0, "sensitive": 0, "total": 0},
+        "dy": {"positive": 0, "negative": 0, "neutral": 0, "sensitive": 0, "total": 0},
+        "ks": {"positive": 0, "negative": 0, "neutral": 0, "sensitive": 0, "total": 0},
+        "bili": {"positive": 0, "negative": 0, "neutral": 0, "sensitive": 0, "total": 0},
+        "wb": {"positive": 0, "negative": 0, "neutral": 0, "sensitive": 0, "total": 0},
+        "tieba": {"positive": 0, "negative": 0, "neutral": 0, "sensitive": 0, "total": 0},
+        "zhihu": {"positive": 0, "negative": 0, "neutral": 0, "sensitive": 0, "total": 0},
+    }
+
+    # 限制每个平台处理的记录数量，避免性能问题
+    MAX_RECORDS_PER_PLATFORM = 500
+
+    for platform, config in PLATFORM_FEED_CONFIG.items():
+        try:
+            model = config["model"]
+            content_fields = config["content_fields"]
+
+            # 获取最新的N条记录
+            queryset = model.objects.all()[:MAX_RECORDS_PER_PLATFORM]
+
+            for obj in queryset:
+                # 拼接内容字段
+                content_parts = []
+                for field in content_fields:
+                    val = getattr(obj, field, None)
+                    if val:
+                        content_parts.append(str(val))
+                content = " ".join(content_parts).strip()
+
+                if not content:
+                    stats[platform]["neutral"] += 1
+                else:
+                    # 进行情绪分析
+                    sentiment_result = analyze_sentiment(content)
+                    sentiment = sentiment_result.get("sentiment", "neutral")
+                    if sentiment in stats[platform]:
+                        stats[platform][sentiment] += 1
+                    else:
+                        stats[platform]["neutral"] += 1
+
+                stats[platform]["total"] += 1
+
+        except Exception as e:
+            # 出错时使用默认值
+            pass
+
+    return Response(stats)
