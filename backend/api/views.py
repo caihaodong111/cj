@@ -254,40 +254,59 @@ def get_monitor_feed(request):
     total_count = 0
     total_pages = 0
 
-    try:
-        # 首先尝试从 monitor_feed 表获取
-        # 获取总数
-        total_count = MonitorFeed.objects.count()
-        total_pages = (total_count + page_size - 1) // page_size if total_count > 0 else 1
+    # 只从 monitor_feed 表获取
+    total_count = MonitorFeed.objects.count()
+    total_pages = (total_count + page_size - 1) // page_size if total_count > 0 else 1
 
-        # 获取当前页数据
-        queryset = MonitorFeed.objects.order_by("-created_at").values(
-            "id", "platform", "platform_name", "content_id", "content", "author", "url", "created_at"
-        )[offset:offset + page_size]
-        rows = list(queryset)
+    queryset = MonitorFeed.objects.order_by("-created_at").values(
+        "id",
+        "platform",
+        "platform_name",
+        "content_id",
+        "content",
+        "author",
+        "url",
+        "created_at",
+        "sentiment",
+        "sentiment_score",
+        "sentiment_labels",
+        "is_sensitive",
+    )[offset:offset + page_size]
+    rows = list(queryset)
 
-        for row in rows:
-            content_text = row.get("content") or ""
-            # 进行情绪分析
+    for row in rows:
+        content_text = row.get("content") or ""
+        sentiment = row.get("sentiment") or "neutral"
+        sentiment_score = row.get("sentiment_score")
+        sentiment_labels = row.get("sentiment_labels") or {}
+        is_sensitive = row.get("is_sensitive")
+
+        if sentiment_score is None or sentiment_labels == {}:
             sentiment_result = analyze_sentiment(content_text)
+            sentiment = sentiment_result.get("sentiment", sentiment)
+            sentiment_score = sentiment_result.get("score", sentiment_score or 0)
+            sentiment_labels = sentiment_result.get("labels", sentiment_labels)
+            is_sensitive = sentiment_labels.get("sensitive") if isinstance(sentiment_labels, dict) else False
 
-            items.append({
-                "id": str(row.get("id")),
-                "platform": row.get("platform", ""),
-                "platform_name": row.get("platform_name", ""),
-                "content_id": row.get("content_id", ""),
-                "content": content_text,
-                "author": row.get("author") or "",
-                "url": row.get("url") or "",
-                "created_at": row.get("created_at") or 0,
-                "sentiment": sentiment_result.get("sentiment", "neutral"),
-                "sentiment_score": sentiment_result.get("score", 0),
-                "sentiment_labels": sentiment_result.get("labels", {}),
-            })
+        if is_sensitive is None:
+            is_sensitive = bool(sentiment_labels.get("sensitive")) or sentiment == "sensitive"
+        if is_sensitive:
+            sentiment = "sensitive"
 
-    except Exception as e:
-        # 如果 monitor_feed 为空，从平台表获取
-        items, total_count, total_pages = _fetch_from_platform_tables_paginated(page, page_size)
+        items.append({
+            "id": str(row.get("id")),
+            "platform": row.get("platform", ""),
+            "platform_name": row.get("platform_name", ""),
+            "content_id": row.get("content_id", ""),
+            "content": content_text,
+            "author": row.get("author") or "",
+            "url": row.get("url") or "",
+            "created_at": row.get("created_at") or 0,
+            "sentiment": sentiment,
+            "sentiment_score": sentiment_score or 0,
+            "sentiment_labels": sentiment_labels,
+            "is_sensitive": bool(is_sensitive),
+        })
 
     # 计算统计数据
     sentiment_stats = {
@@ -328,6 +347,74 @@ def get_monitor_feed(request):
             "neutral": sentiment_stats["neutral"],
             "sensitive": sentiment_stats["sensitive"],
         },
+        "pagination": {
+            "page": page,
+            "page_size": page_size,
+            "total_count": total_count,
+            "total_pages": total_pages,
+            "has_next": page < total_pages,
+            "has_prev": page > 1,
+        },
+        "fetched_at": int(time.time() * 1000),
+    })
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def get_sensitive_feed(request):
+    """Get sensitive feed items from monitor_feed with optional platform filter."""
+    platform = request.GET.get("platform")
+    try:
+        page = max(1, int(request.GET.get("page", 1)))
+        page_size = max(1, int(request.GET.get("page_size", 50)))
+    except ValueError:
+        page = 1
+        page_size = 50
+
+    offset = (page - 1) * page_size
+    queryset = MonitorFeed.objects.filter(is_sensitive=True)
+    if platform:
+        queryset = queryset.filter(platform=platform)
+
+    total_count = queryset.count()
+    total_pages = (total_count + page_size - 1) // page_size if total_count > 0 else 1
+
+    rows = list(
+        queryset.order_by("-created_at").values(
+            "id",
+            "platform",
+            "platform_name",
+            "content_id",
+            "content",
+            "author",
+            "url",
+            "created_at",
+            "sentiment",
+            "sentiment_score",
+            "sentiment_labels",
+            "is_sensitive",
+        )[offset:offset + page_size]
+    )
+
+    items = []
+    for row in rows:
+        items.append({
+            "id": str(row.get("id")),
+            "platform": row.get("platform", ""),
+            "platform_name": row.get("platform_name", ""),
+            "content_id": row.get("content_id", ""),
+            "content": row.get("content") or "",
+            "author": row.get("author") or "",
+            "url": row.get("url") or "",
+            "created_at": row.get("created_at") or 0,
+            "sentiment": row.get("sentiment") or "sensitive",
+            "sentiment_score": row.get("sentiment_score") or 0,
+            "sentiment_labels": row.get("sentiment_labels") or {},
+            "is_sensitive": True,
+        })
+
+    return Response({
+        "items": items,
         "pagination": {
             "page": page,
             "page_size": page_size,
@@ -1351,7 +1438,7 @@ def get_active_cookie(request):
 @permission_classes([AllowAny])
 def get_platform_sentiment_stats(request):
     """获取各平台的情绪统计数据（用于饼图展示）"""
-    from api.sentiment_service import analyze_sentiment
+    from django.db.models import Count
 
     stats = {
         "xhs": {"positive": 0, "negative": 0, "neutral": 0, "sensitive": 0, "total": 0},
@@ -1363,41 +1450,20 @@ def get_platform_sentiment_stats(request):
         "zhihu": {"positive": 0, "negative": 0, "neutral": 0, "sensitive": 0, "total": 0},
     }
 
-    # 限制每个平台处理的记录数量，避免性能问题
-    MAX_RECORDS_PER_PLATFORM = 500
-
-    for platform, config in PLATFORM_FEED_CONFIG.items():
-        try:
-            model = config["model"]
-            content_fields = config["content_fields"]
-
-            # 获取最新的N条记录
-            queryset = model.objects.all()[:MAX_RECORDS_PER_PLATFORM]
-
-            for obj in queryset:
-                # 拼接内容字段
-                content_parts = []
-                for field in content_fields:
-                    val = getattr(obj, field, None)
-                    if val:
-                        content_parts.append(str(val))
-                content = " ".join(content_parts).strip()
-
-                if not content:
-                    stats[platform]["neutral"] += 1
-                else:
-                    # 进行情绪分析
-                    sentiment_result = analyze_sentiment(content)
-                    sentiment = sentiment_result.get("sentiment", "neutral")
-                    if sentiment in stats[platform]:
-                        stats[platform][sentiment] += 1
-                    else:
-                        stats[platform]["neutral"] += 1
-
-                stats[platform]["total"] += 1
-
-        except Exception as e:
-            # 出错时使用默认值
-            pass
+    try:
+        queryset = MonitorFeed.objects.values("platform", "sentiment", "is_sensitive").annotate(cnt=Count("id"))
+        for row in queryset:
+            platform = row.get("platform")
+            if platform not in stats:
+                continue
+            sentiment = row.get("sentiment") or "neutral"
+            is_sensitive = bool(row.get("is_sensitive"))
+            key = "sensitive" if is_sensitive or sentiment == "sensitive" else sentiment
+            if key not in stats[platform]:
+                key = "neutral"
+            stats[platform][key] += row.get("cnt", 0)
+            stats[platform]["total"] += row.get("cnt", 0)
+    except Exception:
+        pass
 
     return Response(stats)

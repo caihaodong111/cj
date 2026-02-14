@@ -136,13 +136,15 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import axios from 'axios'
 import CrawlerControl from '../components/CrawlerControl.vue'
 
 // State
 const platforms = ref([])
 const stats = ref(null)
+const route = useRoute()
 const currentPlatform = ref(null)
 const files = ref([])
 const currentFile = ref(null)
@@ -288,10 +290,22 @@ const onCrawlerStatusChange = async (newStatus) => {
 // Lifecycle
 onMounted(async () => {
   await fetchConfig()
-  if (platforms.value.length > 0) {
+  const initialPlatform = route.query?.platform
+  if (initialPlatform) {
+    await selectPlatform(initialPlatform)
+  } else if (platforms.value.length > 0) {
     await selectPlatform(platforms.value[0].value)
   }
 })
+
+watch(
+  () => route.query?.platform,
+  async (nextPlatform) => {
+    if (nextPlatform) {
+      await selectPlatform(nextPlatform)
+    }
+  }
+)
 
 onUnmounted(() => {
   currentPlatform.value = null

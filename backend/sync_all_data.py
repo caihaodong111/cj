@@ -2,10 +2,14 @@
 # -*- coding: utf-8 -*-
 """Final sync script to sync all platform data to monitor_feed table"""
 
+import json
 import pymysql
+import time
 import sys
 import os
 from dotenv import load_dotenv
+
+from api.sentiment_service import analyze_sentiment
 
 env_path = os.path.join(os.path.dirname(__file__), '.env')
 if os.path.exists(env_path):
@@ -37,6 +41,7 @@ def sync_all():
         platforms = [
             ('xhs', 'xhs_note', 'note_id', 'time', 'nickname', 'note_url', ['title', 'desc']),
             ('dy', 'douyin_aweme', 'aweme_id', 'create_time', 'nickname', 'aweme_url', ['title', 'desc']),
+            ('ks', 'kuaishou_video', 'video_id', 'create_time', 'nickname', 'video_url', ['title', 'desc']),
             ('bili', 'bilibili_video', 'video_id', 'create_time', 'nickname', 'video_url', ['title', 'desc']),
             ('wb', 'weibo_note', 'note_id', 'create_time', 'nickname', 'note_url', ['content']),
             ('tieba', 'tieba_note', 'note_id', 'publish_time', 'user_nickname', 'note_url', ['title', 'desc']),
@@ -48,20 +53,95 @@ def sync_all():
             if not cursor.fetchone():
                 continue
 
-            content_sql = "CONCAT_WS(' ', " + ", ".join([f"IFNULL(`{f}`, '')" for f in content_fields]) + ")"
+            select_fields = [
+                f"CAST(`{id_field}` AS CHAR) AS content_id",
+                f"`{time_field}` AS created_at",
+                f"`{author_field}` AS author",
+                f"`{url_field}` AS url",
+                "COALESCE(source_keyword, '') AS source_keyword",
+            ] + [f"`{field}` AS `{field}`" for field in content_fields]
 
-            cursor.execute(f"""
-                INSERT INTO monitor_feed (platform, platform_name, content_id, content, author, url, created_at, source_keyword, add_ts, last_modify_ts)
-                SELECT '{platform}', '{platform_names[platform]}', CAST({id_field} AS CHAR),
-                    {content_sql}, {author_field}, {url_field}, {time_field},
-                    COALESCE(source_keyword, ''), UNIX_TIMESTAMP(NOW()) * 1000, UNIX_TIMESTAMP(NOW()) * 1000
-                FROM {table}
+            cursor.execute(f"SELECT {', '.join(select_fields)} FROM {table}")
+            columns = [col[0] for col in cursor.description]
+            rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+            now_ms = int(time.time() * 1000)
+            payload = []
+            for row in rows:
+                content_parts = []
+                for field in content_fields:
+                    value = row.get(field)
+                    if value is not None and str(value).strip():
+                        content_parts.append(str(value))
+                content = " ".join(content_parts).strip() or "暂无内容"
+
+                raw_created_at = row.get("created_at")
+                created_at = 0
+                if raw_created_at is not None:
+                    raw_str = str(raw_created_at).strip()
+                    if raw_str.isdigit():
+                        created_at = int(raw_str)
+
+                sentiment_result = analyze_sentiment(content)
+                sentiment = sentiment_result.get("sentiment", "neutral")
+                sentiment_score = sentiment_result.get("score", 0)
+                sentiment_labels = sentiment_result.get("labels") or {}
+                is_sensitive = bool(sentiment_labels.get("sensitive")) or sentiment == "sensitive"
+
+                payload.append((
+                    platform,
+                    platform_names[platform],
+                    row.get("content_id", ""),
+                    content,
+                    row.get("author") or "",
+                    row.get("url") or "",
+                    created_at,
+                    row.get("source_keyword") or "",
+                    now_ms,
+                    now_ms,
+                    sentiment,
+                    sentiment_score,
+                    json.dumps(sentiment_labels, ensure_ascii=False),
+                    1 if is_sensitive else 0,
+                ))
+
+            if not payload:
+                print(f"[OK] {platform_names[platform]:8s}:      0 records")
+                continue
+
+            cursor.executemany(
+                """
+                INSERT INTO monitor_feed (
+                    platform,
+                    platform_name,
+                    content_id,
+                    content,
+                    author,
+                    url,
+                    created_at,
+                    source_keyword,
+                    add_ts,
+                    last_modify_ts,
+                    sentiment,
+                    sentiment_score,
+                    sentiment_labels,
+                    is_sensitive
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON DUPLICATE KEY UPDATE
                     content = VALUES(content),
                     author = VALUES(author),
                     url = VALUES(url),
-                    last_modify_ts = VALUES(last_modify_ts)
-            """)
+                    created_at = VALUES(created_at),
+                    source_keyword = VALUES(source_keyword),
+                    last_modify_ts = VALUES(last_modify_ts),
+                    sentiment = VALUES(sentiment),
+                    sentiment_score = VALUES(sentiment_score),
+                    sentiment_labels = VALUES(sentiment_labels),
+                    is_sensitive = VALUES(is_sensitive)
+                """,
+                payload,
+            )
             print(f"[OK] {platform_names[platform]:8s}: {cursor.rowcount:6d} records")
 
         connection.commit()

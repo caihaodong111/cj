@@ -24,6 +24,7 @@ from api.views import (
     download_file,
     get_data_stats,
     get_monitor_feed,
+    get_sensitive_feed,
     get_platform_sentiment_stats,
     CrawlerView,
     # Cookie Management
@@ -55,6 +56,7 @@ urlpatterns = [
     path("api/data/files/<path:file_path>", get_file_content, name="get_file_content"),
     path("api/data/download/<path:file_path>", download_file, name="download_file"),
     path("api/monitor/feed", get_monitor_feed, name="get_monitor_feed"),
+    path("api/monitor/feed/sensitive", get_sensitive_feed, name="get_sensitive_feed"),
     path("api/monitor/platform-sentiment-stats", get_platform_sentiment_stats, name="get_platform_sentiment_stats"),
 
     # API: Cookie Management

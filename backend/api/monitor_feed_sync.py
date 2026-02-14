@@ -9,6 +9,7 @@ logger = logging.getLogger(__name__)
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'mediacrawler_config.settings')
 django.setup()
 
+from api.sentiment_service import analyze_sentiment
 from media_platform.models import MonitorFeed
 
 PLATFORM_NAMES = {
@@ -48,12 +49,23 @@ def sync_to_monitor_feed(platform: str, content_item: dict):
         url = str(content_item.get("note_url") or content_item.get("aweme_url") or
                    content_item.get("video_url") or content_item.get("content_url") or "")
 
-        created_at = content_item.get("time") or content_item.get("create_time") or \\
-                     content_item.get("created_time") or content_item.get("publish_time") or 0
+        created_at = (
+            content_item.get("time")
+            or content_item.get("create_time")
+            or content_item.get("created_time")
+            or content_item.get("publish_time")
+            or 0
+        )
         try:
             created_at = int(created_at)
         except (ValueError, TypeError):
             created_at = 0
+
+        sentiment_result = analyze_sentiment(content)
+        sentiment = sentiment_result.get("sentiment", "neutral")
+        sentiment_score = sentiment_result.get("score")
+        sentiment_labels = sentiment_result.get("labels") or {}
+        is_sensitive = bool(sentiment_labels.get("sensitive")) or sentiment == "sensitive"
 
         existing = MonitorFeed.objects.filter(platform=platform, content_id=content_id).first()
 
@@ -63,6 +75,10 @@ def sync_to_monitor_feed(platform: str, content_item: dict):
             existing.url = url
             existing.created_at = created_at
             existing.source_keyword = content_item.get("source_keyword", "")
+            existing.sentiment = sentiment
+            existing.sentiment_score = sentiment_score
+            existing.sentiment_labels = sentiment_labels
+            existing.is_sensitive = is_sensitive
             existing.save()
             logger.debug(f"Updated {platform} item {content_id}")
         else:
@@ -75,6 +91,10 @@ def sync_to_monitor_feed(platform: str, content_item: dict):
                 url=url,
                 created_at=created_at,
                 source_keyword=content_item.get("source_keyword", ""),
+                sentiment=sentiment,
+                sentiment_score=sentiment_score,
+                sentiment_labels=sentiment_labels,
+                is_sensitive=is_sensitive,
             )
             logger.info(f"Created {platform} item {content_id}")
 

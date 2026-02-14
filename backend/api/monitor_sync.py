@@ -9,6 +9,7 @@ logger = logging.getLogger(__name__)
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'mediacrawler_config.settings')
 django.setup()
 
+from api.sentiment_service import analyze_sentiment
 from media_platform.models import MonitorFeed
 
 PLATFORM_NAMES = {
@@ -55,6 +56,12 @@ def sync_to_monitor_feed(platform: str, content_item: dict):
         except (ValueError, TypeError):
             created_at = 0
 
+        sentiment_result = analyze_sentiment(content)
+        sentiment = sentiment_result.get("sentiment", "neutral")
+        sentiment_score = sentiment_result.get("score")
+        sentiment_labels = sentiment_result.get("labels") or {}
+        is_sensitive = bool(sentiment_labels.get("sensitive")) or sentiment == "sensitive"
+
         existing = MonitorFeed.objects.filter(
             platform=platform,
             content_id=content_id
@@ -66,6 +73,10 @@ def sync_to_monitor_feed(platform: str, content_item: dict):
             existing.url = url
             existing.created_at = created_at
             existing.source_keyword = content_item.get("source_keyword", "")
+            existing.sentiment = sentiment
+            existing.sentiment_score = sentiment_score
+            existing.sentiment_labels = sentiment_labels
+            existing.is_sensitive = is_sensitive
             existing.save()
             logger.debug(f"Updated {platform} item {content_id}")
         else:
@@ -78,6 +89,10 @@ def sync_to_monitor_feed(platform: str, content_item: dict):
                 url=url,
                 created_at=created_at,
                 source_keyword=content_item.get("source_keyword", ""),
+                sentiment=sentiment,
+                sentiment_score=sentiment_score,
+                sentiment_labels=sentiment_labels,
+                is_sensitive=is_sensitive,
             )
             logger.info(f"Created {platform} item {content_id}")
 

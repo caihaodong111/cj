@@ -27,39 +27,9 @@
             <div class="border-glow entrance-border-glow"></div>
             <div class="cell-header">
               <span class="accent-bar"></span>
-              情感分布占比
+              各平台敏感数据分布
             </div>
             <div ref="mainChartRef" class="main-chart-box entrance-chart-fade"></div>
-          </div>
-
-          <div class="panel-card ios-glass sentiment-summary entrance-scale-up-delay-1">
-            <div class="border-glow blue-tint entrance-border-glow"></div>
-            <div class="cell-header">
-              <span class="accent-bar blue"></span>
-              情绪摘要
-            </div>
-            <div class="summary-grid entrance-content-fade">
-              <div class="summary-item">
-                <span class="label">总监测数据</span>
-                <span class="value">{{ sentimentCounts.total }}</span>
-              </div>
-              <div class="summary-item positive">
-                <span class="label">积极数据</span>
-                <span class="value">{{ sentimentCounts.positive }}</span>
-              </div>
-              <div class="summary-item negative">
-                <span class="label">消极数据</span>
-                <span class="value">{{ sentimentCounts.negative }}</span>
-              </div>
-              <div class="summary-item neutral">
-                <span class="label">中性数据</span>
-                <span class="value">{{ sentimentCounts.neutral }}</span>
-              </div>
-              <div class="summary-item sensitive">
-                <span class="label">敏感数据</span>
-                <span class="value">{{ sentimentCounts.sensitive }}</span>
-              </div>
-            </div>
           </div>
 
           <div class="recent-list ios-glass compact entrance-scale-up-delay-2">
@@ -153,53 +123,8 @@
         </aside>
 
         <main class="right-panel">
-          <div class="stats-grid">
-            <div class="stat-card glass">
-              <div class="stat-icon">📊</div>
-              <div class="stat-info">
-                <span class="label">总监测数据</span>
-                <span class="value">{{ stats.total || 0 }}</span>
-                <span class="trend">共 {{ totalPages }} 页</span>
-              </div>
-            </div>
-            <div class="stat-card glass">
-              <div class="stat-icon">⚠️</div>
-              <div class="stat-info">
-                <span class="label">敏感舆情</span>
-                <span class="value sensitive">{{ stats.sensitive || 0 }}</span>
-                <span class="trend" :class="getSentimentTrendClass(stats.sensitive, stats.total)">
-                  {{ getSentimentTrendText(stats.sensitive, stats.total) }}
-                </span>
-              </div>
-            </div>
-            <div class="stat-card glass">
-              <div class="stat-icon">💚</div>
-              <div class="stat-info">
-                <span class="label">情感指数</span>
-                <span class="value" :class="getSentimentIndexClass(stats.sentimentIndex)">
-                  {{ formatSentimentIndex(stats.sentimentIndex) }}
-                </span>
-                <span class="trend">{{ getSentimentIndexText(stats.sentimentIndex) }}</span>
-              </div>
-            </div>
-            <div class="stat-card glass">
-              <div class="stat-icon">⚡</div>
-              <div class="stat-info">
-                <span class="label">实时热度</span>
-                <span class="value hot">{{ stats.hotScore || 0 }}</span>
-                <span class="trend" :class="{ up: stats.hotScore > 50 }">
-                  {{ getHotScoreText(stats.hotScore) }}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div class="chart-row">
-            <ChartCard title="7日舆情声量趋势" :options="trendChartOptions" />
-          </div>
-
           <div class="sentiment-grid">
-            <div class="platform-card ios-glass entrance-scale-up" style="animation-delay: 0.3s">
+            <div class="platform-card ios-glass entrance-scale-up clickable" style="animation-delay: 0.3s" @click="handlePlatformJump('xhs')">
               <div class="cell-header compact">
                 <span class="accent-bar small"></span>
                 小红书情绪结构
@@ -209,7 +134,7 @@
                 <div class="platform-data-col">
                   <div class="mini-stat-row">
                     <label>High Risk</label>
-                    <span class="value">0</span>
+                    <span class="value">{{ (platformSentimentCounts.xhs?.sensitive || 0) }}</span>
                   </div>
                   <div class="mini-stat-row">
                     <label>Total</label>
@@ -218,7 +143,7 @@
                 </div>
               </div>
             </div>
-            <div class="platform-card ios-glass entrance-scale-up" style="animation-delay: 0.35s">
+            <div class="platform-card ios-glass entrance-scale-up clickable" style="animation-delay: 0.35s" @click="handlePlatformJump('dy')">
               <div class="cell-header compact">
                 <span class="accent-bar small"></span>
                 抖音情绪结构
@@ -228,7 +153,7 @@
                 <div class="platform-data-col">
                   <div class="mini-stat-row">
                     <label>High Risk</label>
-                    <span class="value">0</span>
+                    <span class="value">{{ (platformSentimentCounts.dy?.sensitive || 0) }}</span>
                   </div>
                   <div class="mini-stat-row">
                     <label>Total</label>
@@ -237,7 +162,7 @@
                 </div>
               </div>
             </div>
-            <div class="platform-card ios-glass entrance-scale-up" style="animation-delay: 0.4s">
+            <div class="platform-card ios-glass entrance-scale-up clickable" style="animation-delay: 0.4s" @click="handlePlatformJump('ks')">
               <div class="cell-header compact">
                 <span class="accent-bar small"></span>
                 快手情绪结构
@@ -247,7 +172,7 @@
                 <div class="platform-data-col">
                   <div class="mini-stat-row">
                     <label>High Risk</label>
-                    <span class="value">0</span>
+                    <span class="value">{{ (platformSentimentCounts.ks?.sensitive || 0) }}</span>
                   </div>
                   <div class="mini-stat-row">
                     <label>Total</label>
@@ -256,7 +181,7 @@
                 </div>
               </div>
             </div>
-            <div class="platform-card ios-glass entrance-scale-up" style="animation-delay: 0.45s">
+            <div class="platform-card ios-glass entrance-scale-up clickable" style="animation-delay: 0.45s" @click="handlePlatformJump('bili')">
               <div class="cell-header compact">
                 <span class="accent-bar small"></span>
                 B站情绪结构
@@ -266,7 +191,7 @@
                 <div class="platform-data-col">
                   <div class="mini-stat-row">
                     <label>High Risk</label>
-                    <span class="value">0</span>
+                    <span class="value">{{ (platformSentimentCounts.bili?.sensitive || 0) }}</span>
                   </div>
                   <div class="mini-stat-row">
                     <label>Total</label>
@@ -275,7 +200,7 @@
                 </div>
               </div>
             </div>
-            <div class="platform-card ios-glass entrance-scale-up" style="animation-delay: 0.5s">
+            <div class="platform-card ios-glass entrance-scale-up clickable" style="animation-delay: 0.5s" @click="handlePlatformJump('wb')">
               <div class="cell-header compact">
                 <span class="accent-bar small"></span>
                 微博情绪结构
@@ -285,7 +210,7 @@
                 <div class="platform-data-col">
                   <div class="mini-stat-row">
                     <label>High Risk</label>
-                    <span class="value">0</span>
+                    <span class="value">{{ (platformSentimentCounts.wb?.sensitive || 0) }}</span>
                   </div>
                   <div class="mini-stat-row">
                     <label>Total</label>
@@ -294,7 +219,7 @@
                 </div>
               </div>
             </div>
-            <div class="platform-card ios-glass entrance-scale-up" style="animation-delay: 0.55s">
+            <div class="platform-card ios-glass entrance-scale-up clickable" style="animation-delay: 0.55s" @click="handlePlatformJump('tieba')">
               <div class="cell-header compact">
                 <span class="accent-bar small"></span>
                 贴吧情绪结构
@@ -304,7 +229,7 @@
                 <div class="platform-data-col">
                   <div class="mini-stat-row">
                     <label>High Risk</label>
-                    <span class="value">0</span>
+                    <span class="value">{{ (platformSentimentCounts.tieba?.sensitive || 0) }}</span>
                   </div>
                   <div class="mini-stat-row">
                     <label>Total</label>
@@ -313,7 +238,7 @@
                 </div>
               </div>
             </div>
-            <div class="platform-card ios-glass entrance-scale-up" style="animation-delay: 0.6s">
+            <div class="platform-card ios-glass entrance-scale-up clickable" style="animation-delay: 0.6s" @click="handlePlatformJump('zhihu')">
               <div class="cell-header compact">
                 <span class="accent-bar small"></span>
                 知乎情绪结构
@@ -323,7 +248,7 @@
                 <div class="platform-data-col">
                   <div class="mini-stat-row">
                     <label>High Risk</label>
-                    <span class="value">0</span>
+                    <span class="value">{{ (platformSentimentCounts.zhihu?.sensitive || 0) }}</span>
                   </div>
                   <div class="mini-stat-row">
                     <label>Total</label>
@@ -336,11 +261,51 @@
         </main>
       </div>
     </div>
+
+    <div v-if="sensitiveModalOpen" class="modal-overlay" @click.self="closeSensitiveModal">
+      <div class="modal-card">
+        <div class="modal-header">
+          <div class="modal-title">
+            {{ sensitiveModalPlatformLabel }} 敏感数据
+            <span class="modal-subtitle">共 {{ sensitiveModalTotalCount }} 条</span>
+          </div>
+          <button class="modal-close" @click="closeSensitiveModal">×</button>
+        </div>
+        <div class="modal-body">
+          <div v-if="sensitiveModalLoading" class="modal-loading">
+            <div class="loading-spinner"></div>
+            <span>加载中...</span>
+          </div>
+          <div v-else-if="sensitiveModalItems.length === 0" class="modal-empty">
+            暂无敏感数据
+          </div>
+          <div v-else class="modal-list">
+            <div class="modal-item" v-for="item in sensitiveModalItems" :key="item.id">
+              <div class="modal-item-header">
+                <span class="platform-tag">{{ item.platformLabel }}</span>
+                <span class="time">{{ item.timeLabel }}</span>
+              </div>
+              <div class="modal-content">{{ item.content }}</div>
+              <div class="modal-footer">
+                <span class="author">{{ item.authorLabel || '匿名' }}</span>
+                <a v-if="item.url" :href="item.url" target="_blank" rel="noopener">原文</a>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-pagination" v-if="sensitiveModalTotalPages > 1">
+          <button class="pagination-btn" :disabled="sensitiveModalPage === 1" @click="goSensitivePage(sensitiveModalPage - 1)">上一页</button>
+          <span class="pagination-text">{{ sensitiveModalPage }} / {{ sensitiveModalTotalPages }}</span>
+          <button class="pagination-btn" :disabled="sensitiveModalPage === sensitiveModalTotalPages" @click="goSensitivePage(sensitiveModalPage + 1)">下一页</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import axios from 'axios'
 import * as echarts from 'echarts'
 
@@ -348,6 +313,7 @@ import * as echarts from 'echarts'
 const mainChartRef = ref(null)
 const chartInstances = new Map()
 const platformChartRefs = new Map()
+const router = useRouter()
 
 const setChartRef = (key, el) => {
   if (el) platformChartRefs.set(key, el)
@@ -363,38 +329,260 @@ const initChart = (key, el) => {
   return chartInstances.get(chartKey)
 }
 
+// Render main pie chart
+const renderMainPieChart = () => {
+  console.log('==== 主饼图渲染开始 ====')
+  console.log('1. mainChartRef.value:', mainChartRef.value)
+  console.log('2. feedItems总数：', feedItems.value.length)
+
+  if (!mainChartRef.value) {
+    console.log('⚠️ 主饼图 DOM 元素不存在，跳过渲染')
+    return
+  }
+
+  const chart = initChart('main', mainChartRef.value)
+  if (!chart) {
+    console.log('⚠️ 主饼图 ECharts 实例初始化失败')
+    return
+  }
+
+  console.log('3. 主饼图 ECharts 实例初始化成功')
+
+  const platforms = ['xhs', 'dy', 'ks', 'bili', 'wb', 'tieba', 'zhihu']
+  const sensitiveCounts = platforms.reduce((acc, platform) => {
+    acc[platform] = 0
+    return acc
+  }, {})
+
+  if (platformStats.value) {
+    for (const platform of platforms) {
+      sensitiveCounts[platform] = platformStats.value?.[platform]?.sensitive || 0
+    }
+  } else {
+    // 遍历feedItems计算敏感数据
+    for (const item of feedItems.value) {
+      const platformKey = item?.platformKey
+      const isSensitive = item?.isSensitive ?? item?.sentiment === 'sensitive'
+      if (platformKey && isSensitive) {
+        sensitiveCounts[platformKey]++
+      }
+    }
+  }
+
+  console.log('4. 各平台敏感数据统计：', sensitiveCounts)
+
+  const chartData = platforms.map(platform => ({
+    value: sensitiveCounts[platform],
+    name: {
+      xhs: '小红书',
+      dy: '抖音',
+      ks: '快手',
+      bili: 'B站',
+      wb: '微博',
+      tieba: '贴吧',
+      zhihu: '知乎'
+    }[platform]
+  }))
+
+  const sensitiveTotal = chartData.reduce((sum, item) => sum + item.value, 0)
+  console.log('5. 主饼图数据：', chartData)
+  console.log('6. 敏感总数：', sensitiveTotal)
+
+  // 如果没有敏感数据，显示提示
+  if (sensitiveTotal === 0) {
+    chart.setOption({
+      series: [{
+        type: 'pie',
+        radius: ['45%', '70%'],
+        center: ['40%', '50%'],
+        roseType: 'radius',
+        label: {
+          show: true,
+          position: 'center',
+          formatter: '暂无\n敏感数据',
+          color: '#8899aa',
+          fontSize: 14
+        },
+        data: platforms.map(platform => ({
+          value: 0,
+          name: {
+            xhs: '小红书',
+            dy: '抖音',
+            ks: '快手',
+            bili: 'B站',
+            wb: '微博',
+            tieba: '贴吧',
+            zhihu: '知乎'
+          }[platform],
+          itemStyle: {
+            color: 'rgba(255, 255, 255, 0.05)',
+            borderColor: 'rgba(0, 204, 255, 0.1)',
+            borderWidth: 1
+          }
+        }))
+      }, {
+        type: 'pie',
+        radius: [0, '35%'],
+        center: ['40%', '50%'],
+        silent: true,
+        label: {
+          show: true,
+          position: 'center',
+          formatter: [`{v|0}`, `{l|敏感总数}`].join('\n'),
+          rich: {
+            v: { fontSize: 28, fontWeight: 900, color: '#8899aa' },
+            l: { fontSize: 11, color: '#666666', paddingTop: 4 }
+          }
+        },
+        data: [{ value: 1, itemStyle: { color: 'transparent' } }]
+      }]
+    })
+    console.log('主饼图渲染完成：暂无敏感数据')
+    return
+  }
+
+  // 有敏感数据则正常显示
+  chart.setOption({
+    tooltip: {
+      trigger: 'item',
+      backgroundColor: 'rgba(10, 10, 15, 0.95)',
+      borderColor: 'rgba(0, 204, 255, 0.3)',
+      textStyle: { color: '#fff' },
+      formatter: params => `${params.name}<br/>敏感: ${params.value}`
+    },
+    series: [{
+      type: 'pie',
+      radius: ['45%', '70%'],
+      center: ['40%', '50%'],
+      roseType: 'radius',
+      padAngle: 3,
+      itemStyle: { borderRadius: 8 },
+      label: { show: false },
+      data: chartData
+    }, {
+      type: 'pie',
+      radius: [0, '35%'],
+      center: ['40%', '50%'],
+      silent: true,
+      label: {
+        show: true,
+        position: 'center',
+        formatter: () => {
+          return [`{v|${sensitiveTotal}}`, `{l|敏感总数}`].join('\n')
+        },
+        rich: {
+          v: { fontSize: 28, fontWeight: 900, color: '#ff4d4f', textShadow: '0 0 20px rgba(255, 77, 79, 0.8)' },
+          l: { fontSize: 11, color: '#8899aa', paddingTop: 4 }
+        }
+      },
+      data: [{ value: 1, itemStyle: { color: 'transparent' } }]
+    }]
+  })
+  chart.off('click')
+  chart.on('click', params => {
+    const platformKey = platformNameToKey[params?.name]
+    if (platformKey) {
+      openSensitiveModal(platformKey)
+    }
+  })
+  console.log('==== 主饼图渲染完成 ====')
+}
+
 // Render platform charts
 const renderPlatformCharts = () => {
+  console.log('==== 渲染7个平台小饼图 ====')
   const platforms = ['xhs', 'dy', 'ks', 'bili', 'wb', 'tieba', 'zhihu']
   platforms.forEach(platform => {
     const el = platformChartRefs.get(platform)
-    if (!el) return
+    if (!el) {
+      console.log(`⚠️ 平台 ${platform} 的 DOM 元素不存在`)
+      return
+    }
 
     const chartInstance = initChart(platform, el)
-    const counts = platformSentimentCounts.value[platform] || {}
-    const total = counts.total || 0
-    const positive = counts.positive || 0
-    const negative = counts.negative || 0
-    const neutral = counts.neutral || 0
-    const sensitive = counts.sensitive || 0
 
+    // 统计该平台的敏感/非敏感数据
+    let sensitive = 0
+    let total = 0
+    if (platformStats.value?.[platform]) {
+      sensitive = platformStats.value?.[platform]?.sensitive || 0
+      total = platformStats.value?.[platform]?.total || 0
+    } else {
+      for (const item of feedItems.value) {
+        if (item?.platformKey === platform) {
+          total += 1
+          if (item?.isSensitive ?? item?.sentiment === 'sensitive') {
+            sensitive += 1
+          }
+        }
+      }
+    }
+
+    const nonSensitive = total - sensitive
+    console.log(`平台 ${platform}: sensitive=${sensitive}, nonSensitive=${nonSensitive}, total=${total}`)
+
+    // 如果没有数据，显示"暂无数据"
+    if (total === 0) {
+      chartInstance.setOption({
+        series: [{
+          type: 'pie',
+          radius: ['55%', '80%'],
+          center: ['50%', '50%'],
+          label: {
+            show: true,
+            position: 'center',
+            formatter: '暂无数据',
+            color: '#8899aa',
+            fontSize: 12
+          },
+          data: [{ value: 1, name: '暂无数据', itemStyle: { color: 'rgba(255, 255, 255, 0.08)' } }]
+        }]
+      })
+      return
+    }
+
+    // 有数据则显示情绪分布饼图
     chartInstance.setOption({
+      tooltip: {
+        trigger: 'item',
+        backgroundColor: 'rgba(10, 10, 15, 0.95)',
+        borderColor: 'rgba(0, 204, 255, 0.3)',
+        textStyle: { color: '#fff' },
+        appendToBody: true,
+        confine: false,
+        extraCssText: 'z-index: 9999; max-width: 220px; white-space: normal; pointer-events: none;'
+      },
       series: [
         {
           type: 'pie',
-          radius: ['50%', '75%'],
+          radius: ['45%', '70%'],
           center: ['50%', '45%'],
           label: { show: false },
           data: [
-            { value: positive, name: '积极', itemStyle: { color: '#00ffa3' } },
-            { value: neutral, name: '中性', itemStyle: { color: '#00ccff' } },
-            { value: negative, name: '消极', itemStyle: { color: '#ff6b6b' } },
-            { value: sensitive, name: '敏感', itemStyle: { color: '#ffcc00' } }
+            { value: sensitive, name: '敏感', itemStyle: { color: '#ff4d4f' } },
+            { value: nonSensitive, name: '非敏感', itemStyle: { color: '#3b82f6' } }
           ]
+        },
+        {
+          type: 'pie',
+          radius: [0, '35%'],
+          center: ['50%', '45%'],
+          silent: true,
+          label: {
+            show: true,
+            position: 'center',
+            formatter: () => [`{v|${sensitive}}`, `{l|/ ${total}}`].join('\n'),
+            rich: {
+              v: { fontSize: 18, fontWeight: 800, color: '#ff4d4f' },
+              l: { fontSize: 10, color: '#8899aa', paddingTop: 2 }
+            }
+          },
+          data: [{ value: 1, itemStyle: { color: 'transparent' } }]
         }
       ]
     })
   })
+  console.log('==== 7个平台小饼图渲染完成 ====')
 }
 
 // Mock Data Options for Charts
@@ -485,52 +673,95 @@ const trendChartOptions = computed(() => ({
   ]
 }))
 
-const pieChartOptions = computed(() => ({
-  tooltip: {
-    trigger: 'item',
-    backgroundColor: 'rgba(10, 10, 15, 0.95)',
-    borderColor: 'rgba(0, 204, 255, 0.3)',
-    textStyle: { color: '#fff' }
-  },
-  legend: {
-    bottom: '5%',
-    left: 'center',
-    textStyle: { color: '#aaaaaa' }
-  },
-  series: [
-    {
-      name: 'Sentiment',
-      type: 'pie',
-      radius: ['40%', '70%'],
-      avoidLabelOverlap: false,
-      itemStyle: {
-        borderRadius: 10,
-        borderColor: '#000000',
-        borderWidth: 2
-      },
-      label: { show: false, position: 'center' },
-      emphasis: {
-        label: { show: true, fontSize: 20, fontWeight: 'bold', color: '#fff' }
-      },
-      labelLine: { show: false },
-      data: [
-        { value: 1048, name: '积极', itemStyle: { color: '#00ff88' } },
-        { value: 735, name: '中性', itemStyle: { color: '#00ccff' } },
-        { value: 580, name: '消极', itemStyle: { color: '#ff6b6b' } },
-        { value: 280, name: '敏感', itemStyle: { color: '#ffae00' } }
-      ]
-    }
+const pieChartOptions = computed(() => {
+  const sensitiveData = platformSensitiveData.value
+  const total = sensitiveData.reduce((sum, item) => sum + item.value, 0)
+  const colors = [
+    { grad: ['#00ffa3', '#008a5c'], glow: 'rgba(0, 255, 163, 0.6)' },    // 小红书 - 绿色
+    { grad: ['#ff6b9e', '#cc2343'], glow: 'rgba(255, 107, 158, 0.6)' },    // 抖音 - 粉红
+    { grad: ['#4dc9ff', '#2d5fe0'], glow: 'rgba(77, 201, 255, 0.6)' },    // 快手 - 蓝色
+    { grad: ['#ff89a9', '#ff4d9a'], glow: 'rgba(255, 137, 169, 0.6)' },    // B站 - 粉红
+    { grad: ['#ffa726', '#ff4d6f'], glow: 'rgba(255, 167, 38, 0.6)' },    // 微博 - 橙红
+    { grad: ['#00ccff', '#0066ff'], glow: 'rgba(0, 204, 255, 0.6)' },    // 贴吧 - 蓝色
+    { grad: ['#a855f7', '#6b21a8'], glow: 'rgba(168, 85, 247, 0.6)' }     // 知乎 - 紫色
   ]
-}))
+
+  return {
+    tooltip: {
+      backgroundColor: 'rgba(10, 20, 35, 0.9)',
+      borderColor: '#00c3ff',
+      textStyle: { color: '#fff' }
+    },
+    legend: {
+      orient: 'vertical',
+      right: '5%',
+      top: 'center',
+      textStyle: { color: '#c0ccda', fontSize: 11 },
+      itemGap: 12
+    },
+    series: [
+      {
+        type: 'pie',
+        radius: ['45%', '70%'],
+        center: ['40%', '50%'],
+        roseType: 'radius',
+        padAngle: 3,
+        itemStyle: { borderRadius: 8 },
+        label: { show: false },
+        data: sensitiveData.map((item, index) => ({
+          value: item.value,
+          name: item.name,
+          itemStyle: {
+            color: echarts.graphic.LinearGradient(0, 0, 1, 1, [
+              { offset: 0, color: colors[index].grad[0] },
+              { offset: 1, color: colors[index].grad[1] }
+            ]),
+            borderColor: 'rgba(255,255,255,0.2)',
+            borderWidth: 1,
+            shadowBlur: 12,
+            shadowColor: colors[index].glow
+          }
+        }))
+      },
+      {
+        type: 'pie',
+        radius: [0, '35%'],
+        center: ['40%', '50%'],
+        silent: true,
+        label: {
+          show: true,
+          position: 'center',
+          formatter: () => [`{v|${total}}`, `{l|敏感总数}`].join('\n'),
+          rich: {
+            v: { fontSize: 28, fontWeight: 900, color: '#ff4d4f', textShadow: '0 0 20px rgba(255, 77, 79, 0.8)' },
+            l: { fontSize: 11, color: '#8899aa', paddingTop: 4 }
+          }
+        },
+        data: [{ value: 1, itemStyle: { color: 'transparent' } }]
+      }
+    ]
+  }
+})
 
 const feedItems = ref([])
 const feedLoading = ref(false)
 const lastUpdatedAt = ref(null)
+const platformStats = ref(null)
+const sensitiveModalOpen = ref(false)
+const sensitiveModalLoading = ref(false)
+const sensitiveModalItems = ref([])
+const sensitiveModalPage = ref(1)
+const sensitiveModalTotalPages = ref(1)
+const sensitiveModalTotalCount = ref(0)
+const sensitiveModalPlatform = ref('')
+const sensitiveModalPlatformLabel = ref('全部平台')
 
 const sentimentCounts = computed(() => {
   const counts = { positive: 0, negative: 0, neutral: 0, sensitive: 0 }
   for (const item of feedItems.value) {
-    const key = item?.sentiment || 'neutral'
+    const key = (item?.isSensitive ?? item?.sentiment === 'sensitive')
+      ? 'sensitive'
+      : (item?.sentiment || 'neutral')
     if (counts[key] !== undefined) {
       counts[key] += 1
     } else {
@@ -542,6 +773,9 @@ const sentimentCounts = computed(() => {
 })
 
 const platformSentimentCounts = computed(() => {
+  if (platformStats.value) {
+    return platformStats.value
+  }
   const platforms = ['xhs', 'dy', 'ks', 'bili', 'wb', 'tieba', 'zhihu']
   const base = { positive: 0, negative: 0, neutral: 0, sensitive: 0, total: 0 }
   const result = {}
@@ -553,7 +787,9 @@ const platformSentimentCounts = computed(() => {
   for (const item of feedItems.value) {
     const platformKey = item?.platformKey
     if (!platformKey || !result[platformKey]) continue
-    const sentimentKey = item?.sentiment || 'neutral'
+    const sentimentKey = (item?.isSensitive ?? item?.sentiment === 'sensitive')
+      ? 'sensitive'
+      : (item?.sentiment || 'neutral')
     if (result[platformKey][sentimentKey] !== undefined) {
       result[platformKey][sentimentKey] += 1
     } else {
@@ -565,14 +801,90 @@ const platformSentimentCounts = computed(() => {
   return result
 })
 
+const fetchPlatformStats = async ({ signal = null } = {}) => {
+  if (signal?.aborted) return
+  try {
+    const res = await axios.get('/api/monitor/platform-sentiment-stats', { signal })
+    if (signal?.aborted) return
+    const data = res.data || {}
+    platformStats.value = data
+  } catch (e) {
+    if (e.name === 'CanceledError' || e.code === 'ERR_CANCELED') return
+    if (signal?.aborted) return
+    platformStats.value = null
+  }
+}
+
+const openSensitiveModal = async (platformKey) => {
+  sensitiveModalPlatform.value = platformKey || ''
+  sensitiveModalPlatformLabel.value = getPlatformLabel(platformKey)
+  sensitiveModalPage.value = 1
+  sensitiveModalOpen.value = true
+  await fetchSensitiveModalPage()
+}
+
+const closeSensitiveModal = () => {
+  sensitiveModalOpen.value = false
+  sensitiveModalItems.value = []
+  sensitiveModalTotalPages.value = 1
+  sensitiveModalTotalCount.value = 0
+}
+
+const fetchSensitiveModalPage = async () => {
+  sensitiveModalLoading.value = true
+  try {
+    const res = await axios.get('/api/monitor/feed/sensitive', {
+      params: {
+        platform: sensitiveModalPlatform.value || undefined,
+        page: sensitiveModalPage.value,
+        page_size: 20
+      }
+    })
+    const items = Array.isArray(res.data?.items) ? res.data.items : []
+    sensitiveModalItems.value = items.map((row, index) => {
+      const platformKey = normalizePlatform(row?.platform)
+      const recordTime = row?.created_at || getRecordTime(row)
+      return {
+        id: row?.id || `${platformKey || 'data'}-${index}`,
+        platformKey,
+        platformLabel: row?.platform_name || getPlatformLabel(platformKey),
+        content: row?.content || pickContent(row),
+        timeLabel: formatRelativeTime(recordTime),
+        authorLabel: row?.author || '',
+        url: row?.url || '',
+        sortTime: recordTime || 0
+      }
+    })
+    if (res.data?.pagination) {
+      sensitiveModalTotalPages.value = res.data.pagination.total_pages || 1
+      sensitiveModalTotalCount.value = res.data.pagination.total_count || 0
+    }
+  } catch (e) {
+    sensitiveModalItems.value = []
+    sensitiveModalTotalPages.value = 1
+    sensitiveModalTotalCount.value = 0
+  } finally {
+    sensitiveModalLoading.value = false
+  }
+}
+
+const goSensitivePage = async (page) => {
+  if (page < 1 || page > sensitiveModalTotalPages.value) return
+  sensitiveModalPage.value = page
+  await fetchSensitiveModalPage()
+}
+
 const pieTooltip = {
   trigger: 'item',
   backgroundColor: 'rgba(10, 10, 15, 0.95)',
   borderColor: 'rgba(0, 204, 255, 0.3)',
-  textStyle: { color: '#fff' }
+  textStyle: { color: '#fff' },
+  appendToBody: true,
+  confine: false,
+  extraCssText: 'z-index: 9999; max-width: 220px; white-space: normal; pointer-events: none;'
 }
 
-const buildPlatformPieOptions = ({ positive, negative, neutral, sensitive, total }) => ({
+const buildPlatformPieOptions = ({ sensitive = 0, total = 0 }) => ({
   tooltip: pieTooltip,
   legend: {
     bottom: '4%',
@@ -604,15 +916,34 @@ const buildPlatformPieOptions = ({ positive, negative, neutral, sensitive, total
         center: ['50%', '45%'],
         label: { show: false },
         data: [
-          { value: positive, name: '积极', itemStyle: { color: '#00ff88' } },
-          { value: negative, name: '消极', itemStyle: { color: '#ff6b6b' } },
-          { value: neutral, name: '中性', itemStyle: { color: '#00ccff' } },
-          { value: sensitive, name: '敏感', itemStyle: { color: '#ffae00' } }
+          { value: sensitive, name: '敏感', itemStyle: { color: '#ff4d4f' } },
+          { value: Math.max(total - sensitive, 0), name: '非敏感', itemStyle: { color: '#3b82f6' } }
         ]
+      },
+      {
+        type: 'pie',
+        radius: [0, '35%'],
+        center: ['50%', '45%'],
+        silent: true,
+        label: {
+          show: true,
+          position: 'center',
+          formatter: () => [`{v|${sensitive}}`, `{l|/ ${total}}`].join('\n'),
+          rich: {
+            v: { fontSize: 18, fontWeight: 800, color: '#ff4d4f' },
+            l: { fontSize: 10, color: '#8899aa', paddingTop: 2 }
+          }
+        },
+        data: [{ value: 1, itemStyle: { color: 'transparent' } }]
       }
     ]
   })()
 })
+
+const handlePlatformJump = (platformKey) => {
+  if (!platformKey) return
+  router.push({ path: '/data', query: { platform: platformKey } })
+}
 
 const platformPieOptions = computed(() => {
   const counts = platformSentimentCounts.value
@@ -664,6 +995,16 @@ const platformAliases = {
   wb: ['wb', 'weibo'],
   tieba: ['tieba', 'baidutieba'],
   zhihu: ['zhihu']
+}
+
+const platformNameToKey = {
+  '小红书': 'xhs',
+  '抖音': 'dy',
+  '快手': 'ks',
+  'B站': 'bili',
+  '微博': 'wb',
+  '贴吧': 'tieba',
+  '知乎': 'zhihu'
 }
 
 const normalizePlatform = (value) => {
@@ -756,6 +1097,8 @@ const buildFeedItems = (rows) => {
   return rows.map((row, index) => {
     const platformKey = normalizePlatform(row?.platform)
     const recordTime = row?.created_at || getRecordTime(row)
+    const isSensitive = row?.is_sensitive ?? row?.isSensitive ?? row?.sentiment === 'sensitive'
+    const sentiment = isSensitive ? 'sensitive' : (row?.sentiment || 'neutral')
     const item = {
       id: row?.id || `${platformKey || 'data'}-${index}`,
       platformKey,
@@ -766,9 +1109,10 @@ const buildFeedItems = (rows) => {
       url: row?.url || '',
       sortTime: recordTime || 0,
       // 情绪分析数据
-      sentiment: row?.sentiment || 'neutral',
+      sentiment,
       sentimentScore: row?.sentiment_score || 0,
-      sentimentLabels: row?.sentiment_labels || {}
+      sentimentLabels: row?.sentiment_labels || {},
+      isSensitive
     }
     console.log('buildFeedItems: built item', index, item)
     return item
@@ -893,13 +1237,16 @@ const fetchMonitorFeedPage = async ({ withLoading = true, signal = null } = {}) 
     feedLoading.value = true
   }
   try {
-    const res = await axios.get('/api/monitor/feed', {
-      params: {
-        page: currentPage.value,
-        page_size: pageSize.value
-      },
-      signal
-    })
+    const [res] = await Promise.all([
+      axios.get('/api/monitor/feed', {
+        params: {
+          page: currentPage.value,
+          page_size: pageSize.value
+        },
+        signal
+      }),
+      fetchPlatformStats({ signal })
+    ])
     // 请求完成后再次检查是否被取消
     if (signal?.aborted) return
 
@@ -931,6 +1278,7 @@ const fetchMonitorFeedPage = async ({ withLoading = true, signal = null } = {}) 
 
     // 只在组件未卸载时更新状态
     feedItems.value = []
+    platformStats.value = null
     totalCount.value = 0
     totalPages.value = 1
     lastUpdatedAt.value = new Date()
@@ -1053,6 +1401,10 @@ const checkCrawlerAndFetch = async () => {
   }
 }
 
+// 自动刷新定时器
+let refreshInterval = null
+const AUTO_REFRESH_INTERVAL = 30000 // 30秒自动刷新
+
 onMounted(async () => {
   isMounted.value = true
   // 重置加载状态，防止被旧状态阻塞
@@ -1063,14 +1415,29 @@ onMounted(async () => {
   await fetchMonitorFeed()
 
   nextTick(() => {
+    renderMainPieChart()
     renderPlatformCharts()
   })
+
+  // 启动自动刷新
+  refreshInterval = setInterval(() => {
+    if (!feedLoading.value) {
+      fetchMonitorFeed({ withLoading: false })
+    }
+  }, AUTO_REFRESH_INTERVAL)
 
   window.addEventListener('resize', () => chartInstances.forEach(c => c?.resize()))
 })
 
 onBeforeUnmount(() => {
   isMounted.value = false
+
+  // 清理自动刷新定时器
+  if (refreshInterval) {
+    clearInterval(refreshInterval)
+    refreshInterval = null
+  }
+
   // 保存当前刷新状态到 localStorage，以便返回时恢复
   if (feedLoading.value) {
     localStorage.setItem('dashboard-refresh-running', 'true')
@@ -1081,6 +1448,16 @@ onBeforeUnmount(() => {
   }
   chartInstances.forEach(c => c?.dispose())
 })
+
+// 监听数据变化，重新渲染图表
+watch(feedItems, () => {
+  if (feedItems.value.length > 0) {
+    nextTick(() => {
+      renderMainPieChart()
+      renderPlatformCharts()
+    })
+  }
+}, { deep: true })
 </script>
 
 <style scoped>
@@ -1097,6 +1474,119 @@ onBeforeUnmount(() => {
   gap: 18px;
   overflow-y: auto;
   scroll-behavior: smooth;
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(6, 8, 14, 0.7);
+  backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+
+.modal-card {
+  width: min(900px, 92vw);
+  max-height: 80vh;
+  background: rgba(14, 18, 28, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.45);
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 22px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.modal-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #e6f0ff;
+}
+
+.modal-subtitle {
+  margin-left: 10px;
+  font-size: 12px;
+  color: #8fa3c1;
+}
+
+.modal-close {
+  background: transparent;
+  border: none;
+  font-size: 22px;
+  color: #b8c6e1;
+  cursor: pointer;
+}
+
+.modal-body {
+  padding: 16px 22px;
+  overflow-y: auto;
+}
+
+.modal-loading,
+.modal-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: #9fb2d3;
+  min-height: 180px;
+}
+
+.modal-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.modal-item {
+  background: rgba(12, 16, 26, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+
+.modal-item-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.modal-content {
+  color: #e1e9ff;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+  font-size: 12px;
+  color: #8fa3c1;
+}
+
+.modal-footer a {
+  color: #4fd1ff;
+  text-decoration: none;
+}
+
+.modal-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 12px 18px 18px;
 }
 
 .page-header {
@@ -1167,6 +1657,9 @@ onBeforeUnmount(() => {
 
 .panel-card {
   flex-shrink: 0;
+}
+.panel-card.main-card {
+  min-height: 300px;
 }
 
 .left-panel .chart-card {
@@ -1891,7 +2384,7 @@ body {
 
 .entrance-chart-fade {
   animation: chartFadeIn 1s cubic-bezier(0.16, 1, 0.3, 1) 0.6s forwards;
-  opacity: 0;
+  opacity: 1;
   transform: scale(0.95);
 }
 @keyframes chartFadeIn {
@@ -1918,9 +2411,10 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-shrink: 0;
 }
 .cell-header.compact {
-  padding: 12px 16px;
+  padding: 10px 15px;
   font-size: 12px;
 }
 
@@ -2005,6 +2499,16 @@ body {
   align-items: center;
   padding: 0 16px 10px;
 }
+
+.platform-card.clickable {
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.platform-card.clickable:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+}
 .platform-mini-chart {
   width: 90px;
   height: 90px;
@@ -2047,7 +2551,8 @@ body {
 .main-chart-box {
   flex: 1;
   width: 100%;
-  min-height: 0;
+  min-height: 240px;
+  height: 240px;
 }
 
 /* Sentiment Summary */

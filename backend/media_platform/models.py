@@ -482,6 +482,11 @@ class MonitorFeed(BaseModel):
         blank=True,
         verbose_name="Sentiment analysis labels"
     )
+    is_sensitive = models.BooleanField(
+        default=False,
+        db_index=True,
+        verbose_name="Is sensitive content"
+    )
 
     class Meta:
         db_table = 'monitor_feed'

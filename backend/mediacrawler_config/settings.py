@@ -67,6 +67,8 @@ WSGI_APPLICATION = "mediacrawler_config.wsgi.application"
 
 # Database - MySQL (from .env)
 import pymysql
+pymysql.__version__ = "2.2.1"
+pymysql.version_info = (2, 2, 1, "final", 0)
 pymysql.install_as_MySQLdb()
 
 DB_ENGINE = os.environ.get('DB_ENGINE', 'mysql')
