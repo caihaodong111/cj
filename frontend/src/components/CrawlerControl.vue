@@ -12,28 +12,26 @@
       <div class="form-row">
         <div class="form-group">
           <label>平台</label>
-          <select v-model="config.platform" :disabled="isRunning">
-            <option v-for="p in platforms" :key="p.value" :value="p.value">
-              {{ p.label }}
-            </option>
-          </select>
+          <el-select v-model="config.platform" :disabled="isRunning" class="dark-select crawler-select" popper-class="dark-select-dropdown" :teleported="false">
+            <el-option v-for="p in platforms" :key="p.value" :label="p.label" :value="p.value" />
+          </el-select>
         </div>
 
         <div class="form-group">
           <label>登录方式</label>
-          <select v-model="config.login_type" :disabled="isRunning">
-            <option value="qrcode">二维码登录</option>
-            <option value="cookie">Cookie 登录</option>
-          </select>
+          <el-select v-model="config.login_type" :disabled="isRunning" class="dark-select crawler-select" popper-class="dark-select-dropdown" :teleported="false">
+            <el-option label="二维码登录" value="qrcode" />
+            <el-option label="Cookie 登录" value="cookie" />
+          </el-select>
         </div>
 
         <div class="form-group">
           <label>爬取模式</label>
-          <select v-model="config.crawler_type" :disabled="isRunning">
-            <option value="search">搜索模式</option>
-            <option value="detail">详情模式</option>
-            <option value="creator">创作者模式</option>
-          </select>
+          <el-select v-model="config.crawler_type" :disabled="isRunning" class="dark-select crawler-select" popper-class="dark-select-dropdown" :teleported="false">
+            <el-option label="搜索模式" value="search" />
+            <el-option label="详情模式" value="detail" />
+            <el-option label="创作者模式" value="creator" />
+          </el-select>
         </div>
       </div>
 
@@ -77,12 +75,12 @@
       <div class="form-row">
         <div class="form-group">
           <label>保存格式</label>
-          <select v-model="config.save_option" :disabled="isRunning">
-            <option value="json">JSON</option>
-            <option value="csv">CSV</option>
-            <option value="excel">Excel</option>
-            <option value="db">数据库</option>
-          </select>
+          <el-select v-model="config.save_option" :disabled="isRunning" class="dark-select crawler-select" popper-class="dark-select-dropdown" :teleported="false">
+            <el-option label="JSON" value="json" />
+            <el-option label="CSV" value="csv" />
+            <el-option label="Excel" value="excel" />
+            <el-option label="数据库" value="db" />
+          </el-select>
         </div>
 
         <div class="form-group">
@@ -484,20 +482,88 @@ onUnmounted(() => {
   color: #8899aa;
 }
 
-.form-group select {
-  cursor: pointer;
-  appearance: none;
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  background-image: linear-gradient(135deg, rgba(0, 204, 255, 0.2), rgba(0, 102, 255, 0.1)),
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2300ccff' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 12px center, 0 0;
-  background-size: 100% 100%, 12px 12px;
+/* === Dark Select Styles === */
+:deep(.dark-select) {
+  --el-select-input-focus-border-color: #ffaa00;
+  --el-select-border-color-hover: rgba(255, 170, 0, 0.3);
 }
 
-.form-group input:disabled,
-.form-group select:disabled {
+:deep(.dark-select .el-select__wrapper) {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  box-shadow: none;
+  padding: 4px 12px;
+  min-height: 36px;
+  transition: all 0.2s ease;
+}
+
+:deep(.dark-select .el-select__wrapper:hover) {
+  border-color: rgba(255, 170, 0, 0.3);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+:deep(.dark-select .el-select__wrapper.is-focus) {
+  border-color: #ffaa00;
+  box-shadow: 0 0 12px rgba(255, 170, 0, 0.25);
+}
+
+:deep(.dark-select .el-select__selected-item) {
+  color: #fff;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+:deep(.dark-select .el-select__placeholder) {
+  color: #8899aa;
+  font-size: 12px;
+}
+
+:deep(.dark-select .el-select__suffix) {
+  color: #8899aa;
+}
+
+:deep(.dark-select.is-focus .el-select__suffix) {
+  color: #ffaa00;
+}
+
+:deep(.dark-select.is-disabled .el-select__wrapper) {
+  opacity: 0.4;
+  cursor: not-allowed;
+  border-color: rgba(0, 204, 255, 0.12);
+}
+
+/* === Dark Select Dropdown Styles === */
+:deep(.dark-select-dropdown) {
+  background: rgba(26, 29, 38, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+:deep(.dark-select-dropdown .el-select-dropdown__item) {
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 12px;
+  padding: 8px 16px;
+  transition: all 0.2s ease;
+}
+
+:deep(.dark-select-dropdown .el-select-dropdown__item:hover) {
+  background: rgba(255, 170, 0, 0.15);
+  color: #ffaa00;
+}
+
+:deep(.dark-select-dropdown .el-select-dropdown__item.is-selected) {
+  background: rgba(255, 170, 0, 0.25);
+  color: #ffaa00;
+  font-weight: 500;
+}
+
+:deep(.dark-select-dropdown .el-select-dropdown__item.is-disabled) {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.form-group input:disabled {
   opacity: 0.4;
   cursor: not-allowed;
   border-color: rgba(0, 204, 255, 0.12);

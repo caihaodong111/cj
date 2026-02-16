@@ -108,32 +108,32 @@
 
             <!-- Sentiment Filter -->
             <div class="filter-item">
-              <select v-model="sentimentFilter" class="filter-select">
-                <option value="all">全部情绪</option>
-                <option value="positive">正面</option>
-                <option value="negative">负面</option>
-                <option value="neutral">中性</option>
-                <option value="sensitive">敏感</option>
-              </select>
+              <el-select v-model="sentimentFilter" class="dark-select filter-select-item" :teleported="false">
+                <el-option label="全部情绪" value="all" />
+                <el-option label="正面" value="positive" />
+                <el-option label="负面" value="negative" />
+                <el-option label="中性" value="neutral" />
+                <el-option label="敏感" value="sensitive" />
+              </el-select>
             </div>
 
             <!-- Sensitive Filter -->
             <div class="filter-item">
-              <select v-model="sensitiveFilter" class="filter-select">
-                <option value="all">全部状态</option>
-                <option value="sensitive">仅敏感</option>
-                <option value="non-sensitive">非敏感</option>
-              </select>
+              <el-select v-model="sensitiveFilter" class="dark-select filter-select-item" :teleported="false">
+                <el-option label="全部状态" value="all" />
+                <el-option label="仅敏感" value="sensitive" />
+                <el-option label="非敏感" value="non-sensitive" />
+              </el-select>
             </div>
 
             <!-- Interactions Filter -->
             <div class="filter-item">
-              <select v-model="interactionsFilter" class="filter-select">
-                <option value="all">全部互动</option>
-                <option value="high">高互动 (1000+)</option>
-                <option value="medium">中互动 (100-999)</option>
-                <option value="low">低互动 (&lt;100)</option>
-              </select>
+              <el-select v-model="interactionsFilter" class="dark-select filter-select-item" :teleported="false">
+                <el-option label="全部互动" value="all" />
+                <el-option label="高互动 (1000+)" value="high" />
+                <el-option label="中互动 (100-999)" value="medium" />
+                <el-option label="低互动 (<100)" value="low" />
+              </el-select>
             </div>
 
             <!-- Reset Button -->
@@ -2042,35 +2042,46 @@ tr:hover td {
   color: #ffaa00;
 }
 
-.filter-select {
-  padding: 8px 12px;
-  padding-right: 30px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  color: #fff;
-  font-size: 0.85rem;
-  outline: none;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238899aa' d='M2 4l4 4 4-4z'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 10px center;
-  padding-right: 32px;
+.filter-select-item {
+  width: 140px;
 }
 
-.filter-select:hover {
+/* === Dark Select Styles (matching DevicesView) === */
+:deep(.dark-select .el-select__wrapper) {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  box-shadow: none;
+  padding: 4px 12px;
+  min-height: 36px;
+  transition: all 0.2s ease;
+}
+
+:deep(.dark-select .el-select__wrapper:hover) {
   border-color: rgba(255, 170, 0, 0.3);
 }
 
-.filter-select:focus {
+:deep(.dark-select .el-select__wrapper.is-focus) {
   border-color: #ffaa00;
 }
 
-.filter-select option {
-  background: #1a1d26;
+:deep(.dark-select .el-select__selected-item) {
   color: #fff;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+:deep(.dark-select .el-select__placeholder) {
+  color: #8899aa;
+  font-size: 0.85rem;
+}
+
+:deep(.dark-select .el-select__suffix) {
+  color: #8899aa;
+}
+
+:deep(.dark-select.is-focus .el-select__suffix) {
+  color: #ffaa00;
 }
 
 .filter-reset {
@@ -2430,5 +2441,101 @@ tr:hover td {
   .header-meta {
     display: none;
   }
+}
+</style>
+
+<!-- Global Styles for Element Plus Dropdown (not scoped) -->
+<style>
+/* ==========================================================================
+   Element Plus 下拉菜单全局样式 - 透明玻璃质感
+   ========================================================================== */
+
+/* --- 1. Popper 容器覆盖 (Element Plus 下拉外层容器) --- */
+.el-popper {
+  /* 透明玻璃质感背景 */
+  background-color: rgba(20, 25, 35, 0.75) !important;
+  backdrop-filter: blur(40px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(40px) saturate(180%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 20px !important;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+}
+
+/* --- 2. 下拉菜单容器 (核心玻璃体) --- */
+.el-select-dropdown {
+  /* 内层透明，避免双层背景嵌套感 */
+  background-color: transparent !important;
+  backdrop-filter: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+  margin-top: 0 !important;
+}
+
+/* 下拉菜单内部容器也设为透明 */
+.el-select-dropdown__wrap {
+  background-color: transparent !important;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+}
+
+.el-select-dropdown__wrap::-webkit-scrollbar {
+  width: 4px;
+}
+
+.el-select-dropdown__wrap::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+
+.el-select-dropdown__wrap::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* 隐藏原本的小三角箭头 */
+.el-popper__arrow {
+  display: none !important;
+}
+
+/* --- 3. 选项列表项 --- */
+.el-select-dropdown__list {
+  background-color: transparent !important;
+  padding: 6px 8px !important;
+}
+
+.el-select-dropdown__item {
+  color: #8da0b7 !important;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+  font-size: 13px !important;
+  height: 36px !important;
+  line-height: 36px !important;
+  margin: 1px 4px !important;
+  border-radius: 8px !important;
+  padding: 0 12px !important;
+  transition: all 0.15s ease !important;
+  font-weight: 400 !important;
+}
+
+/* 悬停状态 */
+.el-select-dropdown__item.hover,
+.el-select-dropdown__item:hover {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+  color: #ffffff !important;
+}
+
+/* 选中状态 - 金色高亮 */
+.el-select-dropdown__item.is-selected {
+  background: rgba(255, 170, 0, 0.15) !important;
+  color: #ffaa00 !important;
+  font-weight: 500 !important;
+}
+
+/* 禁用状态 */
+.el-select-dropdown__item.is-disabled {
+  color: rgba(255, 255, 255, 0.2) !important;
+  pointer-events: none;
 }
 </style>
