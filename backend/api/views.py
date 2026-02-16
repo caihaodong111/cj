@@ -1815,7 +1815,8 @@ def get_data_stats(request):
         "total_files": 0,
         "total_size": 0,
         "by_platform": {},
-        "by_type": {}
+        "by_type": {},
+        "updated_at_by_platform": {},
     }
 
     supported_extensions = {".json", ".csv", ".xlsx", ".xls"}
@@ -1855,6 +1856,40 @@ def get_data_stats(request):
             db_count = 0
         if db_count > 0:
             stats["by_platform"][platform] = db_count
+
+    for platform, config_item in PLATFORM_FEED_CONFIG.items():
+        latest_ts = 0
+        try:
+            latest_ts = MonitorFeed.objects.filter(platform=platform).aggregate(
+                max_ts=models.Max(Coalesce("last_modify_ts", "add_ts", "created_at", 0))
+            ).get("max_ts") or 0
+        except Exception:
+            latest_ts = 0
+
+        if not latest_ts:
+            try:
+                model = config_item["model"]
+                time_field = config_item.get("time_field")
+                if time_field:
+                    coalesce_fields = [
+                        models.F(time_field),
+                        models.F("last_modify_ts"),
+                        models.F("add_ts"),
+                        0,
+                    ]
+                else:
+                    coalesce_fields = [
+                        models.F("last_modify_ts"),
+                        models.F("add_ts"),
+                        0,
+                    ]
+                latest_ts = model.objects.aggregate(
+                    max_ts=models.Max(Coalesce(*coalesce_fields))
+                ).get("max_ts") or 0
+            except Exception:
+                latest_ts = 0
+
+        stats["updated_at_by_platform"][platform] = int(latest_ts or 0)
 
     return Response(stats)
 

@@ -126,7 +126,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import axios from 'axios'
 
 // 定义事件
-const emit = defineEmits(['crawler-status-change'])
+const emit = defineEmits(['crawler-status-change', 'platform-change'])
 const props = defineProps({
   currentPlatform: {
     type: String,
@@ -152,7 +152,7 @@ const config = ref({
   keywords: '',
   specified_ids: '',
   creator_ids: '',
-  enable_comments: true,
+  enable_comments: false,
   enable_sub_comments: false,
   cookies: '',
   headless: true
@@ -225,6 +225,7 @@ const startCrawler = async () => {
       console.log('[前端] 二维码登录模式已自动开启浏览器窗口')
     }
 
+    emit('platform-change', requestConfig.platform)
     console.log('[前端] 发送启动请求到 /api/crawler/start')
     const response = await axios.post('/api/crawler/start', requestConfig)
     console.log('[前端] 响应:', response.data)

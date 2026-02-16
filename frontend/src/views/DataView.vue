@@ -365,6 +365,7 @@
             <CrawlerControl
               :current-platform="currentPlatform"
               @crawler-status-change="onCrawlerStatusChange"
+              @platform-change="handleCrawlerPlatformChange"
             />
           </div>
         </div>
@@ -742,6 +743,11 @@ const handleSelectPlatform = async (platformValue) => {
   await selectPlatform(platformValue)
 }
 
+const handleCrawlerPlatformChange = async (platformValue) => {
+  if (!platformValue || platformValue === currentPlatform.value) return
+  await selectPlatform(platformValue)
+}
+
 const getRowIndex = (idx) => (currentPage.value - 1) * pageSize.value + idx
 
 const isExpandable = (val) => {
@@ -821,6 +827,18 @@ const fetchConfig = async () => {
     platforms.value = res.data.platforms
     const statsRes = await axios.get('/api/data/stats')
     stats.value = statsRes.data
+    const updatedMap = statsRes.data?.updated_at_by_platform || {}
+    const nextUpdated = {}
+    Object.keys(updatedMap).forEach((platform) => {
+      const ts = updatedMap[platform]
+      if (ts) {
+        nextUpdated[platform] = formatFetchedAt(ts)
+      }
+    })
+    platformUpdatedAt.value = {
+      ...platformUpdatedAt.value,
+      ...nextUpdated
+    }
     const sentimentRes = await axios.get('/api/monitor/platform-sentiment-stats')
     sentimentStats.value = sentimentRes.data || {}
   } catch (e) {
