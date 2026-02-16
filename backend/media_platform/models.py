@@ -46,6 +46,22 @@ class BilibiliVideo(BaseModel):
     video_comment = models.TextField(null=True, blank=True)
     video_cover_url = models.TextField(null=True, blank=True)
     source_keyword = models.TextField(default='', blank=True, verbose_name="Source keyword")
+    # 情绪分析字段
+    sentiment = models.CharField(
+        max_length=20,
+        default='neutral',
+        db_index=True,
+        null=True,
+        blank=True,
+        verbose_name="Sentiment type (positive/negative/neutral/sensitive)"
+    )
+    is_sensitive = models.BooleanField(
+        default=False,
+        db_index=True,
+        null=True,
+        blank=True,
+        verbose_name="Is sensitive content"
+    )
 
     class Meta:
         db_table = 'bilibili_video'
@@ -154,6 +170,22 @@ class DouyinAweme(BaseModel):
     music_download_url = models.TextField(null=True, blank=True)
     note_download_url = models.TextField(null=True, blank=True)
     source_keyword = models.TextField(default='', blank=True, verbose_name="Source keyword")
+    # 情绪分析字段
+    sentiment = models.CharField(
+        max_length=20,
+        default='neutral',
+        db_index=True,
+        null=True,
+        blank=True,
+        verbose_name="Sentiment type (positive/negative/neutral/sensitive)"
+    )
+    is_sensitive = models.BooleanField(
+        default=False,
+        db_index=True,
+        null=True,
+        blank=True,
+        verbose_name="Is sensitive content"
+    )
 
     class Meta:
         db_table = 'douyin_aweme'
@@ -223,6 +255,22 @@ class KuaishouVideo(BaseModel):
     video_cover_url = models.TextField(null=True, blank=True)
     video_play_url = models.TextField(null=True, blank=True)
     source_keyword = models.TextField(default='', blank=True, verbose_name="Source keyword")
+    # 情绪分析字段
+    sentiment = models.CharField(
+        max_length=20,
+        default='neutral',
+        db_index=True,
+        null=True,
+        blank=True,
+        verbose_name="Sentiment type (positive/negative/neutral/sensitive)"
+    )
+    is_sensitive = models.BooleanField(
+        default=False,
+        db_index=True,
+        null=True,
+        blank=True,
+        verbose_name="Is sensitive content"
+    )
 
     class Meta:
         db_table = 'kuaishou_video'
@@ -266,6 +314,22 @@ class WeiboNote(BaseModel):
     shared_count = models.TextField(null=True, blank=True)
     note_url = models.TextField(null=True, blank=True)
     source_keyword = models.TextField(default='', blank=True, verbose_name="Source keyword")
+    # 情绪分析字段
+    sentiment = models.CharField(
+        max_length=20,
+        default='neutral',
+        db_index=True,
+        null=True,
+        blank=True,
+        verbose_name="Sentiment type (positive/negative/neutral/sensitive)"
+    )
+    is_sensitive = models.BooleanField(
+        default=False,
+        db_index=True,
+        null=True,
+        blank=True,
+        verbose_name="Is sensitive content"
+    )
 
     class Meta:
         db_table = 'weibo_note'
@@ -357,6 +421,22 @@ class XhsNote(BaseModel):
     note_url = models.TextField(null=True, blank=True)
     source_keyword = models.TextField(default='', blank=True, verbose_name="Source keyword")
     xsec_token = models.TextField(null=True, blank=True)
+    # 情绪分析字段
+    sentiment = models.CharField(
+        max_length=20,
+        default='neutral',
+        db_index=True,
+        null=True,
+        blank=True,
+        verbose_name="Sentiment type (positive/negative/neutral/sensitive)"
+    )
+    is_sensitive = models.BooleanField(
+        default=False,
+        db_index=True,
+        null=True,
+        blank=True,
+        verbose_name="Is sensitive content"
+    )
 
     class Meta:
         db_table = 'xhs_note'
@@ -404,6 +484,22 @@ class TiebaNote(BaseModel):
     total_replay_page = models.IntegerField(default=0)
     ip_location = models.TextField(default='', blank=True)
     source_keyword = models.TextField(default='', blank=True, verbose_name="Source keyword")
+    # 情绪分析字段
+    sentiment = models.CharField(
+        max_length=20,
+        default='neutral',
+        db_index=True,
+        null=True,
+        blank=True,
+        verbose_name="Sentiment type (positive/negative/neutral/sensitive)"
+    )
+    is_sensitive = models.BooleanField(
+        default=False,
+        db_index=True,
+        null=True,
+        blank=True,
+        verbose_name="Is sensitive content"
+    )
 
     class Meta:
         db_table = 'tieba_note'
@@ -521,6 +617,22 @@ class ZhihuContent(BaseModel):
     user_nickname = models.TextField(null=True, blank=True)
     user_avatar = models.TextField(null=True, blank=True)
     user_url_token = models.TextField(null=True, blank=True)
+    # 情绪分析字段
+    sentiment = models.CharField(
+        max_length=20,
+        default='neutral',
+        db_index=True,
+        null=True,
+        blank=True,
+        verbose_name="Sentiment type (positive/negative/neutral/sensitive)"
+    )
+    is_sensitive = models.BooleanField(
+        default=False,
+        db_index=True,
+        null=True,
+        blank=True,
+        verbose_name="Is sensitive content"
+    )
 
     class Meta:
         db_table = 'zhihu_content'

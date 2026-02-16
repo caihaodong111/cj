@@ -366,6 +366,8 @@ onUnmounted(() => {
   overflow-y: auto;
   color: #fff;
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 16px;
 }
 
 .control-header {
@@ -373,14 +375,14 @@ onUnmounted(() => {
   justify-content: space-between;
   align-items: center;
   padding: 20px 24px;
-  border-bottom: 1px solid rgba(255,255,255,0.05);
-  background: rgba(0, 0, 0, 0.2);
+  border-bottom: 1px solid rgba(0, 204, 255, 0.15);
+  background: linear-gradient(135deg, rgba(0, 204, 255, 0.06), rgba(255, 170, 0, 0.05));
 }
 
 .control-header h2 {
   margin: 0;
   font-size: 16px;
-  color: #ffaa00;
+  color: #fff;
   font-weight: 600;
   letter-spacing: 1px;
   text-transform: uppercase;
@@ -398,16 +400,16 @@ onUnmounted(() => {
 }
 
 .status-idle {
-  background: rgba(108, 117, 125, 0.15);
-  color: #8899aa;
-  border-color: rgba(255, 255, 255, 0.08);
+  background: rgba(0, 204, 255, 0.08);
+  color: rgba(255, 255, 255, 0.7);
+  border-color: rgba(0, 204, 255, 0.2);
 }
 
 .status-running {
-  background: rgba(74, 222, 128, 0.15);
-  color: #4ade80;
-  border-color: rgba(74, 222, 128, 0.3);
-  box-shadow: 0 0 15px rgba(74, 222, 128, 0.2);
+  background: rgba(0, 204, 255, 0.15);
+  color: #00ccff;
+  border-color: rgba(0, 204, 255, 0.45);
+  box-shadow: 0 0 15px rgba(0, 204, 255, 0.3);
   animation: statusPulse 2s ease-in-out infinite;
 }
 
@@ -417,10 +419,10 @@ onUnmounted(() => {
 }
 
 .status-error {
-  background: rgba(255, 107, 107, 0.15);
-  color: #ff6b6b;
-  border-color: rgba(255, 107, 107, 0.3);
-  box-shadow: 0 0 15px rgba(255, 107, 107, 0.2);
+  background: rgba(255, 107, 107, 0.18);
+  color: #ff7b7b;
+  border-color: rgba(255, 107, 107, 0.45);
+  box-shadow: 0 0 15px rgba(255, 107, 107, 0.25);
 }
 
 .config-form {
@@ -449,7 +451,7 @@ onUnmounted(() => {
   display: block;
   margin-bottom: 6px;
   font-size: 11px;
-  color: #8899aa;
+  color: rgba(255, 255, 255, 0.6);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 1px;
@@ -459,9 +461,9 @@ onUnmounted(() => {
 .form-group input[type="number"],
 .form-group select {
   width: 100%;
-  padding: 10px 12px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 10px 36px 10px 12px;
+  background: rgba(0, 204, 255, 0.06);
+  border: 1px solid rgba(0, 204, 255, 0.15);
   border-radius: 12px;
   color: #fff;
   font-size: 12px;
@@ -472,9 +474,9 @@ onUnmounted(() => {
 .form-group input[type="number"]:focus,
 .form-group select:focus {
   outline: none;
-  border-color: rgba(255, 170, 0, 0.4);
-  box-shadow: 0 0 15px rgba(255, 170, 0, 0.15);
-  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(0, 204, 255, 0.5);
+  box-shadow: 0 0 12px rgba(0, 204, 255, 0.25);
+  background: rgba(0, 204, 255, 0.1);
 }
 
 .form-group input[type="text"]::placeholder,
@@ -485,13 +487,20 @@ onUnmounted(() => {
 .form-group select {
   cursor: pointer;
   appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: linear-gradient(135deg, rgba(0, 204, 255, 0.2), rgba(0, 102, 255, 0.1)),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2300ccff' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center, 0 0;
+  background-size: 100% 100%, 12px 12px;
 }
 
 .form-group input:disabled,
 .form-group select:disabled {
   opacity: 0.4;
   cursor: not-allowed;
-  border-color: rgba(255, 170, 0, 0.1);
+  border-color: rgba(0, 204, 255, 0.12);
 }
 
 .checkbox-group {
@@ -514,24 +523,24 @@ onUnmounted(() => {
 }
 
 .checkbox-group label:hover {
-  color: #ffaa00;
+  color: #00ccff;
 }
 
 .checkbox-group input[type="checkbox"] {
   cursor: pointer;
   width: 16px;
   height: 16px;
-  accent-color: #ffaa00;
+  accent-color: #00ccff;
   border-radius: 4px;
-  border: 1px solid rgba(255, 170, 0, 0.2);
-  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(0, 204, 255, 0.3);
+  background: rgba(0, 204, 255, 0.08);
 }
 
 .form-actions {
   display: flex;
   justify-content: flex-end;
   padding-top: 16px;
-  border-top: 1px solid rgba(255,255,255,0.05);
+  border-top: 1px solid rgba(0, 204, 255, 0.12);
   margin-top: 8px;
 }
 
@@ -554,37 +563,37 @@ onUnmounted(() => {
 }
 
 .btn-start {
-  background: rgba(74, 222, 128, 0.15);
-  border-color: #4ade80;
-  color: #4ade80;
-  box-shadow: 0 4px 14px rgba(74, 222, 128, 0.3);
+  background: linear-gradient(135deg, rgba(0, 204, 255, 0.18), rgba(0, 102, 255, 0.1));
+  border-color: rgba(0, 204, 255, 0.6);
+  color: #e6fbff;
+  box-shadow: 0 6px 18px rgba(0, 204, 255, 0.25);
 }
 
 .btn-start:hover:not(:disabled) {
-  background: rgba(74, 222, 128, 0.25);
-  box-shadow: 0 8px 24px rgba(74, 222, 128, 0.5);
+  background: linear-gradient(135deg, rgba(0, 204, 255, 0.3), rgba(0, 102, 255, 0.2));
+  box-shadow: 0 12px 28px rgba(0, 204, 255, 0.4);
   transform: translateY(-2px);
 }
 
 .btn-stop {
-  background: rgba(255, 107, 107, 0.15);
-  border-color: #ff6b6b;
-  color: #ff6b6b;
-  box-shadow: 0 4px 14px rgba(255, 107, 107, 0.3);
+  background: linear-gradient(135deg, rgba(255, 107, 107, 0.22), rgba(255, 55, 95, 0.16));
+  border-color: rgba(255, 107, 107, 0.6);
+  color: #ffe6e6;
+  box-shadow: 0 6px 18px rgba(255, 107, 107, 0.25);
 }
 
 .btn-stop:hover:not(:disabled) {
-  background: rgba(255, 107, 107, 0.25);
-  box-shadow: 0 8px 24px rgba(255, 107, 107, 0.5);
+  background: linear-gradient(135deg, rgba(255, 107, 107, 0.35), rgba(255, 55, 95, 0.26));
+  box-shadow: 0 12px 28px rgba(255, 107, 107, 0.4);
   transform: translateY(-2px);
 }
 
 .btn-small {
   padding: 6px 12px;
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(0, 204, 255, 0.08);
+  border: 1px solid rgba(0, 204, 255, 0.2);
   border-radius: 10px;
-  color: #ffaa00;
+  color: #00ccff;
   font-size: 11px;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -592,16 +601,16 @@ onUnmounted(() => {
 }
 
 .btn-small:hover {
-  background: rgba(255, 170, 0, 0.12);
-  border-color: rgba(255, 170, 0, 0.3);
-  box-shadow: 0 0 15px rgba(255, 170, 0, 0.2);
+  background: rgba(0, 204, 255, 0.18);
+  border-color: rgba(0, 204, 255, 0.4);
+  box-shadow: 0 0 15px rgba(0, 204, 255, 0.25);
 }
 
 .logs-panel {
   display: flex;
   flex-direction: column;
-  background: rgba(0, 0, 0, 0.4);
-  border-top: 1px solid rgba(255,255,255,0.05);
+  background: rgba(0, 204, 255, 0.04);
+  border-top: 1px solid rgba(0, 204, 255, 0.15);
   flex: 1;
   min-height: 200px;
 }
@@ -611,14 +620,14 @@ onUnmounted(() => {
   justify-content: space-between;
   align-items: center;
   padding: 12px 20px;
-  background: rgba(0, 0, 0, 0.5);
-  border-bottom: 1px solid rgba(255,255,255,0.05);
+  background: rgba(0, 204, 255, 0.08);
+  border-bottom: 1px solid rgba(0, 204, 255, 0.15);
 }
 
 .logs-header h3 {
   margin: 0;
   font-size: 11px;
-  color: #8899aa;
+  color: rgba(255, 255, 255, 0.6);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 1px;
@@ -631,7 +640,7 @@ onUnmounted(() => {
   font-family: 'JetBrains Mono', 'SF Mono', Monaco, 'Cascadia Code', monospace;
   font-size: 11px;
   max-height: 300px;
-  background: rgba(0, 0, 0, 0.3);
+  background: rgba(6, 10, 18, 0.65);
 }
 
 .log-entry {
@@ -639,7 +648,7 @@ onUnmounted(() => {
   gap: 10px;
   padding: 8px 0;
   line-height: 1.5;
-  border-bottom: 1px solid rgba(255,255,255,0.02);
+  border-bottom: 1px solid rgba(0, 204, 255, 0.08);
 }
 
 .log-entry:last-child {
@@ -680,7 +689,7 @@ onUnmounted(() => {
 .logs-empty {
   text-align: center;
   padding: 32px;
-  color: #8899aa;
+  color: rgba(255, 255, 255, 0.55);
   font-style: italic;
   font-size: 12px;
 }
@@ -691,16 +700,16 @@ onUnmounted(() => {
 }
 
 .logs-content::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.2);
+  background: rgba(0, 204, 255, 0.08);
   border-radius: 3px;
 }
 
 .logs-content::-webkit-scrollbar-thumb {
-  background: rgba(255, 170, 0, 0.2);
+  background: rgba(0, 204, 255, 0.3);
   border-radius: 3px;
 }
 
 .logs-content::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 170, 0, 0.4);
+  background: rgba(0, 204, 255, 0.5);
 }
 </style>

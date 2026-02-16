@@ -913,10 +913,13 @@ def get_file_info(file_path: Path) -> dict:
 
 
 def _get_db_preview_row(platform: str, obj) -> dict:
+    from media_platform.models import MonitorFeed
+
     config = PLATFORM_FEED_CONFIG.get(platform, {})
     content_fields = config.get("content_fields", [])
     time_field = config.get("time_field")
     author_field = config.get("author_field")
+    id_field = config.get("id_field")
 
     content_parts = []
     for field in content_fields:
@@ -925,6 +928,25 @@ def _get_db_preview_row(platform: str, obj) -> dict:
             content_parts.append(str(val))
     content = " ".join(content_parts).strip()
     time_value = getattr(obj, time_field, None) if time_field else None
+
+    # Get sentiment and is_sensitive from platform table first
+    sentiment = getattr(obj, "sentiment", None)
+    is_sensitive = getattr(obj, "is_sensitive", None)
+
+    # Try to get fresh data from MonitorFeed (more up-to-date)
+    content_id = getattr(obj, id_field, None) if id_field else None
+    if content_id:
+        try:
+            monitor_feed = MonitorFeed.objects.filter(
+                platform=platform,
+                content_id=str(content_id)
+            ).first()
+            if monitor_feed:
+                # Use MonitorFeed values if they exist
+                sentiment = monitor_feed.sentiment
+                is_sensitive = monitor_feed.is_sensitive
+        except Exception:
+            pass
 
     return {
         "create_time": time_value,
@@ -939,6 +961,8 @@ def _get_db_preview_row(platform: str, obj) -> dict:
             or getattr(obj, "avatar_url", None)
         ),
         "ip_location": getattr(obj, "ip_location", None),
+        "sentiment": sentiment,
+        "is_sensitive": is_sensitive,
     }
 
 
@@ -961,6 +985,262 @@ def _get_db_preview_data(platform: str, limit: int) -> tuple[list, int]:
         return rows, total
     except Exception:
         return [], 0
+
+
+def _get_monitor_feed_data(platform: str, limit: int = 100, page: int = 1) -> tuple[list, int]:
+    """Get data from MonitorFeed table for the given platform"""
+    from media_platform.models import MonitorFeed
+
+    if not platform:
+        return [], 0
+
+    try:
+        offset = (page - 1) * limit
+        queryset = MonitorFeed.objects.filter(platform=platform).order_by("-created_at")
+        total = queryset.count()
+
+        # Get interactions data from original platform tables
+        content_ids_to_fetch = []
+        for feed in queryset[offset:offset + limit]:
+            content_ids_to_fetch.append(feed.content_id)
+
+        interactions_map = _get_interactions_from_platform(platform, content_ids_to_fetch)
+
+        rows = []
+        for feed in queryset[offset:offset + limit]:
+            row_data = {
+                "create_time": feed.created_at,
+                "created_time": feed.created_at,
+                "content": feed.content,
+                "desc": None,
+                "title": None,
+                "nickname": feed.author,
+                "avatar": None,
+                "ip_location": None,
+                "sentiment": feed.sentiment,
+                "is_sensitive": feed.is_sensitive,
+                # Extra fields from MonitorFeed
+                "content_id": feed.content_id,
+                "platform": feed.platform,
+                "platform_name": feed.platform_name,
+                "url": feed.url,
+            }
+
+            # Add interactions data
+            interactions = interactions_map.get(feed.content_id, {})
+            row_data.update(interactions)
+
+            rows.append(row_data)
+        return rows, total
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return [], 0
+
+
+def _get_interactions_from_platform(platform: str, content_ids: list) -> dict:
+    """Get interactions data from original platform tables"""
+    if not content_ids:
+        return {}
+
+    interactions_map = {}
+
+    try:
+        if platform == "xhs":
+            from media_platform.models import XhsNote
+            notes = XhsNote.objects.filter(note_id__in=content_ids)
+            for note in notes:
+                interactions_map[note.note_id] = {
+                    "liked_count": _safe_int(note.liked_count),
+                    "comment_count": _safe_int(note.comment_count),
+                    "share_count": _safe_int(note.share_count),
+                    "collected_count": _safe_int(note.collected_count),
+                }
+
+        elif platform == "dy":
+            from media_platform.models import DouyinAweme
+            # Convert string IDs to integers for query
+            int_ids = []
+            for cid in content_ids:
+                try:
+                    int_ids.append(int(cid))
+                except (ValueError, TypeError):
+                    pass
+            awemes = DouyinAweme.objects.filter(aweme_id__in=int_ids)
+            for aweme in awemes:
+                interactions_map[str(aweme.aweme_id)] = {
+                    "liked_count": _safe_int(aweme.liked_count),
+                    "comment_count": _safe_int(aweme.comment_count),
+                    "share_count": _safe_int(aweme.share_count),
+                    "collected_count": _safe_int(aweme.collected_count),
+                }
+
+        elif platform == "bili":
+            from media_platform.models import BilibiliVideo
+            int_ids = []
+            for cid in content_ids:
+                try:
+                    int_ids.append(int(cid))
+                except (ValueError, TypeError):
+                    pass
+            videos = BilibiliVideo.objects.filter(video_id__in=int_ids)
+            for video in videos:
+                interactions_map[str(video.video_id)] = {
+                    "liked_count": _safe_int(video.liked_count),
+                    "comment_count": _safe_int(video.video_comment),
+                    "share_count": _safe_int(video.video_share_count),
+                    "collected_count": _safe_int(video.video_favorite_count),
+                }
+
+        elif platform == "wb":
+            from media_platform.models import WeiboNote
+            int_ids = []
+            for cid in content_ids:
+                try:
+                    int_ids.append(int(cid))
+                except (ValueError, TypeError):
+                    pass
+            notes = WeiboNote.objects.filter(weibo_id__in=int_ids)
+            for note in notes:
+                interactions_map[str(note.weibo_id)] = {
+                    "liked_count": _safe_int(note.liked_count),
+                    "comment_count": _safe_int(note.comments_count),
+                    "share_count": _safe_int(note.shared_count),
+                    "collected_count": "0",
+                }
+
+        elif platform == "ks":
+            from media_platform.models import KuaishouVideo
+            videos = KuaishouVideo.objects.filter(video_id__in=content_ids)
+            for video in videos:
+                interactions_map[video.video_id] = {
+                    "liked_count": _safe_int(video.liked_count),
+                    "comment_count": "0",
+                    "share_count": "0",
+                    "collected_count": "0",
+                }
+
+        elif platform == "zhihu":
+            from media_platform.models import ZhihuContent
+            contents = ZhihuContent.objects.filter(content_id__in=content_ids)
+            for content in contents:
+                interactions_map[content.content_id] = {
+                    "liked_count": _safe_int(content.voteup_count),
+                    "comment_count": _safe_int(content.comment_count),
+                    "share_count": "0",
+                    "collected_count": "0",
+                }
+
+        elif platform == "tieba":
+            from media_platform.models import TiebaNote
+            notes = TiebaNote.objects.filter(note_id__in=content_ids)
+            for note in notes:
+                interactions_map[note.note_id] = {
+                    "liked_count": "0",
+                    "comment_count": _safe_int(note.total_replay_num),
+                    "share_count": "0",
+                    "collected_count": "0",
+                }
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+
+    return interactions_map
+
+
+def _safe_int(value):
+    """Safely convert value to integer string"""
+    if value is None or value == "":
+        return "0"
+
+    # Handle Chinese number format (e.g., "7.9万", "1.2K")
+    if isinstance(value, str):
+        value = value.strip()
+        # Handle "万" (ten thousand)
+        if "万" in value:
+            try:
+                num_part = value.replace("万", "").strip()
+                num = float(num_part) * 10000
+                return str(int(num))
+            except (ValueError, TypeError):
+                pass
+        # Handle "K" (thousand)
+        elif "K" in value.upper():
+            try:
+                num_part = value.upper().replace("K", "").strip()
+                num = float(num_part) * 1000
+                return str(int(num))
+            except (ValueError, TypeError):
+                pass
+        # Handle "w" (ten thousand, lowercase variant)
+        elif "w" in value.lower():
+            try:
+                num_part = value.lower().replace("w", "").strip()
+                num = float(num_part) * 10000
+                return str(int(num))
+            except (ValueError, TypeError):
+                pass
+
+    try:
+        # If already an int or valid string int
+        return str(int(value))
+    except (ValueError, TypeError):
+        return "0"
+
+
+def _detect_platform_from_path(file_path: str) -> str:
+    """Detect platform from file path"""
+    path_lower = file_path.lower()
+    for platform, aliases in PLATFORM_PATH_ALIASES.items():
+        if any(alias in path_lower for alias in aliases):
+            return platform
+    return None
+
+
+def _get_sensitive_map_from_monitor_feed(platform: str, rows: list) -> dict:
+    """Get sensitive data map from MonitorFeed table for given rows"""
+    from media_platform.models import MonitorFeed
+
+    if not platform or not rows:
+        return {}
+
+    # Extract content_ids from rows
+    content_ids = []
+    for row in rows:
+        content_id = _extract_content_id(row, platform)
+        if content_id:
+            content_ids.append(content_id)
+
+    if not content_ids:
+        return {}
+
+    try:
+        # Query MonitorFeed for these content_ids
+        feeds = MonitorFeed.objects.filter(
+            platform=platform,
+            content_id__in=content_ids
+        ).values("content_id", "sentiment", "is_sensitive")
+
+        return {f["content_id"]: f for f in feeds}
+    except Exception:
+        return {}
+
+
+def _extract_content_id(row: dict, platform: str) -> str:
+    """Extract content_id from row based on platform"""
+    if not row:
+        return None
+
+    # Common field names for content_id
+    id_fields = ["note_id", "aweme_id", "video_id", "content_id"]
+
+    for field in id_fields:
+        val = row.get(field)
+        if val:
+            return str(val)
+
+    return None
 
 
 def _start_process(cmd, platform: str, crawler_type: str):
@@ -1000,51 +1280,65 @@ def _finalize_process(process):
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def list_data_files(request):
-    """Get data file list"""
+    """Get data file list - now returns MonitorFeed platform data as virtual files"""
+    from media_platform.models import MonitorFeed
+
     platform = request.GET.get("platform")
     file_type = request.GET.get("file_type")
 
     files = []
     supported_extensions = {".json", ".csv", ".xlsx", ".xls"}
 
-    if DATA_DIR.exists():
-        for root, dirs, filenames in os.walk(DATA_DIR):
-            root_path = Path(root)
-            for filename in filenames:
-                file_path = root_path / filename
-                if file_path.suffix.lower() not in supported_extensions:
-                    continue
-
-                # Platform filter
-                if platform:
-                    rel_path = str(file_path.relative_to(DATA_DIR)).lower()
-                    aliases = PLATFORM_PATH_ALIASES.get(platform.lower(), [platform.lower()])
-                    if not any(alias in rel_path for alias in aliases):
-                        continue
-
-                # Type filter
-                if file_type and file_path.suffix[1:].lower() != file_type.lower():
-                    continue
-
-                try:
-                    files.append(get_file_info(file_path))
-                except Exception:
-                    continue
-
-    # Sort by modification time (newest first)
-    files.sort(key=lambda x: x["modified_at"], reverse=True)
-
-    if platform and not files and not file_type:
-        db_rows, db_total = _get_db_preview_data(platform.lower(), limit=1)
-        if db_total > 0:
+    # If platform is specified, check MonitorFeed first
+    if platform:
+        platform_count = MonitorFeed.objects.filter(platform=platform).count()
+        if platform_count > 0:
+            platform_name_map = {
+                "xhs": "小红书",
+                "dy": "抖音",
+                "ks": "快手",
+                "bili": "B站",
+                "wb": "微博",
+                "tieba": "贴吧",
+                "zhihu": "知乎",
+            }
             files.append({
-                "name": f"db:{platform}",
+                "name": f"{platform_name_map.get(platform, platform.upper())} 数据",
                 "path": f"db/{platform}/contents",
                 "size": 0,
                 "modified_at": time.time(),
-                "record_count": db_total,
+                "record_count": platform_count,
                 "type": "db",
             })
+
+    # Also include actual files if needed (optional, can be removed)
+    if not platform or not file_type:
+        if DATA_DIR.exists():
+            for root, dirs, filenames in os.walk(DATA_DIR):
+                root_path = Path(root)
+                for filename in filenames:
+                    file_path = root_path / filename
+                    if file_path.suffix.lower() not in supported_extensions:
+                        continue
+
+                    # Platform filter
+                    if platform:
+                        rel_path = str(file_path.relative_to(DATA_DIR)).lower()
+                        aliases = PLATFORM_PATH_ALIASES.get(platform.lower(), [platform.lower()])
+                        if not any(alias in rel_path for alias in aliases):
+                            continue
+
+                    # Type filter
+                    if file_type and file_path.suffix[1:].lower() != file_type.lower():
+                        continue
+
+                    try:
+                        files.append(get_file_info(file_path))
+                    except Exception:
+                        continue
+
+    # Sort by modification time (newest first)
+    files.sort(key=lambda x: x["modified_at"], reverse=True)
 
     return Response({"files": files})
 
@@ -1060,9 +1354,11 @@ def get_file_content(request, file_path: str):
         platform = parts[1].lower()
         preview = request.GET.get("preview", "true").lower() == "true"
         limit = int(request.GET.get("limit", 100))
+        page = int(request.GET.get("page", 1))
         if not preview:
             return Response({"error": "DB content does not support download"}, status=status.HTTP_400_BAD_REQUEST)
-        rows, total = _get_db_preview_data(platform, limit=limit)
+        # Use MonitorFeed instead of platform table
+        rows, total = _get_monitor_feed_data(platform, limit=limit, page=page)
         if total == 0:
             return Response({"data": [], "total": 0})
         return Response({"data": rows, "total": total})
@@ -1092,6 +1388,13 @@ def get_file_content(request, file_path: str):
 
     preview = request.GET.get("preview", "true").lower() == "true"
     limit = int(request.GET.get("limit", 100))
+
+    # Check if this is a platform file - if so, return MonitorFeed data instead
+    platform = _detect_platform_from_path(file_path)
+    if platform and preview:
+        page = int(request.GET.get("page", 1))
+        rows, total = _get_monitor_feed_data(platform, limit=limit, page=page)
+        return Response({"data": rows, "total": total})
 
     if preview:
         # Return preview data
