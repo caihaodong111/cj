@@ -65,6 +65,7 @@ async def update_kuaishou_video(video_item: Dict):
         "user_id": user_info.get("id"),
         "nickname": user_info.get("name"),
         "avatar": user_info.get("headerUrl", ""),
+        "ip_location": "",
         "liked_count": str(photo_info.get("realLikeCount")),
         "viewd_count": str(photo_info.get("viewCount")),
         "last_modify_ts": utils.get_current_timestamp(),

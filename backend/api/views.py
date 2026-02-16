@@ -32,7 +32,8 @@ if not crawler_logger.handlers:
     crawler_logger.addHandler(console_handler)
 
 from django.conf import settings
-from django.db import connection
+from django.db import connection, models
+from django.db.models.functions import Coalesce
 from django.http import JsonResponse, FileResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
@@ -86,6 +87,16 @@ PLATFORM_PATH_ALIASES = {
     "zhihu": ["zhihu"],
 }
 
+PLATFORM_NAMES = {
+    "xhs": "小红书",
+    "dy": "抖音",
+    "ks": "快手",
+    "bili": "B站",
+    "wb": "微博",
+    "tieba": "贴吧",
+    "zhihu": "知乎",
+}
+
 PLATFORM_FEED_CONFIG = {
     "xhs": {
         "model": XhsNote,
@@ -136,6 +147,16 @@ PLATFORM_FEED_CONFIG = {
         "content_fields": ["title", "desc", "content_text"],
         "author_field": "user_nickname",
     },
+}
+
+PLATFORM_URL_FIELDS = {
+    "xhs": "note_url",
+    "dy": "aweme_url",
+    "ks": "video_url",
+    "bili": "video_url",
+    "wb": "note_url",
+    "tieba": "note_url",
+    "zhihu": "content_url",
 }
 
 
@@ -399,6 +420,8 @@ def get_monitor_feed(request):
 def get_sensitive_feed(request):
     """Get sensitive feed items from monitor_feed with optional platform filter."""
     platform = request.GET.get("platform")
+    sort_by = request.GET.get("sort_by")
+    sort_order = request.GET.get("sort_order", "asc").lower()
     try:
         page = max(1, int(request.GET.get("page", 1)))
         page_size = max(1, int(request.GET.get("page_size", 50)))
@@ -407,15 +430,54 @@ def get_sensitive_feed(request):
         page_size = 50
 
     offset = (page - 1) * page_size
-    queryset = MonitorFeed.objects.filter(is_sensitive=True)
+    queryset = MonitorFeed.objects.filter(
+        models.Q(is_sensitive=True) | models.Q(sentiment="sensitive")
+    )
     if platform:
         queryset = queryset.filter(platform=platform)
 
+    latest_update_ts = queryset.aggregate(
+        max_ts=models.Max(Coalesce("last_modify_ts", "add_ts", 0))
+    ).get("max_ts") or 0
+
+    if sort_by == "sensitive":
+        queryset = queryset.annotate(
+            sensitive_rank=models.Case(
+                models.When(
+                    models.Q(is_sensitive=True) | models.Q(sentiment="sensitive"),
+                    then=models.Value(0),
+                ),
+                default=models.Value(1),
+                output_field=models.IntegerField(),
+            )
+        )
+        order_field = "sensitive_rank" if sort_order != "desc" else "-sensitive_rank"
+        queryset = queryset.order_by(order_field, "-created_at")
+    else:
+        queryset = queryset.order_by("-created_at")
+
     total_count = queryset.count()
+    if platform and total_count == 0:
+        items, total_count, total_pages, latest_update_ts = _fetch_platform_feed_data(
+            platform, page, page_size
+        )
+        return Response({
+            "items": items,
+            "latest_update_ts": latest_update_ts,
+            "pagination": {
+                "page": page,
+                "page_size": page_size,
+                "total_count": total_count,
+                "total_pages": total_pages,
+                "has_next": page < total_pages,
+                "has_prev": page > 1,
+            },
+            "fetched_at": int(time.time() * 1000),
+        })
     total_pages = (total_count + page_size - 1) // page_size if total_count > 0 else 1
 
     rows = list(
-        queryset.order_by("-created_at").values(
+        queryset.values(
             "id",
             "platform",
             "platform_name",
@@ -428,11 +490,29 @@ def get_sensitive_feed(request):
             "sentiment_score",
             "sentiment_labels",
             "is_sensitive",
+            "extra_data",
         )[offset:offset + page_size]
     )
 
+    content_ids_by_platform = {}
+    for row in rows:
+        platform_key = row.get("platform")
+        content_ids_by_platform.setdefault(platform_key, []).append(row.get("content_id"))
+
+    interactions_map_by_platform = {
+        platform_key: _get_interactions_from_platform(platform_key, ids)
+        for platform_key, ids in content_ids_by_platform.items()
+    }
+
     items = []
     for row in rows:
+        extra_data = row.get("extra_data") or {}
+        extra_ip = extra_data.get("ip_location") if isinstance(extra_data, dict) else None
+
+        # 获取互动数据，优先使用interactions_map中的ip_location，否则使用extra_ip
+        interaction_data = interactions_map_by_platform.get(row.get("platform"), {}).get(row.get("content_id"), {})
+        final_ip_location = interaction_data.get("ip_location") or extra_ip or "-"
+
         items.append({
             "id": str(row.get("id")),
             "platform": row.get("platform", ""),
@@ -446,10 +526,131 @@ def get_sensitive_feed(request):
             "sentiment_score": row.get("sentiment_score") or 0,
             "sentiment_labels": row.get("sentiment_labels") or {},
             "is_sensitive": True,
+            "ip_location": final_ip_location,
+            **{k: v for k, v in interaction_data.items() if k != "ip_location"},
         })
 
     return Response({
         "items": items,
+        "latest_update_ts": latest_update_ts,
+        "pagination": {
+            "page": page,
+            "page_size": page_size,
+            "total_count": total_count,
+            "total_pages": total_pages,
+            "has_next": page < total_pages,
+            "has_prev": page > 1,
+        },
+        "fetched_at": int(time.time() * 1000),
+    })
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def get_all_feed(request):
+    """Get all feed items from monitor_feed with optional platform filter."""
+    platform = request.GET.get("platform")
+    sort_by = request.GET.get("sort_by")
+    sort_order = request.GET.get("sort_order", "asc").lower()
+    try:
+        page = max(1, int(request.GET.get("page", 1)))
+        page_size = max(1, int(request.GET.get("page_size", 50)))
+    except ValueError:
+        page = 1
+        page_size = 50
+
+    offset = (page - 1) * page_size
+    queryset = MonitorFeed.objects.all()
+    if platform:
+        queryset = queryset.filter(platform=platform)
+
+    latest_update_ts = queryset.aggregate(
+        max_ts=models.Max(Coalesce("last_modify_ts", "add_ts", 0))
+    ).get("max_ts") or 0
+
+    if sort_by == "sensitive":
+        queryset = queryset.annotate(
+            sensitive_rank=models.Case(
+                models.When(
+                    models.Q(is_sensitive=True) | models.Q(sentiment="sensitive"),
+                    then=models.Value(0),
+                ),
+                default=models.Value(1),
+                output_field=models.IntegerField(),
+            )
+        )
+        order_field = "sensitive_rank" if sort_order != "desc" else "-sensitive_rank"
+        queryset = queryset.order_by(order_field, "-created_at")
+    else:
+        queryset = queryset.order_by("-created_at")
+
+    total_count = queryset.count()
+    total_pages = (total_count + page_size - 1) // page_size if total_count > 0 else 1
+
+    rows = list(
+        queryset.values(
+            "id",
+            "platform",
+            "platform_name",
+            "content_id",
+            "content",
+            "author",
+            "url",
+            "created_at",
+            "sentiment",
+            "sentiment_score",
+            "sentiment_labels",
+            "is_sensitive",
+            "extra_data",
+        )[offset:offset + page_size]
+    )
+
+    content_ids_by_platform = {}
+    for row in rows:
+        platform_key = row.get("platform")
+        content_ids_by_platform.setdefault(platform_key, []).append(row.get("content_id"))
+
+    interactions_map_by_platform = {
+        platform_key: _get_interactions_from_platform(platform_key, ids)
+        for platform_key, ids in content_ids_by_platform.items()
+    }
+
+    items = []
+    for row in rows:
+        is_sensitive = row.get("is_sensitive")
+        sentiment = row.get("sentiment") or "neutral"
+        sentiment_labels = row.get("sentiment_labels") or {}
+        extra_data = row.get("extra_data") or {}
+        extra_ip = extra_data.get("ip_location") if isinstance(extra_data, dict) else None
+
+        # 确保敏感状态正确设置
+        if is_sensitive is None:
+            is_sensitive = bool(sentiment_labels.get("sensitive")) or sentiment == "sensitive"
+
+        # 获取互动数据，优先使用interactions_map中的ip_location，否则使用extra_ip
+        interaction_data = interactions_map_by_platform.get(row.get("platform"), {}).get(row.get("content_id"), {})
+        final_ip_location = interaction_data.get("ip_location") or extra_ip or "-"
+
+        items.append({
+            "id": str(row.get("id")),
+            "platform": row.get("platform", ""),
+            "platform_name": row.get("platform_name", ""),
+            "content_id": row.get("content_id", ""),
+            "content": row.get("content") or "",
+            "author": row.get("author") or "",
+            "url": row.get("url") or "",
+            "created_at": row.get("created_at") or 0,
+            "sentiment": sentiment,
+            "sentiment_score": row.get("sentiment_score") or 0,
+            "sentiment_labels": sentiment_labels,
+            "is_sensitive": bool(is_sensitive),
+            "ip_location": final_ip_location,
+            **{k: v for k, v in interaction_data.items() if k != "ip_location"},
+        })
+
+    return Response({
+        "items": items,
+        "latest_update_ts": latest_update_ts,
         "pagination": {
             "page": page,
             "page_size": page_size,
@@ -676,13 +877,13 @@ def get_platforms(request):
     """Get list of supported platforms"""
     return Response({
         "platforms": [
-            {"value": "xhs", "label": "Xiaohongshu", "icon": "book-open"},
-            {"value": "dy", "label": "Douyin", "icon": "music"},
-            {"value": "ks", "label": "Kuaishou", "icon": "video"},
-            {"value": "bili", "label": "Bilibili", "icon": "tv"},
-            {"value": "wb", "label": "Weibo", "icon": "message-circle"},
-            {"value": "tieba", "label": "Baidu Tieba", "icon": "messages-square"},
-            {"value": "zhihu", "label": "Zhihu", "icon": "help-circle"},
+            {"value": "xhs", "label": "小红书", "icon": "book-open"},
+            {"value": "dy", "label": "抖音", "icon": "music"},
+            {"value": "ks", "label": "快手", "icon": "video"},
+            {"value": "bili", "label": "哔哩哔哩", "icon": "tv"},
+            {"value": "wb", "label": "微博", "icon": "message-circle"},
+            {"value": "tieba", "label": "百度贴吧", "icon": "messages-square"},
+            {"value": "zhihu", "label": "知乎", "icon": "help-circle"},
         ]
     })
 
@@ -1059,8 +1260,90 @@ def _get_monitor_feed_data(platform: str, limit: int = 100, page: int = 1) -> tu
         return [], 0
 
 
+def _fetch_platform_feed_data(platform: str, page: int, page_size: int) -> tuple[list, int, int, int]:
+    config = PLATFORM_FEED_CONFIG.get(platform)
+    if not config:
+        return [], 0, 1, 0
+
+    model = config["model"]
+    id_field = config.get("id_field")
+    time_field = config.get("time_field")
+    content_fields = config.get("content_fields", [])
+    author_field = config.get("author_field")
+    url_field = PLATFORM_URL_FIELDS.get(platform)
+
+    try:
+        queryset = model.objects.all()
+        if time_field:
+            queryset = queryset.order_by(f"-{time_field}")
+        else:
+            queryset = queryset.order_by("-id")
+
+        latest_update_ts = queryset.aggregate(
+            max_ts=models.Max(Coalesce("last_modify_ts", "add_ts", 0))
+        ).get("max_ts") or 0
+
+        total_count = queryset.count()
+        total_pages = (total_count + page_size - 1) // page_size if total_count > 0 else 1
+
+        offset = (page - 1) * page_size
+        rows = list(queryset[offset:offset + page_size])
+
+        content_ids = []
+        for obj in rows:
+            content_id = getattr(obj, id_field, None) if id_field else None
+            if content_id is not None:
+                content_ids.append(str(content_id))
+
+        interactions_map = _get_interactions_from_platform(platform, content_ids)
+
+        items = []
+        for obj in rows:
+            content_parts = []
+            for field in content_fields:
+                val = getattr(obj, field, None)
+                if val:
+                    content_parts.append(str(val))
+            content = " ".join(content_parts).strip()
+
+            content_id = getattr(obj, id_field, None) if id_field else None
+            content_id_str = str(content_id) if content_id is not None else ""
+            created_at = getattr(obj, time_field, None) if time_field else 0
+            author = getattr(obj, author_field, None) if author_field else None
+            url = getattr(obj, url_field, None) if url_field else None
+
+            sentiment = getattr(obj, "sentiment", None) or "neutral"
+            is_sensitive = getattr(obj, "is_sensitive", None)
+            if is_sensitive is None:
+                is_sensitive = sentiment == "sensitive"
+
+            interaction_data = interactions_map.get(content_id_str, {})
+            final_ip_location = interaction_data.get("ip_location") or getattr(obj, "ip_location", None) or "-"
+
+            items.append({
+                "id": str(getattr(obj, "id", "")),
+                "platform": platform,
+                "platform_name": PLATFORM_NAMES.get(platform, platform),
+                "content_id": content_id_str,
+                "content": content,
+                "author": author or "",
+                "url": url or "",
+                "created_at": created_at or 0,
+                "sentiment": sentiment,
+                "sentiment_score": None,
+                "sentiment_labels": {},
+                "is_sensitive": bool(is_sensitive),
+                "ip_location": final_ip_location,
+                **{k: v for k, v in interaction_data.items() if k != "ip_location"},
+            })
+
+        return items, total_count, total_pages, latest_update_ts
+    except Exception:
+        return [], 0, 1, 0
+
+
 def _get_interactions_from_platform(platform: str, content_ids: list) -> dict:
-    """Get interactions data from original platform tables"""
+    """Get interactions and ip_location data from original platform tables"""
     if not content_ids:
         return {}
 
@@ -1072,6 +1355,7 @@ def _get_interactions_from_platform(platform: str, content_ids: list) -> dict:
             notes = XhsNote.objects.filter(note_id__in=content_ids)
             for note in notes:
                 interactions_map[note.note_id] = {
+                    "ip_location": note.ip_location,
                     "liked_count": _safe_int(note.liked_count),
                     "comment_count": _safe_int(note.comment_count),
                     "share_count": _safe_int(note.share_count),
@@ -1090,6 +1374,7 @@ def _get_interactions_from_platform(platform: str, content_ids: list) -> dict:
             awemes = DouyinAweme.objects.filter(aweme_id__in=int_ids)
             for aweme in awemes:
                 interactions_map[str(aweme.aweme_id)] = {
+                    "ip_location": aweme.ip_location,
                     "liked_count": _safe_int(aweme.liked_count),
                     "comment_count": _safe_int(aweme.comment_count),
                     "share_count": _safe_int(aweme.share_count),
@@ -1107,6 +1392,7 @@ def _get_interactions_from_platform(platform: str, content_ids: list) -> dict:
             videos = BilibiliVideo.objects.filter(video_id__in=int_ids)
             for video in videos:
                 interactions_map[str(video.video_id)] = {
+                    "ip_location": video.ip_location or None,
                     "liked_count": _safe_int(video.liked_count),
                     "comment_count": _safe_int(video.video_comment),
                     "share_count": _safe_int(video.video_share_count),
@@ -1121,9 +1407,10 @@ def _get_interactions_from_platform(platform: str, content_ids: list) -> dict:
                     int_ids.append(int(cid))
                 except (ValueError, TypeError):
                     pass
-            notes = WeiboNote.objects.filter(weibo_id__in=int_ids)
+            notes = WeiboNote.objects.filter(note_id__in=int_ids)
             for note in notes:
-                interactions_map[str(note.weibo_id)] = {
+                interactions_map[str(note.note_id)] = {
+                    "ip_location": note.ip_location,
                     "liked_count": _safe_int(note.liked_count),
                     "comment_count": _safe_int(note.comments_count),
                     "share_count": _safe_int(note.shared_count),
@@ -1135,6 +1422,7 @@ def _get_interactions_from_platform(platform: str, content_ids: list) -> dict:
             videos = KuaishouVideo.objects.filter(video_id__in=content_ids)
             for video in videos:
                 interactions_map[video.video_id] = {
+                    "ip_location": video.ip_location or None,
                     "liked_count": _safe_int(video.liked_count),
                     "comment_count": "0",
                     "share_count": "0",
@@ -1146,6 +1434,7 @@ def _get_interactions_from_platform(platform: str, content_ids: list) -> dict:
             contents = ZhihuContent.objects.filter(content_id__in=content_ids)
             for content in contents:
                 interactions_map[content.content_id] = {
+                    "ip_location": content.ip_location or None,
                     "liked_count": _safe_int(content.voteup_count),
                     "comment_count": _safe_int(content.comment_count),
                     "share_count": "0",
@@ -1157,6 +1446,7 @@ def _get_interactions_from_platform(platform: str, content_ids: list) -> dict:
             notes = TiebaNote.objects.filter(note_id__in=content_ids)
             for note in notes:
                 interactions_map[note.note_id] = {
+                    "ip_location": note.ip_location,
                     "liked_count": "0",
                     "comment_count": _safe_int(note.total_replay_num),
                     "share_count": "0",

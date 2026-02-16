@@ -15,15 +15,34 @@
     <div class="data-view">
       <header class="page-header entrance-slide-in">
         <div class="title-area">
-          <h1 class="ios-title">DATA SOURCE<span class="subtitle">数据源概览</span></h1>
+          <h1 class="ios-title">数据源概览<span class="subtitle">DATA SOURCE</span></h1>
         </div>
         <div class="header-actions">
-          <button class="crawler-btn" type="button" @click="crawlerDialogVisible = true">
+          <button
+            class="crawler-btn"
+            type="button"
+            @click="crawlerDialogVisible = true"
+            :disabled="crawlerStatus === 'running'"
+            :class="{ 'is-updating': crawlerStatus === 'running' }"
+          >
             <span class="btn-dot"></span>
-            爬虫控制
+            <span class="btn-text">{{ crawlerStatus === 'running' ? '更新中...' : '更新' }}</span>
           </button>
-          <button class="refresh-btn" type="button" @click="refreshCurrentPlatform" :disabled="loadingPreview">
-            同步刷新
+          <button
+            class="refresh-btn icon-only"
+            type="button"
+            @click="refreshCurrentPlatform"
+            :disabled="loadingPreview"
+            :class="{ 'is-refreshing': refreshInFlight }"
+            title="同步刷新"
+            aria-label="同步刷新"
+          >
+            <svg class="refresh-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M3 12a8 8 0 0 1 13.66-5.66"/>
+              <polyline points="16 3 16 7 12 7"/>
+              <path d="M21 12a8 8 0 0 1-13.66 5.66"/>
+              <polyline points="8 21 8 17 12 17"/>
+            </svg>
           </button>
         </div>
       </header>
@@ -57,6 +76,7 @@
             <div class="status-mini-tags">
               <span class="tag total">总数 {{ currentTotalCount }}</span>
               <span class="tag sensitive">敏感 {{ currentSensitiveCount }}</span>
+              <span v-if="currentUpdatedAt" class="update-time">更新于 {{ currentUpdatedAt }}</span>
             </div>
           </div>
         </button>
@@ -139,11 +159,7 @@
           </div>
 
           <!-- Result Count -->
-          <div class="filter-info">
-            <span v-if="searchKeyword || sensitiveFilter !== 'all' || interactionsFilter !== 'all'" class="filter-active">
-              筛选中
-            </span>
-          </div>
+          <div class="filter-info"></div>
         </div>
         <!-- Data Table -->
         <el-table
@@ -154,6 +170,7 @@
           v-loading="loadingPreview"
           :height="520"
           :empty-text="orderedRows.length === 0 ? '暂无数据' : '没有符合筛选条件的数据'"
+          @sort-change="handleSortChange"
         >
           <!-- CONTENT ID Column -->
           <el-table-column label="CONTENT ID" width="150" sortable :sort-by="(row) => row.content_id || row.note_id || row.aweme_id || row.video_id || ''">
@@ -193,7 +210,7 @@
           </el-table-column>
 
           <!-- SENSITIVE Column -->
-          <el-table-column label="SENSITIVE" width="120" align="center" sortable>
+          <el-table-column label="SENSITIVE" prop="sensitive" width="120" align="center" sortable :sort-by="getSensitiveSortValue">
             <template #default="{ row }">
               <span class="sensitive-flag" :class="getSensitiveFlagClass(row)">
                 {{ getSensitiveLabel(row) }}
@@ -314,6 +331,9 @@
                   <span v-if="platform.sensitiveCount > 0" class="stat-badge sensitive">{{ platform.sensitiveCount }}</span>
                   <span class="stat-badge total">{{ platform.count }}</span>
                 </div>
+                <div class="platform-updated">
+                  更新于 {{ getPlatformUpdatedAt(platform.value) || '-' }}
+                </div>
               </div>
               <div class="platform-progress">
                 <div class="platform-progress-track">
@@ -338,11 +358,14 @@
       <div v-if="crawlerDialogVisible" class="dialog-overlay" @click.self="crawlerDialogVisible = false">
         <div class="dialog-panel">
           <div class="dialog-header">
-            <span>爬虫控制</span>
+            <span>更新</span>
             <button class="drawer-close" type="button" @click="crawlerDialogVisible = false">×</button>
           </div>
           <div class="dialog-body">
-            <CrawlerControl @crawler-status-change="onCrawlerStatusChange" />
+            <CrawlerControl
+              :current-platform="currentPlatform"
+              @crawler-status-change="onCrawlerStatusChange"
+            />
           </div>
         </div>
       </div>
@@ -366,19 +389,25 @@ const currentPlatform = ref(null)
 const files = ref([])
 const currentFile = ref(null)
 const searchKeyword = ref('')
-const sensitiveFilter = ref('all') // all, sensitive, non-sensitive
+const sentimentFilter = ref('all') // all, positive, negative, neutral, sensitive
+const sensitiveFilter = ref('sensitive') // all, sensitive, non-sensitive
 const interactionsFilter = ref('all') // all, high, medium, low
 const previewData = ref(null)
 const loadingPreview = ref(false)
 const drawerVisible = ref(false)
 const crawlerDialogVisible = ref(false)
 const crawlerStatus = ref('idle')
+const crawlerStatusPollingTimer = ref(null)
 const refreshTimer = ref(null)
+const refreshInFlight = ref(false)
+const lastStatsRefresh = ref(0)
+const platformUpdatedAt = ref({})
 const pageSize = ref(50)
 const currentPage = ref(1)
 const expandedCells = ref(new Set())
 const activeTab = ref('sensitive')
 const sensitivePreviewSize = 1000
+const sortState = ref({ prop: '', order: '' })
 
 const columnDefs = [
   { label: 'AVATAR', keys: ['avatar', 'avatar_url', 'avatarUrl', 'head_url', 'head', 'AVATAR'], type: 'avatar', align: 'center' },
@@ -428,6 +457,11 @@ const currentPlatformCount = computed(() => {
   if (!currentPlatform.value) return 0
   const map = stats.value?.by_platform || {}
   return map[currentPlatform.value] || 0
+})
+
+const currentUpdatedAt = computed(() => {
+  if (!currentPlatform.value) return ''
+  return platformUpdatedAt.value[currentPlatform.value] || ''
 })
 
 const orderedRows = computed(() => {
@@ -500,16 +534,28 @@ const orderedRows = computed(() => {
 const hasActiveFilters = computed(() => {
   return Boolean(
     searchKeyword.value.trim() ||
+    sentimentFilter.value !== 'all' ||
     sensitiveFilter.value !== 'all' ||
     interactionsFilter.value !== 'all'
   )
 })
 
+const isSensitiveOnlyFilter = computed(() => {
+  return (
+    activeTab.value === 'all' &&
+    sensitiveFilter.value === 'sensitive' &&
+    sentimentFilter.value === 'all' &&
+    interactionsFilter.value === 'all' &&
+    !searchKeyword.value.trim()
+  )
+})
+
 const useServerPagination = computed(() => {
   const hasTotal = previewData.value && typeof previewData.value.total === 'number'
-  if (!hasTotal || hasActiveFilters.value) return false
-  if (activeTab.value === 'sensitive') return true
-  return currentFile.value?.type === 'db'
+  if (!hasTotal) return false
+  if (activeTab.value === 'sensitive' || isSensitiveOnlyFilter.value) return true
+  if (hasActiveFilters.value) return false
+  return true
 })
 
 const totalCount = computed(() => {
@@ -590,15 +636,26 @@ const getDisplayLabel = (value) => {
   return chineseNames[value] || null
 }
 
+const getPlatformUpdatedAt = (value) => {
+  return platformUpdatedAt.value[value] || ''
+}
+
 const isBrandLogo = (value) => value === 'xhs' || value === 'dy'
 
 const getSensitiveFlag = (row) => {
   if (!row) return null
-  const direct = row.is_sensitive ?? row.isSensitive ?? row.sensitive
-  if (direct !== undefined && direct !== null && direct !== '') {
-    return Boolean(direct)
-  }
+  const direct = row.is_sensitive ?? row.isSensitive
   const sentiment = row.sentiment ?? row.sentiment_label ?? row.sentimentLabel
+    ?? (typeof row.sensitive === 'string' ? row.sensitive : undefined)
+  if (direct !== undefined && direct !== null && direct !== '') {
+    if (direct === true || direct === 1 || direct === '1') {
+      return true
+    }
+    if (typeof sentiment === 'string') {
+      return sentiment.toLowerCase() === 'sensitive' || sentiment === '敏感'
+    }
+    return false
+  }
   if (typeof sentiment === 'string') {
     return sentiment.toLowerCase() === 'sensitive' || sentiment === '敏感'
   }
@@ -653,6 +710,13 @@ const interactionsSortMethod = (rowA, rowB) => {
   const interactionsA = getInteractions(rowA)
   const interactionsB = getInteractions(rowB)
   return interactionsB - interactionsA
+}
+
+const getSensitiveSortValue = (row) => {
+  const flag = getSensitiveFlag(row)
+  if (flag === true) return 0
+  if (flag === false) return 1
+  return 2
 }
 
 // Get content ID from various possible fields
@@ -740,7 +804,7 @@ const getRowKey = (row, index) => {
 }
 
 // Reset page when filters change
-watch([searchKeyword, sensitiveFilter, interactionsFilter], () => {
+watch([searchKeyword, sentimentFilter, sensitiveFilter, interactionsFilter], () => {
   currentPage.value = 1
 })
 
@@ -770,22 +834,11 @@ const selectPlatform = async (platformValue) => {
   previewData.value = null
   currentPage.value = 1
   expandedCells.value = new Set()
-  if (activeTab.value === 'sensitive') {
+  if (activeTab.value === 'sensitive' || isSensitiveOnlyFilter.value) {
     await fetchSensitivePreview(platformValue, 1, pageSize.value)
     return
   }
-  try {
-    const res = await axios.get('/api/data/files', {
-      params: { platform: platformValue }
-    })
-    files.value = res.data.files || []
-    const nextFile = [...files.value].sort((a, b) => (b.modified_at || 0) - (a.modified_at || 0))[0]
-    if (nextFile) {
-      await selectFile(nextFile, { page: 1, limit: pageSize.value })
-    }
-  } catch (e) {
-    console.error('Failed to fetch files', e)
-  }
+  await fetchAllFeedData(platformValue, 1, pageSize.value)
 }
 
 const selectFile = async (file, options = {}) => {
@@ -809,7 +862,20 @@ const selectFile = async (file, options = {}) => {
   }
 }
 
-const fetchSensitivePreview = async (platformValue, page = 1, pageSize = sensitivePreviewSize, keepPage = false) => {
+const formatFetchedAt = (timestampMs) => {
+  if (!timestampMs) return ''
+  const date = new Date(timestampMs)
+  return date.toLocaleString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  })
+}
+
+const fetchAllFeedData = async (platformValue, page = 1, pageSize = 50, keepPage = false) => {
   if (!platformValue) return
   loadingPreview.value = true
   previewData.value = null
@@ -818,8 +884,13 @@ const fetchSensitivePreview = async (platformValue, page = 1, pageSize = sensiti
   }
   expandedCells.value = new Set()
   try {
-    const res = await axios.get('/api/monitor/feed/sensitive', {
-      params: { platform: platformValue, page, page_size: pageSize }
+    const params = { platform: platformValue, page, page_size: pageSize }
+    if (sortState.value.prop === 'sensitive' && sortState.value.order) {
+      params.sort_by = 'sensitive'
+      params.sort_order = sortState.value.order === 'ascending' ? 'asc' : 'desc'
+    }
+    const res = await axios.get('/api/monitor/feed/all', {
+      params
     })
     const items = res.data.items || []
     previewData.value = {
@@ -833,9 +904,73 @@ const fetchSensitivePreview = async (platformValue, page = 1, pageSize = sensiti
         author: item.author,
         url: item.url,
         sentiment: item.sentiment,
-        is_sensitive: item.is_sensitive
+        is_sensitive: item.is_sensitive,
+        ip_location: item.ip_location,
+        liked_count: item.liked_count,
+        comment_count: item.comment_count,
+        share_count: item.share_count,
+        collected_count: item.collected_count
       })),
       total: res.data.pagination?.total_count || items.length
+    }
+    const updateTs = res.data.latest_update_ts || res.data.fetched_at
+    if (updateTs) {
+      platformUpdatedAt.value = {
+        ...platformUpdatedAt.value,
+        [platformValue]: formatFetchedAt(updateTs)
+      }
+    }
+  } catch (e) {
+    console.error('Failed to fetch all feed data', e)
+  } finally {
+    loadingPreview.value = false
+  }
+}
+
+const fetchSensitivePreview = async (platformValue, page = 1, pageSize = sensitivePreviewSize, keepPage = false) => {
+  if (!platformValue) return
+  loadingPreview.value = true
+  previewData.value = null
+  if (!keepPage) {
+    currentPage.value = 1
+  }
+  expandedCells.value = new Set()
+  try {
+    const params = { platform: platformValue, page, page_size: pageSize }
+    if (sortState.value.prop === 'sensitive' && sortState.value.order) {
+      params.sort_by = 'sensitive'
+      params.sort_order = sortState.value.order === 'ascending' ? 'asc' : 'desc'
+    }
+    const res = await axios.get('/api/monitor/feed/sensitive', {
+      params
+    })
+    const items = res.data.items || []
+    previewData.value = {
+      data: items.map(item => ({
+        content_id: item.content_id,
+        note_id: item.content_id,
+        create_time: item.created_at,
+        created_time: item.created_at,
+        content: item.content,
+        nickname: item.author,
+        author: item.author,
+        url: item.url,
+        sentiment: item.sentiment,
+        is_sensitive: item.is_sensitive,
+        ip_location: item.ip_location,
+        liked_count: item.liked_count,
+        comment_count: item.comment_count,
+        share_count: item.share_count,
+        collected_count: item.collected_count
+      })),
+      total: res.data.pagination?.total_count || items.length
+    }
+    const updateTs = res.data.latest_update_ts || res.data.fetched_at
+    if (updateTs) {
+      platformUpdatedAt.value = {
+        ...platformUpdatedAt.value,
+        [platformValue]: formatFetchedAt(updateTs)
+      }
     }
   } catch (e) {
     console.error('Failed to fetch sensitive feed', e)
@@ -844,37 +979,79 @@ const fetchSensitivePreview = async (platformValue, page = 1, pageSize = sensiti
   }
 }
 
-const refreshCurrentPlatform = async () => {
-  if (loadingPreview.value) return
-  await fetchConfig()
-  if (currentPlatform.value) {
-    if (activeTab.value === 'sensitive') {
-      await fetchSensitivePreview(currentPlatform.value, currentPage.value, pageSize.value, true)
-    } else {
-      if (currentFile.value?.type === 'db') {
-        await selectFile(currentFile.value, { page: currentPage.value, limit: pageSize.value, keepPage: true })
+const refreshCurrentPlatform = async ({ refreshStats = false } = {}) => {
+  if (loadingPreview.value || refreshInFlight.value) return
+  refreshInFlight.value = true
+  try {
+    const now = Date.now()
+    const shouldRefreshStats = refreshStats || now - lastStatsRefresh.value > 30000
+    if (shouldRefreshStats) {
+      await fetchConfig()
+      lastStatsRefresh.value = now
+    }
+    if (currentPlatform.value) {
+      if (activeTab.value === 'sensitive' || isSensitiveOnlyFilter.value) {
+        await fetchSensitivePreview(currentPlatform.value, currentPage.value, pageSize.value, true)
       } else {
-        await selectPlatform(currentPlatform.value)
+        // 所有数据列表也从MonitorFeed加载
+        await fetchAllFeedData(currentPlatform.value, currentPage.value, pageSize.value, true)
       }
     }
-  } else {
-    await fetchConfig()
+  } finally {
+    refreshInFlight.value = false
   }
 }
 
 const onCrawlerStatusChange = async (newStatus) => {
   crawlerStatus.value = newStatus
-  await refreshCurrentPlatform()
+  await refreshCurrentPlatform({ refreshStats: true })
+
+  // 如果爬虫正在运行，启动状态轮询确保及时更新
+  if (newStatus === 'running') {
+    startCrawlerStatusPolling()
+  }
+}
+
+// 启动爬虫状态轮询
+const startCrawlerStatusPolling = () => {
+  // 清除现有轮询
+  if (crawlerStatusPollingTimer.value) {
+    clearInterval(crawlerStatusPollingTimer.value)
+  }
+  // 每2秒检查一次状态
+  crawlerStatusPollingTimer.value = setInterval(async () => {
+    try {
+      const res = await axios.get('/api/crawler/status')
+      const newStatus = res.data.status
+      // 只有状态变化时才更新
+      if (crawlerStatus.value !== newStatus) {
+        crawlerStatus.value = newStatus
+        if (newStatus === 'idle') {
+          // 爬虫停止，清除轮询
+          clearInterval(crawlerStatusPollingTimer.value)
+          crawlerStatusPollingTimer.value = null
+          await refreshCurrentPlatform({ refreshStats: true })
+        }
+      }
+    } catch (e) {
+      console.error('获取爬虫状态失败:', e)
+    }
+  }, 2000)
+}
+
+const handleSortChange = ({ prop, order }) => {
+  if (prop !== 'sensitive') return
+  sortState.value = { prop, order: order || '' }
+  refreshCurrentPlatform()
 }
 
 const fetchPageData = async () => {
-  if (!useServerPagination.value || hasActiveFilters.value) return
-  if (activeTab.value === 'sensitive') {
+  if (!useServerPagination.value) return
+  if (activeTab.value === 'sensitive' || isSensitiveOnlyFilter.value) {
     await fetchSensitivePreview(currentPlatform.value, currentPage.value, pageSize.value, true)
-    return
-  }
-  if (currentFile.value?.type === 'db') {
-    await selectFile(currentFile.value, { page: currentPage.value, limit: pageSize.value, keepPage: true })
+  } else {
+    // 所有数据列表使用服务端分页
+    await fetchAllFeedData(currentPlatform.value, currentPage.value, pageSize.value, true)
   }
 }
 
@@ -899,7 +1076,16 @@ watch(
 )
 
 watch(
-  () => [currentPage.value, pageSize.value, activeTab.value, currentFile.value],
+  () => sensitiveFilter.value,
+  () => {
+    if (activeTab.value === 'all') {
+      refreshCurrentPlatform()
+    }
+  }
+)
+
+watch(
+  () => [currentPage.value, pageSize.value],
   () => {
     fetchPageData()
   }
@@ -912,10 +1098,8 @@ watch(
       clearInterval(refreshTimer.value)
       refreshTimer.value = null
     }
-    if (nextStatus === 'running') {
-      refreshTimer.value = setInterval(() => {
-        refreshCurrentPlatform()
-      }, 5000)
+    if (nextStatus === 'idle') {
+      refreshCurrentPlatform({ refreshStats: true })
     }
   }
 )
@@ -935,6 +1119,11 @@ watch(
   () => {
     currentPage.value = 1
     expandedCells.value = new Set()
+    if (activeTab.value === 'sensitive') {
+      sensitiveFilter.value = 'sensitive'
+    } else if (sensitiveFilter.value === 'sensitive') {
+      sensitiveFilter.value = 'all'
+    }
     refreshCurrentPlatform()
   }
 )
@@ -943,6 +1132,9 @@ onUnmounted(() => {
   currentPlatform.value = null
   if (refreshTimer.value) {
     clearInterval(refreshTimer.value)
+  }
+  if (crawlerStatusPollingTimer.value) {
+    clearInterval(crawlerStatusPollingTimer.value)
   }
 })
 </script>
@@ -1106,9 +1298,18 @@ onUnmounted(() => {
   align-items: flex-end;
   justify-content: space-between;
   position: relative;
-  z-index: 3;
+  z-index: 4;
   padding-bottom: 12px;
   border-bottom: 1px solid rgba(0, 204, 255, 0.2);
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  position: relative;
+  z-index: 5;
+  pointer-events: auto;
 }
 
 .title-area {
@@ -1158,23 +1359,41 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   padding: 0.6rem 1rem;
-  background: rgba(0, 204, 255, 0.1);
+  background: rgba(255, 255, 255, 0.08);
   color: #fff;
-  border: 1px solid rgba(0, 204, 255, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 999px;
   cursor: pointer;
   transition: all 0.25s ease;
   margin-left: 0.6rem;
 }
 
+.refresh-btn.icon-only {
+  padding: 0.55rem;
+}
+
+.refresh-icon {
+  width: 18px;
+  height: 18px;
+}
+
 .refresh-btn:hover {
-  border-color: rgba(0, 204, 255, 0.7);
-  box-shadow: 0 0 18px rgba(0, 204, 255, 0.2);
+  border-color: rgba(255, 170, 0, 0.5);
+  box-shadow: 0 0 20px rgba(255, 170, 0, 0.2);
 }
 
 .refresh-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.refresh-btn.is-refreshing .refresh-icon {
+  animation: spinRefresh 1s linear infinite;
+}
+
+@keyframes spinRefresh {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 .btn-dot {
@@ -1183,6 +1402,26 @@ onUnmounted(() => {
   border-radius: 50%;
   background: #ffaa00;
   box-shadow: 0 0 8px rgba(255, 170, 0, 0.8);
+}
+
+.crawler-btn.is-updating .btn-dot {
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.crawler-btn.is-updating {
+  cursor: not-allowed;
+  opacity: 0.8;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.2);
+  }
 }
 
 /* === iOS Glass Card === */
@@ -1372,6 +1611,21 @@ onUnmounted(() => {
   display: flex;
   gap: 10px;
   margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.update-time {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 8px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.platform-updated {
+  margin-top: 6px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
 }
 
 .tag {
@@ -1805,6 +2059,9 @@ tr:hover td {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
 }
 
 .platform-item {

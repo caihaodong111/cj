@@ -64,6 +64,7 @@ async def update_bilibili_video(video_item: Dict):
         "user_id": str(video_user_info.get("mid")),
         "nickname": video_user_info.get("name"),
         "avatar": video_user_info.get("face", ""),
+        "ip_location": "",
         "liked_count": str(video_item_stat.get("like", "")),
         "disliked_count": str(video_item_stat.get("dislike", "")),
         "video_play_count": str(video_item_stat.get("view", "")),

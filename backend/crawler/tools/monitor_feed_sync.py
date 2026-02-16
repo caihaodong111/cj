@@ -71,6 +71,7 @@ async def _sync_with_session(session, platform: str, content_item: Dict) -> bool
         return False
 
     content = _build_content_text(content_item)
+    ip_location = content_item.get("ip_location")
     author = str(content_item.get("nickname") or content_item.get("user_nickname") or "")
     url = str(
         content_item.get("note_url")
@@ -97,6 +98,11 @@ async def _sync_with_session(session, platform: str, content_item: Dict) -> bool
     )
     existing = result.scalar_one_or_none()
     if existing:
+        if ip_location:
+            extra_data = existing.extra_data or {}
+            if isinstance(extra_data, dict):
+                extra_data["ip_location"] = ip_location
+                existing.extra_data = extra_data
         existing.content = content
         existing.author = author
         existing.url = url
@@ -108,6 +114,7 @@ async def _sync_with_session(session, platform: str, content_item: Dict) -> bool
         existing.is_sensitive = is_sensitive
         existing.last_modify_ts = now_ts
     else:
+        extra_data = {"ip_location": ip_location} if ip_location else None
         session.add(
             MonitorFeed(
                 platform=platform,
@@ -118,6 +125,7 @@ async def _sync_with_session(session, platform: str, content_item: Dict) -> bool
                 url=url,
                 created_at=created_at,
                 source_keyword=content_item.get("source_keyword", ""),
+                extra_data=extra_data,
                 sentiment=sentiment,
                 sentiment_score=sentiment_score,
                 sentiment_labels=sentiment_labels,

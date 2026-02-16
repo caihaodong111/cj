@@ -122,11 +122,17 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import axios from 'axios'
 
 // 定义事件
 const emit = defineEmits(['crawler-status-change'])
+const props = defineProps({
+  currentPlatform: {
+    type: String,
+    default: ''
+  }
+})
 
 // State
 const platforms = ref([])
@@ -151,6 +157,17 @@ const config = ref({
   cookies: '',
   headless: true
 })
+
+watch(
+  () => props.currentPlatform,
+  (nextPlatform) => {
+    if (!nextPlatform) return
+    if (config.value.platform !== nextPlatform) {
+      config.value.platform = nextPlatform
+    }
+  },
+  { immediate: true }
+)
 
 // Methods
 const fetchPlatforms = async () => {
