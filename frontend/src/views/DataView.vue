@@ -109,17 +109,6 @@
               >×</button>
             </div>
 
-            <!-- Sentiment Filter -->
-            <div class="filter-item">
-              <el-select v-model="sentimentFilter" class="dark-select filter-select-item" :teleported="false">
-                <el-option label="全部情绪" value="all" />
-                <el-option label="正面" value="positive" />
-                <el-option label="负面" value="negative" />
-                <el-option label="中性" value="neutral" />
-                <el-option label="敏感" value="sensitive" />
-              </el-select>
-            </div>
-
             <!-- Sensitive Filter -->
             <div class="filter-item">
               <el-select v-model="sensitiveFilter" class="dark-select filter-select-item" :teleported="false">
@@ -151,7 +140,7 @@
 
           <!-- Result Count -->
           <div class="filter-info">
-            <span v-if="searchKeyword || sentimentFilter !== 'all' || sensitiveFilter !== 'all' || interactionsFilter !== 'all'" class="filter-active">
+            <span v-if="searchKeyword || sensitiveFilter !== 'all' || interactionsFilter !== 'all'" class="filter-active">
               筛选中
             </span>
           </div>
@@ -377,7 +366,6 @@ const currentPlatform = ref(null)
 const files = ref([])
 const currentFile = ref(null)
 const searchKeyword = ref('')
-const sentimentFilter = ref('all') // all, positive, negative, neutral, sensitive
 const sensitiveFilter = ref('all') // all, sensitive, non-sensitive
 const interactionsFilter = ref('all') // all, high, medium, low
 const previewData = ref(null)
@@ -456,17 +444,6 @@ const orderedRows = computed(() => {
     })
   }
 
-  // Sentiment filter
-  if (sentimentFilter.value !== 'all') {
-    filtered = filtered.filter(row => {
-      const sentiment = row.sentiment || row.sentiment_label || ''
-      if (sentimentFilter.value === 'sensitive') {
-        return sentiment === 'sensitive' || getSensitiveFlag(row) === true
-      }
-      return sentiment === sentimentFilter.value
-    })
-  }
-
   // Sensitive filter
   if (sensitiveFilter.value !== 'all') {
     filtered = filtered.filter(row => {
@@ -523,7 +500,6 @@ const orderedRows = computed(() => {
 const hasActiveFilters = computed(() => {
   return Boolean(
     searchKeyword.value.trim() ||
-    sentimentFilter.value !== 'all' ||
     sensitiveFilter.value !== 'all' ||
     interactionsFilter.value !== 'all'
   )
@@ -741,7 +717,6 @@ const goToPage = (page) => {
 
 const resetFilters = () => {
   searchKeyword.value = ''
-  sentimentFilter.value = 'all'
   sensitiveFilter.value = 'all'
   interactionsFilter.value = 'all'
   currentPage.value = 1
@@ -765,7 +740,7 @@ const getRowKey = (row, index) => {
 }
 
 // Reset page when filters change
-watch([searchKeyword, sentimentFilter, sensitiveFilter, interactionsFilter], () => {
+watch([searchKeyword, sensitiveFilter, interactionsFilter], () => {
   currentPage.value = 1
 })
 

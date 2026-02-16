@@ -1221,20 +1221,15 @@ const buildFeedItems = (rows) => {
   return result
 }
 
-// 获取情绪类型显示标签
+// 获取情绪类型显示标签（简化为敏感/正常）
 const getSentimentLabel = (sentiment) => {
-  const labels = {
-    positive: '积极',
-    negative: '消极',
-    neutral: '中性',
-    sensitive: '敏感'
-  }
-  return labels[sentiment] || '中性'
+  // sensitive 显示为"敏感"，其他都显示为"正常"
+  return sentiment === 'sensitive' ? '敏感' : '正常'
 }
 
-// 获取情绪类型样式类名
+// 获取情绪类型样式类名（简化为敏感/正常）
 const getSentimentClass = (sentiment) => {
-  return `sentiment-${sentiment || 'neutral'}`
+  return sentiment === 'sensitive' ? 'sentiment-sensitive' : 'sentiment-normal'
 }
 
 // 格式化情感指数
@@ -2296,26 +2291,14 @@ watch(feedItems, () => {
   white-space: nowrap;
 }
 
-.sentiment-tag.positive {
-  background: rgba(0, 255, 136, 0.15);
-  color: var(--green-status);
-  border: 1px solid rgba(0, 255, 136, 0.3);
-  box-shadow: 0 0 10px rgba(0, 255, 136, 0.2);
-}
-
-.sentiment-tag.negative {
-  background: rgba(255, 107, 107, 0.15);
-  color: #ff6b6b;
-  border: 1px solid rgba(255, 107, 107, 0.3);
-  box-shadow: 0 0 10px rgba(255, 107, 107, 0.2);
-}
-
-.sentiment-tag.neutral {
+/* 正常状态标签 */
+.sentiment-tag.normal {
   background: rgba(0, 204, 255, 0.08);
   color: var(--cyan-primary);
   border: 1px solid rgba(0, 204, 255, 0.2);
 }
 
+/* 敏感状态标签 */
 .sentiment-tag.sensitive {
   background: rgba(255, 170, 0, 0.15);
   color: var(--orange-gold);
@@ -2333,16 +2316,8 @@ watch(feedItems, () => {
   }
 }
 
-/* 情绪类型列表项样式 */
-.list-item.sentiment-positive {
-  border-left: 3px solid var(--green-status);
-}
-
-.list-item.sentiment-negative {
-  border-left: 3px solid #ff6b6b;
-}
-
-.list-item.sentiment-neutral {
+/* 状态类型列表项样式 */
+.list-item.sentiment-normal {
   border-left: 3px solid var(--cyan-primary);
 }
 
