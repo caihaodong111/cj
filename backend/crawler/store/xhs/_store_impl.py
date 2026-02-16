@@ -117,10 +117,12 @@ class XhsDbStoreImplement(AbstractStore):
 
         # Sync to monitor_feed table
         try:
-            from api.monitor_feed_sync import sync_to_monitor_feed
-            sync_to_monitor_feed("xhs", content_item)
-        except Exception:
-            pass
+            from api.monitor_feed_sync import async_sync_to_monitor_feed
+            await async_sync_to_monitor_feed("xhs", content_item)
+        except Exception as e:
+            # 记录错误但不要中断爬虫
+            logger = utils.logger
+            logger.warning(f"[XhsDbStore] Failed to sync to monitor_feed: {e}")
 
     async def add_content(self, session: AsyncSession, content_item: Dict):
         add_ts = int(get_current_timestamp())

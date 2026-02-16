@@ -210,7 +210,7 @@ const config = ref({
   keywords: '',
   specified_ids: '',
   creator_ids: '',
-  save_option: 'json',
+  save_option: 'db',
   start_page: 1,
   enable_comments: true,
   enable_sub_comments: false,

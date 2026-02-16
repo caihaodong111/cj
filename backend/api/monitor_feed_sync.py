@@ -2,6 +2,7 @@
 import os
 import django
 import logging
+from asgiref.sync import sync_to_async
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -23,7 +24,8 @@ PLATFORM_NAMES = {
 }
 
 
-def sync_to_monitor_feed(platform: str, content_item: dict):
+def _sync_to_monitor_feed_sync(platform: str, content_item: dict):
+    """同步版本的同步函数，在线程池中执行"""
     try:
         content_id = str(content_item.get("note_id") or content_item.get("aweme_id") or
                           content_item.get("video_id") or content_item.get("content_id") or "")
@@ -100,3 +102,17 @@ def sync_to_monitor_feed(platform: str, content_item: dict):
 
     except Exception as e:
         logger.error(f"Failed to sync {platform} item: {e}", exc_info=True)
+
+
+# 创建同步到异步的包装器
+_sync_to_monitor_feed_async = sync_to_async(_sync_to_monitor_feed_sync)
+
+
+def sync_to_monitor_feed(platform: str, content_item: dict):
+    """同步函数，用于同步上下文"""
+    _sync_to_monitor_feed_sync(platform, content_item)
+
+
+async def async_sync_to_monitor_feed(platform: str, content_item: dict):
+    """异步函数，用于异步上下文"""
+    await _sync_to_monitor_feed_async(platform, content_item)

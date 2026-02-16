@@ -1,15 +1,15 @@
 <template>
-  <div class="settings-wrapper">
-    <div class="ambient-background">
-      <div class="nebula blue"></div>
-      <div class="nebula gold"></div>
+    <div class="settings-wrapper">
+      <div class="ambient-background">
+        <div class="nebula blue"></div>
+        <div class="nebula gold"></div>
       <div class="breathing-line gold-1"></div>
       <div class="breathing-line gold-2"></div>
-      <div class="scan-grid"></div>
-      <div class="particles">
-        <div class="particle" v-for="i in 8" :key="i" :style="{ animationDelay: `${i * 1.5}s` }"></div>
+        <div class="scan-grid"></div>
+        <div class="particles">
+          <div class="particle" v-for="i in 8" :key="i" :style="{ animationDelay: `${i * 1.5}s` }"></div>
+        </div>
       </div>
-    </div>
 
     <div class="settings-view">
       <header class="page-header entrance-slide-in">
@@ -67,28 +67,6 @@
           </div>
           <div class="config-item">
             <label>包含图片下载</label>
-            <label class="switch">
-              <input type="checkbox" checked>
-              <span class="slider round"></span>
-            </label>
-          </div>
-        </div>
-
-        <div class="settings-group">
-          <div class="group-title">
-            <span class="accent-bar"></span>
-            <h4>显示设置 (Appearance)</h4>
-          </div>
-          <div class="config-item">
-            <label>主题色</label>
-            <div class="color-picker">
-              <div class="color-circle gold active"></div>
-              <div class="color-circle blue"></div>
-              <div class="color-circle green"></div>
-            </div>
-          </div>
-          <div class="config-item">
-            <label>呼吸动画</label>
             <label class="switch">
               <input type="checkbox" checked>
               <span class="slider round"></span>
@@ -824,28 +802,6 @@ input:checked + .slider:before {
 
 .slider.round:before {
   border-radius: 50%;
-}
-
-.color-picker {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.color-circle {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  cursor: pointer;
-  border: 2px solid transparent;
-}
-
-.color-circle.gold { background: #FFD700; }
-.color-circle.blue { background: #00BFFF; }
-.color-circle.green { background: #32CD32; }
-
-.color-circle.active {
-  border-color: white;
-  box-shadow: 0 0 5px rgba(255, 255, 255, 0.5);
 }
 
 .actions {

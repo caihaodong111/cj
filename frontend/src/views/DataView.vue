@@ -22,6 +22,9 @@
             <span class="btn-dot"></span>
             爬虫控制
           </button>
+          <button class="refresh-btn" type="button" @click="refreshCurrentPlatform" :disabled="loadingPreview">
+            同步刷新
+          </button>
         </div>
       </header>
 
@@ -381,10 +384,13 @@ const previewData = ref(null)
 const loadingPreview = ref(false)
 const drawerVisible = ref(false)
 const crawlerDialogVisible = ref(false)
+const crawlerStatus = ref('idle')
+const refreshTimer = ref(null)
 const pageSize = ref(50)
 const currentPage = ref(1)
 const expandedCells = ref(new Set())
 const activeTab = ref('sensitive')
+const sensitivePreviewSize = 1000
 
 const columnDefs = [
   { label: 'AVATAR', keys: ['avatar', 'avatar_url', 'avatarUrl', 'head_url', 'head', 'AVATAR'], type: 'avatar', align: 'center' },
@@ -514,8 +520,34 @@ const orderedRows = computed(() => {
 
   return filtered
 })
-const totalPages = computed(() => Math.max(1, Math.ceil(orderedRows.value.length / pageSize.value)))
+const hasActiveFilters = computed(() => {
+  return Boolean(
+    searchKeyword.value.trim() ||
+    sentimentFilter.value !== 'all' ||
+    sensitiveFilter.value !== 'all' ||
+    interactionsFilter.value !== 'all'
+  )
+})
+
+const useServerPagination = computed(() => {
+  const hasTotal = previewData.value && typeof previewData.value.total === 'number'
+  if (!hasTotal || hasActiveFilters.value) return false
+  if (activeTab.value === 'sensitive') return true
+  return currentFile.value?.type === 'db'
+})
+
+const totalCount = computed(() => {
+  if (useServerPagination.value && previewData.value) {
+    return previewData.value.total || 0
+  }
+  return orderedRows.value.length
+})
+
+const totalPages = computed(() => Math.max(1, Math.ceil(totalCount.value / pageSize.value)))
 const pagedRows = computed(() => {
+  if (useServerPagination.value) {
+    return orderedRows.value
+  }
   const start = (currentPage.value - 1) * pageSize.value
   const end = start + pageSize.value
   return orderedRows.value.slice(start, end)
@@ -763,6 +795,10 @@ const selectPlatform = async (platformValue) => {
   previewData.value = null
   currentPage.value = 1
   expandedCells.value = new Set()
+  if (activeTab.value === 'sensitive') {
+    await fetchSensitivePreview(platformValue, 1, pageSize.value)
+    return
+  }
   try {
     const res = await axios.get('/api/data/files', {
       params: { platform: platformValue }
@@ -770,22 +806,25 @@ const selectPlatform = async (platformValue) => {
     files.value = res.data.files || []
     const nextFile = [...files.value].sort((a, b) => (b.modified_at || 0) - (a.modified_at || 0))[0]
     if (nextFile) {
-      await selectFile(nextFile)
+      await selectFile(nextFile, { page: 1, limit: pageSize.value })
     }
   } catch (e) {
     console.error('Failed to fetch files', e)
   }
 }
 
-const selectFile = async (file) => {
+const selectFile = async (file, options = {}) => {
+  const { page = 1, limit = 100, keepPage = false } = options
   currentFile.value = file
   loadingPreview.value = true
   previewData.value = null
-  currentPage.value = 1
+  if (!keepPage) {
+    currentPage.value = 1
+  }
   expandedCells.value = new Set()
   try {
     const res = await axios.get(`/api/data/files/${file.path}`, {
-      params: { preview: true, limit: 100 }
+      params: { preview: true, limit, page }
     })
     previewData.value = res.data
   } catch (e) {
@@ -795,9 +834,72 @@ const selectFile = async (file) => {
   }
 }
 
-const onCrawlerStatusChange = async (newStatus) => {
+const fetchSensitivePreview = async (platformValue, page = 1, pageSize = sensitivePreviewSize, keepPage = false) => {
+  if (!platformValue) return
+  loadingPreview.value = true
+  previewData.value = null
+  if (!keepPage) {
+    currentPage.value = 1
+  }
+  expandedCells.value = new Set()
+  try {
+    const res = await axios.get('/api/monitor/feed/sensitive', {
+      params: { platform: platformValue, page, page_size: pageSize }
+    })
+    const items = res.data.items || []
+    previewData.value = {
+      data: items.map(item => ({
+        content_id: item.content_id,
+        note_id: item.content_id,
+        create_time: item.created_at,
+        created_time: item.created_at,
+        content: item.content,
+        nickname: item.author,
+        author: item.author,
+        url: item.url,
+        sentiment: item.sentiment,
+        is_sensitive: item.is_sensitive
+      })),
+      total: res.data.pagination?.total_count || items.length
+    }
+  } catch (e) {
+    console.error('Failed to fetch sensitive feed', e)
+  } finally {
+    loadingPreview.value = false
+  }
+}
+
+const refreshCurrentPlatform = async () => {
+  if (loadingPreview.value) return
+  await fetchConfig()
   if (currentPlatform.value) {
-    await selectPlatform(currentPlatform.value)
+    if (activeTab.value === 'sensitive') {
+      await fetchSensitivePreview(currentPlatform.value, currentPage.value, pageSize.value, true)
+    } else {
+      if (currentFile.value?.type === 'db') {
+        await selectFile(currentFile.value, { page: currentPage.value, limit: pageSize.value, keepPage: true })
+      } else {
+        await selectPlatform(currentPlatform.value)
+      }
+    }
+  } else {
+    await fetchConfig()
+  }
+}
+
+const onCrawlerStatusChange = async (newStatus) => {
+  crawlerStatus.value = newStatus
+  await refreshCurrentPlatform()
+}
+
+const fetchPageData = async () => {
+  if (!useServerPagination.value || hasActiveFilters.value) return
+  if (activeTab.value === 'sensitive') {
+    await fetchSensitivePreview(currentPlatform.value, currentPage.value, pageSize.value, true)
+    return
+  }
+  if (currentFile.value?.type === 'db') {
+    await selectFile(currentFile.value, { page: currentPage.value, limit: pageSize.value, keepPage: true })
   }
 }
 
@@ -822,6 +924,28 @@ watch(
 )
 
 watch(
+  () => [currentPage.value, pageSize.value, activeTab.value, currentFile.value],
+  () => {
+    fetchPageData()
+  }
+)
+
+watch(
+  () => crawlerStatus.value,
+  (nextStatus) => {
+    if (refreshTimer.value) {
+      clearInterval(refreshTimer.value)
+      refreshTimer.value = null
+    }
+    if (nextStatus === 'running') {
+      refreshTimer.value = setInterval(() => {
+        refreshCurrentPlatform()
+      }, 5000)
+    }
+  }
+)
+
+watch(
   () => [orderedRows.value.length, pageSize.value],
   () => {
     if (currentPage.value > totalPages.value) {
@@ -836,11 +960,15 @@ watch(
   () => {
     currentPage.value = 1
     expandedCells.value = new Set()
+    refreshCurrentPlatform()
   }
 )
 
 onUnmounted(() => {
   currentPlatform.value = null
+  if (refreshTimer.value) {
+    clearInterval(refreshTimer.value)
+  }
 })
 </script>
 
@@ -1049,6 +1177,29 @@ onUnmounted(() => {
 .crawler-btn:hover {
   border-color: rgba(255, 170, 0, 0.5);
   box-shadow: 0 0 20px rgba(255, 170, 0, 0.2);
+}
+
+.refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.6rem 1rem;
+  background: rgba(0, 204, 255, 0.1);
+  color: #fff;
+  border: 1px solid rgba(0, 204, 255, 0.35);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  margin-left: 0.6rem;
+}
+
+.refresh-btn:hover {
+  border-color: rgba(0, 204, 255, 0.7);
+  box-shadow: 0 0 18px rgba(0, 204, 255, 0.2);
+}
+
+.refresh-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .btn-dot {

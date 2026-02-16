@@ -16,7 +16,7 @@
 # 详细许可条款请参阅项目根目录下的LICENSE文件。
 # 使用本代码即表示您同意遵守上述原则和LICENSE中的所有条款。
 
-from sqlalchemy import create_engine, Column, Integer, Text, String, BigInteger
+from sqlalchemy import create_engine, Column, Integer, Text, String, BigInteger, Boolean, Float, JSON, UniqueConstraint
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
@@ -325,6 +325,28 @@ class XhsNoteComment(Base):
     pictures = Column(Text)
     parent_comment_id = Column(String(255))
     like_count = Column(Text)
+
+
+class MonitorFeed(Base):
+    __tablename__ = 'monitor_feed'
+    __table_args__ = (UniqueConstraint("platform", "content_id", name="idx_unique_platform_content"),)
+
+    id = Column(Integer, primary_key=True)
+    add_ts = Column(BigInteger)
+    last_modify_ts = Column(BigInteger)
+    platform = Column(String(20), index=True, nullable=False)
+    platform_name = Column(String(50))
+    content_id = Column(String(255), index=True, nullable=False)
+    content = Column(Text, nullable=False)
+    author = Column(Text)
+    url = Column(Text)
+    created_at = Column(BigInteger, index=True)
+    source_keyword = Column(Text, default='')
+    extra_data = Column(JSON)
+    sentiment = Column(String(20), index=True, default='neutral')
+    sentiment_score = Column(Float)
+    sentiment_labels = Column(JSON)
+    is_sensitive = Column(Boolean, default=False)
 
 class TiebaNote(Base):
     __tablename__ = 'tieba_note'

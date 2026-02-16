@@ -10,6 +10,7 @@ Django API views for MediaCrawler Backend
 
 import os
 import json
+import logging
 import subprocess
 import sys
 import time
@@ -18,6 +19,17 @@ from collections import deque
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
+
+# 创建爬虫日志记录器，输出到 Django 终端
+crawler_logger = logging.getLogger("crawler")
+crawler_logger.setLevel(logging.INFO)
+# 如果 logger 还没有 handler，添加 console handler
+if not crawler_logger.handlers:
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(logging.Formatter(
+        '[%(levelname)s] %(message)s'
+    ))
+    crawler_logger.addHandler(console_handler)
 
 from django.conf import settings
 from django.db import connection
@@ -133,12 +145,16 @@ def _build_run_cmd(args):
 
 
 def _append_log(level: str, message: str):
+    """添加日志到内存队列，同时输出到 Django 终端"""
     with CRAWLER_LOCK:
         CRAWLER_LOGS.append({
             "level": level,
             "message": message,
             "timestamp": time.time(),
         })
+    # 同时输出到 Django 终端
+    log_level = logging.INFO if level == "INFO" else logging.ERROR
+    crawler_logger.log(log_level, message)
 
 
 def _get_process():
@@ -186,11 +202,16 @@ def _get_state():
 
 
 def _stream_pipe(pipe, level: str):
+    """流式读取管道输出，同时存储到内存队列和输出到 Django 终端"""
     try:
         for line in iter(pipe.readline, ""):
             if not line:
                 break
-            _append_log(level, line.rstrip())
+            message = line.rstrip()
+            _append_log(level, message)
+            # 同时输出到 Django 终端
+            log_level = logging.INFO if level == "INFO" else logging.ERROR
+            crawler_logger.log(log_level, message)
     finally:
         try:
             pipe.close()

@@ -128,10 +128,11 @@ class WeiboDbStoreImplement(AbstractStore):
 
         # Sync to monitor_feed table
         try:
-            from api.monitor_feed_sync import sync_to_monitor_feed
-            sync_to_monitor_feed("wb", content_item)
-        except Exception:
-            pass
+            from api.monitor_feed_sync import async_sync_to_monitor_feed
+            await async_sync_to_monitor_feed("wb", content_item)
+        except Exception as e:
+            logger = utils.logger
+            logger.warning(f"[WeiboDbStore] Failed to sync to monitor_feed: {e}")
 
     async def store_comment(self, comment_item: Dict):
         """

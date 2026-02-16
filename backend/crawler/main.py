@@ -21,6 +21,14 @@ import sys
 import io
 from pathlib import Path
 
+# Ensure crawler modules resolve first, then allow backend (api/) imports.
+CRAWLER_ROOT = Path(__file__).resolve().parent
+BACKEND_ROOT = CRAWLER_ROOT.parent
+if str(CRAWLER_ROOT) not in sys.path:
+    sys.path.insert(0, str(CRAWLER_ROOT))
+if str(BACKEND_ROOT) not in sys.path:
+    sys.path.append(str(BACKEND_ROOT))
+
 # Force UTF-8 encoding for stdout/stderr to prevent encoding errors
 # when outputting Chinese characters in non-UTF-8 terminals
 if sys.stdout and hasattr(sys.stdout, 'buffer'):
@@ -125,6 +133,14 @@ async def main() -> None:
 
     crawler = CrawlerFactory.create_crawler(platform=config.PLATFORM)
     await crawler.start()
+
+    if config.SAVE_DATA_OPTION in ("db", "sqlite"):
+        try:
+            from tools.monitor_feed_sync import sync_platform_incremental
+            synced = await sync_platform_incremental(config.PLATFORM)
+            print(f"[Main] monitor_feed synced {synced} {config.PLATFORM} items")
+        except Exception as e:
+            print(f"[Main] monitor_feed sync failed: {e}")
 
     _flush_excel_if_needed()
 
