@@ -1920,7 +1920,7 @@ tr:hover td {
 .dialog-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(3, 5, 8, 0.65);
+  background: rgba(3, 5, 8, 0.4);
   backdrop-filter: blur(6px);
   z-index: 3000;
   display: flex;
@@ -1930,12 +1930,13 @@ tr:hover td {
 .drawer-panel {
   width: min(420px, 90vw);
   height: 100%;
-  background: rgba(10, 12, 18, 0.96);
+  background: rgba(10, 12, 18, 0.80);
   border-left: 1px solid rgba(255, 255, 255, 0.08);
   padding: 20px;
   display: flex;
   flex-direction: column;
   gap: 16px;
+  backdrop-filter: blur(20px);
   transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -1946,11 +1947,12 @@ tr:hover td {
 
 .dialog-panel {
   width: min(520px, 92vw);
-  background: rgba(10, 12, 18, 0.98);
+  background: rgba(10, 12, 18, 0.75);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 18px;
   padding: 18px 20px 20px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(20px);
   transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
