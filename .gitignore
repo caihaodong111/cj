@@ -186,3 +186,14 @@ agent_zone
 debug_tools
 
 database/*.db
+
+# Keep crawler database python module tracked (avoid global ignore collisions)
+!backend/crawler/database/__init__.py
+!backend/crawler/database/db.py
+!backend/crawler/database/db_session.py
+!backend/crawler/database/models.py
+!backend/crawler/database/mongodb_store_base.py
+
+# Windows explorer metadata
+Thumbs.db
+Desktop.ini
