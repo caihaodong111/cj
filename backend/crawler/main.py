@@ -52,7 +52,7 @@ from typing import Optional, Type
 
 import cmd_arg
 import config
-from database import db
+from crawler.database import db
 from base.base_crawler import AbstractCrawler
 
 
