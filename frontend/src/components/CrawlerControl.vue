@@ -106,7 +106,7 @@
           class="cyber-btn cyber-btn-primary"
           :disabled="starting"
         >
-          {{ starting ? '启动中...' : '启动爬虫' }}
+          {{ starting ? '启动中...' : '启动' }}
         </button>
         <button
           v-else
@@ -114,7 +114,7 @@
           class="cyber-btn cyber-btn-danger"
           :disabled="stopping"
         >
-          {{ stopping ? '停止中...' : '停止爬虫' }}
+          {{ stopping ? '停止中...' : '停止' }}
         </button>
       </div>
     </div>
