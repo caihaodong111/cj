@@ -36,6 +36,9 @@ from api.views import (
     delete_cookie,
     toggle_cookie_status,
     get_active_cookie,
+    # AI Analysis
+    ai_keyword_analysis,
+    ai_analysis,
 )
 
 urlpatterns = [
@@ -69,6 +72,10 @@ urlpatterns = [
     path("api/cookies/<int:cookie_id>/update", update_cookie, name="update_cookie"),
     path("api/cookies/<int:cookie_id>/delete", delete_cookie, name="delete_cookie"),
     path("api/cookies/<int:cookie_id>/toggle", toggle_cookie_status, name="toggle_cookie_status"),
+
+    # API: AI Analysis
+    path("api/ai/keyword-analysis", ai_keyword_analysis, name="ai_keyword_analysis"),
+    path("api/ai/analysis", ai_analysis, name="ai_analysis"),
 
     # Root endpoint
     path(

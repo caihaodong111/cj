@@ -18,7 +18,7 @@ import threading
 from collections import deque
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 
 # 创建爬虫日志记录器，输出到 Django 终端
 crawler_logger = logging.getLogger("crawler")
@@ -33,6 +33,7 @@ if not crawler_logger.handlers:
 
 from django.conf import settings
 from django.db import connection, models
+from django.db.models import Count, Q
 from django.db.models.functions import Coalesce
 from django.http import JsonResponse, FileResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -59,7 +60,7 @@ from media_platform.models import (
     ZhihuContent,
     MonitorFeed,
 )
-from .models import CookieConfig
+from .models import CookieConfig, AIUsageRecord
 
 # Data directory
 DATA_DIR = Path(__file__).parent.parent.parent / "data"
@@ -2130,3 +2131,508 @@ def get_platform_sentiment_stats(request):
         pass
 
     return Response(stats)
+
+
+# ============== AI Analysis ==============
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def ai_keyword_analysis(request):
+    """使用智谱 AI 分析关键词"""
+    import os
+    import re
+    import time
+
+    # 打印调试信息
+    print(f"[DEBUG] 收到 AI 分析请求")
+
+    # 获取 API Key
+    api_key = os.environ.get('ZHIPU_API_KEY')
+    print(f"[DEBUG] API Key 存在: {bool(api_key)}")
+    print(f"[DEBUG] API Key 格式: {api_key[:20]}..." if api_key else "[DEBUG] API Key: None")
+
+    # 获取请求参数
+    data = request.data
+    print(f"[DEBUG] 请求数据: {data}")
+    keyword = data.get('keyword')
+    platform = data.get('platform', 'all')
+    time_range = data.get('time_range', '7')
+
+    if not keyword:
+        return Response(
+            {"error": "请输入分析关键词"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # 平台名称映射
+    platform_names = {
+        'all': '所有平台',
+        'xhs': '小红书',
+        'dy': '抖音',
+        'ks': '快手',
+        'bili': 'B站',
+        'wb': '微博',
+        'tieba': '贴吧',
+        'zhihu': '知乎'
+    }
+
+    platform_display = platform_names.get(platform, platform)
+    time_range_display = f"过去{time_range}天" if str(time_range).isdigit() else "自定义时间"
+
+    print(f"[DEBUG] 关键词: {keyword}, 平台: {platform_display}, 时间: {time_range_display}")
+
+    # 创建AI使用记录（初始状态）
+    usage_record = AIUsageRecord.objects.create(
+        keyword=keyword,
+        platform=platform,
+        time_range=time_range_display,
+        is_success=False
+    )
+
+    if not api_key:
+        usage_record.error_message = "未配置智谱 AI API Key"
+        usage_record.save()
+        return Response(
+            {"error": "未配置智谱 AI API Key，请在后端 .env 文件中设置 ZHIPU_API_KEY"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+    try:
+        # 调用智谱 AI API
+        import requests
+        url = "https://open.bigmodel.cn/api/paas/v4/chat/completions"
+
+        # 按照智谱 AI 文档的标准格式
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}"
+        }
+
+        # 简化提示词，使用更简洁的格式
+        prompt = f'请列出10-15个关于"{keyword}"在{platform_display}的关键词，每行一个。'
+
+        payload = {
+            "model": "glm-4.7-flash",
+            "messages": [
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ]
+        }
+
+        print(f"[DEBUG] 请求URL: {url}")
+        print(f"[DEBUG] 请求头: Content-Type={headers['Content-Type']}")
+        print(f"[DEBUG] 请求体: {payload}")
+        print(f"[DEBUG] 开始调用智谱 AI API...")
+
+        # 重试机制：最多重试 2 次
+        max_retries = 2
+
+        for attempt in range(max_retries + 1):
+            try:
+                if attempt > 0:
+                    print(f"[DEBUG] 第 {attempt + 1} 次尝试...")
+                    time.sleep(1)
+
+                # 增加超时时间，添加连接超时
+                response = requests.post(
+                    url,
+                    json=payload,
+                    headers=headers,
+                    timeout=(10, 90),  # (连接超时, 读取超时)
+                    verify=True  # 验证 SSL
+                )
+
+                print(f"[DEBUG] API 响应状态码: {response.status_code}")
+                print(f"[DEBUG] API 响应头: {dict(response.headers)}")
+
+                if response.status_code != 200:
+                    print(f"[DEBUG] API 错误响应: {response.text}")
+
+                response.raise_for_status()
+                result = response.json()
+                print(f"[DEBUG] API 返回 JSON: {result}")
+
+                # 检查返回格式
+                if 'choices' not in result or not result['choices']:
+                    usage_record.error_message = "AI 返回格式异常，未包含 choices"
+                    usage_record.save()
+                    return Response(
+                        {"error": "AI 返回格式异常，未包含 choices"},
+                        status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                    )
+
+                # 解析返回的关键词
+                content = result['choices'][0]['message']['content']
+                print(f"[DEBUG] AI 返回内容: {content}")
+
+                keywords = []
+                for line in content.split('\n'):
+                    line = line.strip()
+                    # 使用正则表达式移除序号和其他符号
+                    line = re.sub(r'^[\d\-\*\.\、]+\s*', '', line).strip()
+                    # 移除可能的引号和特殊符号
+                    line = line.strip('"\'""''《》【】()（）-—–')
+                    if line and 1 < len(line) < 20:
+                        keywords.append(line)
+
+                print(f"[DEBUG] 解析后的关键词: {keywords}")
+
+                if not keywords:
+                    usage_record.error_message = "AI 未能生成有效关键词"
+                    usage_record.save()
+                    return Response(
+                        {"error": "AI 未能生成有效关键词，请重试"},
+                        status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                    )
+
+                # 更新使用记录为成功状态
+                usage_record.is_success = True
+                usage_record.result_keywords = keywords[:15]
+                usage_record.error_message = ""
+                usage_record.save()
+
+                return Response({
+                    "success": True,
+                    "keywords": keywords[:15]
+                })
+
+            except requests.exceptions.Timeout as e:
+                print(f"[DEBUG] 第 {attempt + 1} 次尝试超时: {e}")
+                if attempt == max_retries:
+                    usage_record.error_message = f"AI 服务响应超时: {str(e)}"
+                    usage_record.save()
+                    raise
+            except requests.exceptions.RequestException as e:
+                print(f"[DEBUG] 第 {attempt + 1} 次尝试失败: {e}")
+                if hasattr(e, 'response') and e.response is not None:
+                    print(f"[DEBUG] 错误响应状态码: {e.response.status_code}")
+                    print(f"[DEBUG] 错误响应内容: {e.response.text[:500]}")
+                if attempt == max_retries:
+                    usage_record.error_message = f"请求失败: {str(e)}"
+                    usage_record.save()
+                    raise
+
+    except requests.exceptions.Timeout as e:
+        print(f"[ERROR] 所有尝试均超时: {e}")
+        return Response(
+            {"error": "AI 服务响应超时，可能是网络问题。请检查服务器网络连接，或稍后重试。"},
+            status=status.HTTP_504_GATEWAY_TIMEOUT
+        )
+    except requests.exceptions.RequestException as e:
+        print(f"[ERROR] 请求异常: {e}")
+        error_msg = str(e)
+        if hasattr(e, 'response') and e.response is not None:
+            print(f"[ERROR] 响应状态码: {e.response.status_code}")
+            error_content = e.response.text[:500]
+            print(f"[ERROR] 响应内容: {error_content}")
+            # 尝试解析错误信息
+            try:
+                error_json = e.response.json()
+                if 'error' in error_json:
+                    error_msg = error_json['error'].get('message', error_msg)
+            except:
+                pass
+        return Response(
+            {"error": f"AI 分析请求失败: {error_msg}"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+    except Exception as e:
+        import traceback
+        print(f"[ERROR] 异常: {e}")
+        traceback.print_exc()
+        usage_record.error_message = f"未知错误: {str(e)}"
+        usage_record.save()
+        return Response(
+            {"error": f"AI 分析失败: {str(e)}"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+def _normalize_epoch_seconds(value) -> Optional[int]:
+    try:
+        ts = int(value)
+    except (TypeError, ValueError):
+        return None
+    if ts > 10**12:
+        ts = ts // 1000
+    return ts
+
+
+def _sentiment_key(sentiment: Optional[str], is_sensitive: bool) -> str:
+    if is_sensitive or sentiment == "sensitive":
+        return "sensitive"
+    if sentiment in {"positive", "negative", "neutral"}:
+        return sentiment
+    return "neutral"
+
+
+def _fallback_keywords_from_samples(samples: List[str]) -> List[str]:
+    import re
+    tokens = []
+    for text in samples:
+        tokens.extend(re.findall(r"[\u4e00-\u9fa5]{2,6}", text))
+    freq = {}
+    for token in tokens:
+        freq[token] = freq.get(token, 0) + 1
+    return [k for k, _ in sorted(freq.items(), key=lambda item: item[1], reverse=True)[:12]]
+
+
+def _build_default_summary(total_hits: int, platform: str, time_range_display: str) -> List[str]:
+    platform_name = PLATFORM_NAMES.get(platform, platform) if platform != "all" else "全平台"
+    return [
+        f"当前分析覆盖{platform_name}，时间范围为{time_range_display}。",
+        f"本次共匹配到{total_hits}条相关内容，后续可继续观察情绪变化。",
+        "建议结合高频观点与风险提示进行重点研判。"
+    ]
+
+
+def _build_default_risks(sentiment_stats: dict) -> List[dict]:
+    risks = []
+    total = sentiment_stats.get("total", 0) or 0
+    negative = sentiment_stats.get("negative", 0) or 0
+    sensitive = sentiment_stats.get("sensitive", 0) or 0
+    if total:
+        neg_ratio = negative / total
+        if neg_ratio >= 0.35:
+            risks.append({
+                "level": "medium",
+                "trigger": "负面占比偏高",
+                "reason": f"负面内容占比约{neg_ratio:.0%}，需要关注情绪扩散趋势。"
+            })
+    if sensitive > 0:
+        risks.append({
+            "level": "high",
+            "trigger": "敏感内容命中",
+            "reason": f"监测到{sensitive}条敏感内容，需确认话题来源与扩散路径。"
+        })
+    if not risks:
+        risks.append({
+            "level": "low",
+            "trigger": "风险信号较弱",
+            "reason": "当前未出现明显敏感或负面集中现象，可持续观察。"
+        })
+    return risks
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def ai_analysis(request):
+    """AI 聚合分析：关键词 + 摘要 + 情绪分布 + 风险提示"""
+    import re
+    import time
+    import requests
+    from django.utils import timezone
+
+    data = request.data
+    keyword = data.get('keyword')
+    platform = data.get('platform', 'all')
+    time_range = data.get('time_range', '7')
+
+    if not keyword:
+        return Response(
+            {"error": "请输入分析关键词"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    platform_display = PLATFORM_NAMES.get(platform, platform) if platform != "all" else "所有平台"
+    time_range_display = f"过去{time_range}天" if str(time_range).isdigit() else "自定义时间"
+
+    api_key = os.environ.get('ZHIPU_API_KEY')
+
+    usage_record = AIUsageRecord.objects.create(
+        keyword=keyword,
+        platform=platform,
+        time_range=time_range_display,
+        is_success=False
+    )
+
+    queryset = MonitorFeed.objects.all()
+    if platform != "all":
+        queryset = queryset.filter(platform=platform)
+
+    keyword_filter = Q(content__icontains=keyword) | Q(source_keyword__icontains=keyword)
+    queryset = queryset.filter(keyword_filter)
+
+    if str(time_range).isdigit():
+        days = int(time_range)
+        cutoff_ts = int(time.time()) - days * 86400
+        queryset = queryset.filter(created_at__gte=cutoff_ts)
+
+    # 情绪分布（按平台）
+    sentiment_by_platform = {
+        code: {"positive": 0, "negative": 0, "neutral": 0, "sensitive": 0, "total": 0}
+        for code in PLATFORM_NAMES.keys()
+    }
+    platform_rows = queryset.values("platform", "sentiment", "is_sensitive").annotate(cnt=Count("id"))
+    for row in platform_rows:
+        platform_code = row.get("platform")
+        if platform_code not in sentiment_by_platform:
+            continue
+        sentiment = row.get("sentiment")
+        is_sensitive = bool(row.get("is_sensitive"))
+        key = _sentiment_key(sentiment, is_sensitive)
+        sentiment_by_platform[platform_code][key] += row.get("cnt", 0)
+        sentiment_by_platform[platform_code]["total"] += row.get("cnt", 0)
+
+    # 情绪分布（按时间）
+    day_buckets = {}
+    for row in queryset.values("created_at", "sentiment", "is_sensitive"):
+        ts = _normalize_epoch_seconds(row.get("created_at"))
+        if not ts:
+            continue
+        day = timezone.localtime(datetime.fromtimestamp(ts, tz=timezone.get_current_timezone())).strftime("%Y-%m-%d")
+        bucket = day_buckets.setdefault(day, {"positive": 0, "negative": 0, "neutral": 0, "sensitive": 0, "total": 0})
+        key = _sentiment_key(row.get("sentiment"), bool(row.get("is_sensitive")))
+        bucket[key] += 1
+        bucket["total"] += 1
+
+    sentiment_by_day = [{"date": day, **day_buckets[day]} for day in sorted(day_buckets.keys())]
+
+    total_hits = queryset.count()
+
+    # 采样内容用于 AI 分析
+    sample_qs = queryset.order_by("-created_at").values("content", "author", "platform")[:40]
+    samples = []
+    for item in sample_qs:
+        content = (item.get("content") or "").strip().replace("\n", " ")
+        content = re.sub(r"\s+", " ", content)
+        if not content:
+            continue
+        samples.append(f"[{PLATFORM_NAMES.get(item.get('platform'), item.get('platform'))}] {item.get('author') or '匿名'}: {content[:120]}")
+
+    if total_hits == 0:
+        summary = _build_default_summary(total_hits, platform, time_range_display)
+        usage_record.is_success = True
+        usage_record.result_keywords = [keyword]
+        usage_record.error_message = ""
+        usage_record.save()
+        return Response({
+            "success": True,
+            "keywords": [keyword],
+            "summary": summary,
+            "sentiment_distribution": {
+                "by_platform": sentiment_by_platform,
+                "by_day": sentiment_by_day
+            },
+            "risks": _build_default_risks({"total": 0, "negative": 0, "sensitive": 0}),
+            "meta": {
+                "platform": platform,
+                "time_range": time_range_display,
+                "total_hits": total_hits,
+                "sample_size": len(samples),
+                "ai_enabled": False
+            }
+        })
+
+    if not api_key:
+        keywords = _fallback_keywords_from_samples(samples) or [keyword, f"{keyword}热度", "用户讨论", "情绪反馈"]
+        summary = _build_default_summary(total_hits, platform, time_range_display)
+        risks = _build_default_risks(sentiment_by_platform.get(platform, {}) if platform != "all" else {
+            "total": sum(p["total"] for p in sentiment_by_platform.values()),
+            "negative": sum(p["negative"] for p in sentiment_by_platform.values()),
+            "sensitive": sum(p["sensitive"] for p in sentiment_by_platform.values()),
+        })
+        usage_record.error_message = "未配置智谱 AI API Key"
+        usage_record.save()
+        return Response({
+            "success": True,
+            "keywords": keywords[:15],
+            "summary": summary,
+            "sentiment_distribution": {
+                "by_platform": sentiment_by_platform,
+                "by_day": sentiment_by_day
+            },
+            "risks": risks,
+            "meta": {
+                "platform": platform,
+                "time_range": time_range_display,
+                "total_hits": total_hits,
+                "sample_size": len(samples),
+                "ai_enabled": False
+            }
+        })
+
+    try:
+        url = "https://open.bigmodel.cn/api/paas/v4/chat/completions"
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}"
+        }
+
+        prompt = (
+            "你是舆情分析助手，请根据样本内容输出结构化 JSON，只输出 JSON。\n"
+            f"关键词：{keyword}\n"
+            f"平台：{platform_display}\n"
+            f"时间范围：{time_range_display}\n"
+            "样本内容：\n"
+            + "\n".join(samples[:30]) +
+            "\n请输出 JSON，格式如下：\n"
+            "{\n"
+            '  "keywords": ["词1", "词2"],\n'
+            '  "summary": ["句子1", "句子2", "句子3"],\n'
+            '  "risks": [\n'
+            '    {"level": "low/medium/high", "trigger": "触发条件", "reason": "原因"}\n'
+            "  ]\n"
+            "}\n"
+            "summary 请输出 3-5 句中文，risks 1-4 条。"
+        )
+
+        payload = {
+            "model": "glm-4.7-flash",
+            "messages": [{"role": "user", "content": prompt}]
+        }
+
+        response = requests.post(url, json=payload, headers=headers, timeout=(10, 90), verify=True)
+        response.raise_for_status()
+        result = response.json()
+        content = result.get("choices", [{}])[0].get("message", {}).get("content", "")
+
+        json_match = re.search(r"\{.*\}", content, re.S)
+        parsed = json.loads(json_match.group(0)) if json_match else {}
+
+        keywords = parsed.get("keywords") or []
+        summary = parsed.get("summary") or []
+        risks = parsed.get("risks") or []
+
+        if not keywords:
+            keywords = _fallback_keywords_from_samples(samples) or [keyword]
+        if not summary:
+            summary = _build_default_summary(total_hits, platform, time_range_display)
+        if not risks:
+            risks = _build_default_risks(sentiment_by_platform.get(platform, {}) if platform != "all" else {
+                "total": sum(p["total"] for p in sentiment_by_platform.values()),
+                "negative": sum(p["negative"] for p in sentiment_by_platform.values()),
+                "sensitive": sum(p["sensitive"] for p in sentiment_by_platform.values()),
+            })
+
+        usage_record.is_success = True
+        usage_record.result_keywords = keywords[:15]
+        usage_record.error_message = ""
+        usage_record.save()
+
+        return Response({
+            "success": True,
+            "keywords": keywords[:15],
+            "summary": summary[:5],
+            "sentiment_distribution": {
+                "by_platform": sentiment_by_platform,
+                "by_day": sentiment_by_day
+            },
+            "risks": risks[:4],
+            "meta": {
+                "platform": platform,
+                "time_range": time_range_display,
+                "total_hits": total_hits,
+                "sample_size": len(samples),
+                "ai_enabled": True
+            }
+        })
+    except Exception as e:
+        usage_record.error_message = f"AI 分析失败: {str(e)}"
+        usage_record.save()
+        return Response(
+            {"error": f"AI 分析失败: {str(e)}"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )

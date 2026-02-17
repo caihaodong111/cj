@@ -7,6 +7,67 @@
 from django.db import models
 
 
+class AIUsageRecord(models.Model):
+    """AI使用记录模型，用于记录深度分析功能的AI调用"""
+
+    PLATFORM_CHOICES = [
+        ('all', '所有平台'),
+        ('xhs', '小红书'),
+        ('dy', '抖音'),
+        ('ks', '快手'),
+        ('bili', '哔哩哔哩'),
+        ('wb', '微博'),
+        ('tieba', '百度贴吧'),
+        ('zhihu', '知乎'),
+    ]
+
+    id = models.AutoField(primary_key=True)
+    keyword = models.CharField(
+        max_length=200,
+        verbose_name='分析关键词',
+        db_index=True
+    )
+    platform = models.CharField(
+        max_length=20,
+        choices=PLATFORM_CHOICES,
+        default='all',
+        verbose_name='平台',
+        db_index=True
+    )
+    time_range = models.CharField(
+        max_length=50,
+        verbose_name='时间范围'
+    )
+    result_keywords = models.JSONField(
+        verbose_name='返回的关键词列表',
+        null=True,
+        blank=True
+    )
+    is_success = models.BooleanField(
+        default=True,
+        verbose_name='是否成功'
+    )
+    error_message = models.TextField(
+        blank=True,
+        default='',
+        verbose_name='错误信息'
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name='创建时间',
+        db_index=True
+    )
+
+    class Meta:
+        db_table = 'ai_usage_record'
+        verbose_name = 'AI使用记录'
+        verbose_name_plural = 'AI使用记录'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.keyword} - {self.get_platform_display()}'
+
+
 class CookieConfig(models.Model):
     """Cookie配置模型，用于存储各平台的登录Cookie"""
 
