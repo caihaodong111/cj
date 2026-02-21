@@ -84,6 +84,11 @@ rich==14.3.2
 pytest==9.0.2
 pytest-asyncio==1.3.0
 
+# ============== Production Server ==============
+uvicorn==0.34.0
+gunicorn==23.0.0
+whitenoise==6.8.2
+
 # ============== Other Dependencies ==============
 cffi==2.0.0
 cryptography==46.0.5
@@ -95,3 +100,4 @@ pyee==11.1.0
 Pygments==2.19.2
 shellingham==1.5.4
 six==1.17.0
+websockets==14.1
