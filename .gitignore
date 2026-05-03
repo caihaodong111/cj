@@ -166,6 +166,8 @@ cython_debug/
 /temp_image/
 /browser_data/
 /data/
+backend/data/
+backend/crawler/browser_data/
 backend/crawler/cache/
 
 */.DS_Store

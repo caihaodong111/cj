@@ -1,132 +1,113 @@
 # MediaCrawler Backend Dockerfile
-# Multi-stage build with Tsinghua mirrors for faster Chinese network builds
+# Multi-stage build with Chinese mirrors for faster package installation.
 
-# Stage 1: Builder
 FROM python:3.11-slim AS builder
 
-# Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple \
+    PIP_TRUSTED_HOST=pypi.tuna.tsinghua.edu.cn \
+    MEDIACRAWLER_QR_MODE=web \
+    PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 
-# Use Tsinghua mirror for apt (Debian packages)
-RUN sed -i 's/deb.debian.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apt/sources.list.d/debian.sources && \
-    apt-get update && apt-get install -y --no-install-recommends \
-    gcc \
-    g++ \
-    make \
-    libffi-dev \
-    libpq-dev \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
+RUN sed -i 's|deb.debian.org|mirrors.tuna.tsinghua.edu.cn|g; s|security.debian.org|mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list.d/debian.sources && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+        curl \
+        gcc \
+        g++ \
+        libffi-dev \
+        libpq-dev \
+        make && \
+    rm -rf /var/lib/apt/lists/*
 
-# Use Tsinghua mirror for pip
-RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple && \
-    pip config set global.trusted-host pypi.tuna.tsinghua.edu.cn
-
-# Create virtual environment
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-# Upgrade pip with Tsinghua mirror
-RUN pip install --upgrade pip
+WORKDIR /build
 
-# Copy requirements and install Python dependencies
 COPY requirements.txt .
-RUN pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host pypi.tuna.tsinghua.edu.cn
+RUN pip install --upgrade pip && \
+    pip install -r requirements.txt
 
-# Install Playwright browsers
+# Download Chromium into a fixed path so it can be copied into the runtime image.
+# Do not use `playwright install-deps` here: on Debian trixie it falls back to
+# an Ubuntu package list that includes unavailable font packages.
 RUN playwright install chromium
 
-# Install Chromium system dependencies for Debian (instead of playwright install-deps)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libnss3 \
-    libnspr4 \
-    libatk1.0-0 \
-    libatk-bridge2.0-0 \
-    libcups2 \
-    libdrm2 \
-    libdbus-1-3 \
-    libxkbcommon0 \
-    libxcomposite1 \
-    libxdamage1 \
-    libxfixes3 \
-    libxrandr2 \
-    libgbm1 \
-    libasound2 \
-    fonts-freefont-ttf \
-    libu2f-udev \
-    libvulkan1 \
-    libxshmfence1 \
-    && rm -rf /var/lib/apt/lists/*
-
-# Stage 2: Runtime
 FROM python:3.11-slim
 
-# Set labels
 LABEL maintainer="MediaCrawler" \
       description="MediaCrawler Backend Service"
 
-# Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PATH="/opt/venv/bin:$PATH" \
-    DJANGO_SETTINGS_MODULE=mediacrawler_config.settings
+    DJANGO_SETTINGS_MODULE=mediacrawler_config.settings \
+    MEDIACRAWLER_QR_MODE=web \
+    PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 
-# Use Tsinghua mirror for apt
-RUN sed -i 's/deb.debian.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apt/sources.list.d/debian.sources && \
-    apt-get update && apt-get install -y --no-install-recommends \
-    libpq5 \
-    libffi8 \
-    curl \
-    gosu \
-    && rm -rf /var/lib/apt/lists/*
+RUN sed -i 's|deb.debian.org|mirrors.tuna.tsinghua.edu.cn|g; s|security.debian.org|mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list.d/debian.sources && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+        curl \
+        fonts-freefont-ttf \
+        gosu \
+        nodejs \
+        libasound2 \
+        libatk-bridge2.0-0 \
+        libatk1.0-0 \
+        libatspi2.0-0 \
+        libcairo2 \
+        libcups2 \
+        libdbus-1-3 \
+        libdrm2 \
+        libffi8 \
+        libgbm1 \
+        libnspr4 \
+        libnss3 \
+        libpango-1.0-0 \
+        libpq5 \
+        libu2f-udev \
+        libvulkan1 \
+        libxcomposite1 \
+        libxdamage1 \
+        libxfixes3 \
+        libxext6 \
+        libx11-6 \
+        libx11-xcb1 \
+        libxcb1 \
+        libxcursor1 \
+        libxi6 \
+        libxkbcommon0 \
+        libxrender1 \
+        libxrandr2 \
+        libxshmfence1 && \
+    rm -rf /var/lib/apt/lists/*
 
-# Copy virtual environment from builder
 COPY --from=builder /opt/venv /opt/venv
+COPY --from=builder /ms-playwright /ms-playwright
 
-# Create non-root user
 RUN useradd --create-home --shell /bin/bash appuser
 
-# Set work directory
 WORKDIR /app
 
-# Copy project files
 COPY --chown=appuser:appuser . .
 
-# Create necessary directories
-RUN mkdir -p /app/logs /app/staticfiles /app/media && \
-    chown -R appuser:appuser /app/logs /app/staticfiles /app/media
+RUN mkdir -p /app/logs /app/staticfiles /app/media /app/data /app/data/qr_bridge \
+    /app/crawler/browser_data /app/crawler/temp_image && \
+    chown -R appuser:appuser /app/logs /app/staticfiles /app/media /app/data /app/crawler/browser_data /app/crawler/temp_image
 
-# Collect static files
-RUN python manage.py collectstatic --noinput || true
-
-# Copy entrypoint script
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
-# Expose port
 EXPOSE 8000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=5 \
     CMD curl -f http://localhost:8000/api/health || exit 1
 
-# Set entrypoint to fix permissions before running
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 
-# Run the application with gunicorn
-CMD exec gunicorn mediacrawler_config.wsgi:application \
-    --bind 0.0.0.0:8000 \
-    --workers 4 \
-    --threads 2 \
-    --worker-class sync \
-    --worker-tmp-dir /dev/shm \
-    --timeout 120 \
-    --keep-alive 30 \
-    --max-requests 1000 \
-    --max-requests-jitter 50 \
-    --access-logfile - \
-    --error-logfile - \
-    --log-level info
+CMD ["gunicorn", "mediacrawler_config.wsgi:application", "--bind=0.0.0.0:8000", "--workers=3", "--threads=2", "--worker-class=sync", "--worker-tmp-dir=/dev/shm", "--timeout=120", "--keep-alive=30", "--max-requests=1000", "--max-requests-jitter=50", "--access-logfile=-", "--error-logfile=-", "--log-level=info"]

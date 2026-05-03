@@ -21,6 +21,7 @@
 import asyncio
 import os
 # import random  # Removed as we now use fixed config.CRAWLER_MAX_SLEEP_SEC intervals
+import sys
 import time
 from asyncio import Task
 from typing import Dict, List, Optional, Tuple
@@ -62,6 +63,15 @@ class KuaishouCrawler(AbstractCrawler):
 
     async def start(self):
         playwright_proxy_format, httpx_proxy_format = None, None
+        headless = config.HEADLESS
+        cdp_headless = config.CDP_HEADLESS
+        if config.LOGIN_TYPE == "qrcode":
+            if config.ENABLE_CDP_MODE and cdp_headless:
+                utils.logger.warning("[KuaishouCrawler] 快手二维码登录在 CDP headless 模式下不稳定，强制改为可见浏览器")
+                cdp_headless = False
+            elif not config.ENABLE_CDP_MODE and headless:
+                utils.logger.warning("[KuaishouCrawler] 快手二维码登录在 headless 模式下不稳定，强制改为可见浏览器")
+                headless = False
         if config.ENABLE_IP_PROXY:
             self.ip_proxy_pool = await create_ip_pool(
                 config.IP_PROXY_POOL_COUNT, enable_validate_ip=True
@@ -79,14 +89,14 @@ class KuaishouCrawler(AbstractCrawler):
                     playwright,
                     playwright_proxy_format,
                     self.user_agent,
-                    headless=config.CDP_HEADLESS,
+                    headless=cdp_headless,
                 )
             else:
                 utils.logger.info("[KuaishouCrawler] Launching browser using standard mode")
                 # Launch a browser context.
                 chromium = playwright.chromium
                 self.browser_context = await self.launch_browser(
-                    chromium, None, self.user_agent, headless=config.HEADLESS
+                    chromium, None, self.user_agent, headless=headless
                 )
                 # stealth.min.js is a js script to prevent the website from detecting the crawler.
                 await self.browser_context.add_init_script(path="libs/stealth.min.js")
@@ -109,6 +119,10 @@ class KuaishouCrawler(AbstractCrawler):
                 await self.ks_client.update_cookies(
                     browser_context=self.browser_context
                 )
+                if not await self.ks_client.pong():
+                    utils.logger.error("[KuaishouCrawler.start] Cookie login failed or expired before crawl started")
+                    if config.LOGIN_TYPE == "cookie":
+                        sys.exit(1)
 
             crawler_type_var.set(config.CRAWLER_TYPE)
             if config.CRAWLER_TYPE == "search":

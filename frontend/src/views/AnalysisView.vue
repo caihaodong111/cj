@@ -263,7 +263,7 @@ async function startAnalysis() {
 
   try {
     // 调用后端 API
-    const response = await fetch('http://localhost:8000/api/ai/analysis', {
+    const response = await fetch('/api/ai/analysis', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

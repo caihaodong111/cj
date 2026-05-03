@@ -117,8 +117,8 @@ class XhsDbStoreImplement(AbstractStore):
 
         # Sync to monitor_feed table
         try:
-            from api.monitor_feed_sync import async_sync_to_monitor_feed
-            await async_sync_to_monitor_feed("xhs", content_item)
+            from tools.monitor_feed_sync import sync_to_monitor_feed
+            await sync_to_monitor_feed("xhs", content_item)
         except Exception as e:
             # 记录错误但不要中断爬虫
             logger = utils.logger

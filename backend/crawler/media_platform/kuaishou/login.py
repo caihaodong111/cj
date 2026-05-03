@@ -21,7 +21,7 @@
 import asyncio
 import functools
 import sys
-from typing import Optional
+from typing import Optional, Sequence
 
 from playwright.async_api import BrowserContext, Page
 from tenacity import (RetryError, retry, retry_if_result, stop_after_attempt,
@@ -29,7 +29,21 @@ from tenacity import (RetryError, retry, retry_if_result, stop_after_attempt,
 
 import config
 from base.base_crawler import AbstractLogin
+from tools.qr_bridge import write_status
 from tools import utils
+
+LOGIN_TRIGGER_SELECTORS = (
+    "xpath=//p[text()='登录']",
+    "xpath=//button[contains(., '登录')]",
+    "xpath=//div[@role='button' and contains(., '登录')]",
+    "text=登录",
+)
+
+QRCODE_SELECTORS = (
+    "xpath=//div[contains(@class, 'qrcode-img')]//img",
+    "xpath=//img[contains(@alt, '二维码')]",
+    "xpath=//div[contains(@class, 'login')]//img[contains(@src, 'data:image')]",
+)
 
 
 class KuaishouLogin(AbstractLogin):
@@ -75,35 +89,41 @@ class KuaishouLogin(AbstractLogin):
     async def login_by_qrcode(self):
         """login kuaishou website and keep webdriver login state"""
         utils.logger.info("[KuaishouLogin.login_by_qrcode] Begin login kuaishou by qrcode ...")
+        await self._wait_for_page_stable()
 
-        # click login button
-        login_button_ele = self.context_page.locator(
-            "xpath=//p[text()='登录']"
-        )
-        await login_button_ele.click()
+        qrcode_img_selector = await self._wait_for_any_selector(QRCODE_SELECTORS, timeout_ms=5000)
+        if not qrcode_img_selector:
+            clicked_selector = await self._click_first_available(LOGIN_TRIGGER_SELECTORS)
+            if clicked_selector:
+                utils.logger.info(f"[KuaishouLogin.login_by_qrcode] triggered login entry via selector: {clicked_selector}")
+            await asyncio.sleep(1)
+            qrcode_img_selector = await self._wait_for_any_selector(QRCODE_SELECTORS, timeout_ms=10000)
 
-        # find login qrcode
-        qrcode_img_selector = "//div[@class='qrcode-img']//img"
-        base64_qrcode_img = await utils.find_login_qrcode(
-            self.context_page,
-            selector=qrcode_img_selector
-        )
+        base64_qrcode_img = None
+        if qrcode_img_selector:
+            base64_qrcode_img = await utils.find_login_qrcode(
+                self.context_page,
+                selector=qrcode_img_selector
+            )
         if not base64_qrcode_img:
             utils.logger.info("[KuaishouLogin.login_by_qrcode] login failed , have not found qrcode please check ....")
+            write_status("ks", "failed")
             sys.exit()
 
 
         # show login qrcode
-        partial_show_qrcode = functools.partial(utils.show_qrcode, base64_qrcode_img)
+        partial_show_qrcode = functools.partial(utils.show_qrcode, base64_qrcode_img, "ks")
         asyncio.get_running_loop().run_in_executor(executor=None, func=partial_show_qrcode)
 
         utils.logger.info(f"[KuaishouLogin.login_by_qrcode] waiting for scan code login, remaining time is 20s")
         try:
             await self.check_login_state()
         except RetryError:
+            write_status("ks", "failed")
             utils.logger.info("[KuaishouLogin.login_by_qrcode] Login kuaishou failed by qrcode login method ...")
             sys.exit()
 
+        write_status("ks", "success")
         wait_redirect_seconds = 5
         utils.logger.info(f"[KuaishouLogin.login_by_qrcode] Login successful then wait for {wait_redirect_seconds} seconds redirect ...")
         await asyncio.sleep(wait_redirect_seconds)
@@ -120,3 +140,42 @@ class KuaishouLogin(AbstractLogin):
                 'domain': ".kuaishou.com",
                 'path': "/"
             }])
+        try:
+            await self.context_page.goto("https://www.kuaishou.com/?isHome=1", wait_until="domcontentloaded")
+        except Exception as exc:
+            utils.logger.warning(f"[KuaishouLogin.login_by_cookies] Failed to refresh homepage after setting cookies: {exc}")
+        await self._wait_for_page_stable()
+
+    async def _wait_for_page_stable(self, timeout_ms: int = 5000) -> None:
+        try:
+            await self.context_page.wait_for_load_state("domcontentloaded", timeout=timeout_ms)
+        except Exception:
+            pass
+        try:
+            await self.context_page.wait_for_load_state("networkidle", timeout=timeout_ms)
+        except Exception:
+            pass
+
+    async def _wait_for_any_selector(self, selectors: Sequence[str], timeout_ms: int = 5000) -> Optional[str]:
+        deadline = asyncio.get_running_loop().time() + timeout_ms / 1000
+        while asyncio.get_running_loop().time() < deadline:
+            for selector in selectors:
+                try:
+                    await self.context_page.locator(selector).first.wait_for(state="visible", timeout=500)
+                    return selector
+                except Exception:
+                    continue
+        return None
+
+    async def _click_first_available(self, selectors: Sequence[str], timeout_ms: int = 3000) -> Optional[str]:
+        deadline = asyncio.get_running_loop().time() + timeout_ms / 1000
+        while asyncio.get_running_loop().time() < deadline:
+            for selector in selectors:
+                try:
+                    locator = self.context_page.locator(selector).first
+                    await locator.wait_for(state="visible", timeout=500)
+                    await locator.click(timeout=1000)
+                    return selector
+                except Exception:
+                    continue
+        return None

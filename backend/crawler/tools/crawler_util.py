@@ -25,6 +25,7 @@
 
 import base64
 import json
+import os
 import random
 import re
 import urllib
@@ -36,6 +37,7 @@ import httpx
 from PIL import Image, ImageDraw, ImageShow
 from playwright.async_api import Cookie, Page
 
+from .qr_bridge import write_qr, write_status
 from . import utils
 
 
@@ -84,8 +86,14 @@ async def find_qrcode_img_from_canvas(page: Page, canvas_selector: str) -> str:
     return base64_image
 
 
-def show_qrcode(qr_code) -> None:  # type: ignore
+def show_qrcode(qr_code, platform: Optional[str] = None) -> None:  # type: ignore
     """parse base64 encode qrcode image and show it"""
+    qr_mode = os.environ.get("MEDIACRAWLER_QR_MODE", "").strip().lower()
+    if qr_mode == "web" and platform:
+        write_qr(platform, qr_code)
+        write_status(platform, "pending")
+        return
+
     if "," in qr_code:
         qr_code = qr_code.split(",")[1]
     qr_code = base64.b64decode(qr_code)

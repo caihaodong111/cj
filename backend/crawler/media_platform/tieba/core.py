@@ -20,6 +20,7 @@
 
 import asyncio
 import os
+import sys
 from asyncio import Task
 from typing import Dict, List, Optional, Tuple
 
@@ -65,6 +66,15 @@ class TieBaCrawler(AbstractCrawler):
 
         """
         playwright_proxy_format, httpx_proxy_format = None, None
+        headless = config.HEADLESS
+        cdp_headless = config.CDP_HEADLESS
+        if config.LOGIN_TYPE == "qrcode":
+            if config.ENABLE_CDP_MODE and cdp_headless:
+                utils.logger.warning("[BaiduTieBaCrawler] 贴吧二维码登录在 CDP headless 模式下不稳定，强制改为可见浏览器")
+                cdp_headless = False
+            elif not config.ENABLE_CDP_MODE and headless:
+                utils.logger.warning("[BaiduTieBaCrawler] 贴吧二维码登录在 headless 模式下不稳定，强制改为可见浏览器")
+                headless = False
         if config.ENABLE_IP_PROXY:
             utils.logger.info(
                 "[BaiduTieBaCrawler.start] Begin create ip proxy pool ..."
@@ -86,7 +96,7 @@ class TieBaCrawler(AbstractCrawler):
                     playwright,
                     playwright_proxy_format,
                     self.user_agent,
-                    headless=config.CDP_HEADLESS,
+                    headless=cdp_headless,
                 )
             else:
                 utils.logger.info("[BaiduTieBaCrawler] Launching browser in standard mode")
@@ -96,7 +106,7 @@ class TieBaCrawler(AbstractCrawler):
                     chromium,
                     playwright_proxy_format,
                     self.user_agent,
-                    headless=config.HEADLESS,
+                    headless=headless,
                 )
 
             # Inject anti-detection scripts - for Baidu's special detection
@@ -124,6 +134,9 @@ class TieBaCrawler(AbstractCrawler):
                 )
                 await login_obj.begin()
                 await self.tieba_client.update_cookies(browser_context=self.browser_context)
+                if not await self.tieba_client.pong(browser_context=self.browser_context):
+                    utils.logger.error("[BaiduTieBaCrawler.start] Cookie/qrcode login failed or expired before crawl started")
+                    sys.exit(1)
 
             crawler_type_var.set(config.CRAWLER_TYPE)
             if config.CRAWLER_TYPE == "search":

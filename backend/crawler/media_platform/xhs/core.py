@@ -20,6 +20,7 @@
 import asyncio
 import os
 import random
+import sys
 from asyncio import Task
 from typing import Dict, List, Optional
 
@@ -63,6 +64,16 @@ class XiaoHongShuCrawler(AbstractCrawler):
 
     async def start(self) -> None:
         playwright_proxy_format, httpx_proxy_format = None, None
+        headless = config.HEADLESS
+        cdp_headless = config.CDP_HEADLESS
+        if config.LOGIN_TYPE == "qrcode":
+            if config.ENABLE_CDP_MODE and cdp_headless:
+                utils.logger.warning("[XiaoHongShuCrawler] 小红书二维码登录在 CDP headless 模式下不稳定，强制改为可见浏览器")
+                cdp_headless = False
+            elif not config.ENABLE_CDP_MODE and headless:
+                utils.logger.warning("[XiaoHongShuCrawler] 小红书二维码登录在 headless 模式下不稳定，强制改为可见浏览器")
+                headless = False
+
         if config.ENABLE_IP_PROXY:
             self.ip_proxy_pool = await create_ip_pool(config.IP_PROXY_POOL_COUNT, enable_validate_ip=True)
             ip_proxy_info: IpInfoModel = await self.ip_proxy_pool.get_proxy()
@@ -76,7 +87,7 @@ class XiaoHongShuCrawler(AbstractCrawler):
                     playwright,
                     playwright_proxy_format,
                     self.user_agent,
-                    headless=config.CDP_HEADLESS,
+                    headless=cdp_headless,
                 )
             else:
                 utils.logger.info("[XiaoHongShuCrawler] Launching browser using standard mode")
@@ -86,13 +97,13 @@ class XiaoHongShuCrawler(AbstractCrawler):
                     chromium,
                     playwright_proxy_format,
                     self.user_agent,
-                    headless=config.HEADLESS,
+                    headless=headless,
                 )
                 # stealth.min.js is a js script to prevent the website from detecting the crawler.
                 await self.browser_context.add_init_script(path="libs/stealth.min.js")
 
             self.context_page = await self.browser_context.new_page()
-            await self.context_page.goto(self.index_url)
+            await self.context_page.goto(self.index_url, wait_until="domcontentloaded")
 
             # Create a client to interact with the Xiaohongshu website.
             self.xhs_client = await self.create_xhs_client(httpx_proxy_format)
@@ -106,6 +117,10 @@ class XiaoHongShuCrawler(AbstractCrawler):
                 )
                 await login_obj.begin()
                 await self.xhs_client.update_cookies(browser_context=self.browser_context)
+                if not await self.xhs_client.pong():
+                    utils.logger.error("[XiaoHongShuCrawler.start] Cookie login failed or expired before crawl started")
+                    if config.LOGIN_TYPE == "cookie":
+                        sys.exit(1)
 
             crawler_type_var.set(config.CRAWLER_TYPE)
             if config.CRAWLER_TYPE == "search":
@@ -163,8 +178,11 @@ class XiaoHongShuCrawler(AbstractCrawler):
                             semaphore=semaphore,
                         ) for post_item in notes_res.get("items", {}) if post_item.get("model_type") not in ("rec_query", "hot_query")
                     ]
-                    note_details = await asyncio.gather(*task_list)
+                    note_details = await asyncio.gather(*task_list, return_exceptions=True)
                     for note_detail in note_details:
+                        if isinstance(note_detail, Exception):
+                            utils.logger.error(f"[XiaoHongShuCrawler.search] Skip failed note detail task: {note_detail}")
+                            continue
                         if note_detail:
                             await xhs_store.update_xhs_note(note_detail)
                             await self.get_notice_media(note_detail)
@@ -233,8 +251,11 @@ class XiaoHongShuCrawler(AbstractCrawler):
             ) for post_item in note_list
         ]
 
-        note_details = await asyncio.gather(*task_list)
+        note_details = await asyncio.gather(*task_list, return_exceptions=True)
         for note_detail in note_details:
+            if isinstance(note_detail, Exception):
+                utils.logger.error(f"[XiaoHongShuCrawler.fetch_creator_notes_detail] Skip failed note detail task: {note_detail}")
+                continue
             if note_detail:
                 await xhs_store.update_xhs_note(note_detail)
                 await self.get_notice_media(note_detail)
@@ -258,8 +279,11 @@ class XiaoHongShuCrawler(AbstractCrawler):
 
         need_get_comment_note_ids = []
         xsec_tokens = []
-        note_details = await asyncio.gather(*get_note_detail_task_list)
+        note_details = await asyncio.gather(*get_note_detail_task_list, return_exceptions=True)
         for note_detail in note_details:
+            if isinstance(note_detail, Exception):
+                utils.logger.error(f"[XiaoHongShuCrawler.get_specified_notes] Skip failed note detail task: {note_detail}")
+                continue
             if note_detail:
                 need_get_comment_note_ids.append(note_detail.get("note_id", ""))
                 xsec_tokens.append(note_detail.get("xsec_token", ""))
@@ -316,6 +340,9 @@ class XiaoHongShuCrawler(AbstractCrawler):
                 return None
             except KeyError as ex:
                 utils.logger.error(f"[XiaoHongShuCrawler.get_note_detail_async_task] have not fund note detail note_id:{note_id}, err: {ex}")
+                return None
+            except Exception as ex:
+                utils.logger.error(f"[XiaoHongShuCrawler.get_note_detail_async_task] Unexpected error for note {note_id}: {ex}")
                 return None
 
     async def batch_get_note_comments(self, note_list: List[str], xsec_tokens: List[str]):

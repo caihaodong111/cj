@@ -26,7 +26,7 @@
 import asyncio
 import functools
 import sys
-from typing import Optional
+from typing import Optional, Sequence
 
 from playwright.async_api import BrowserContext, Page
 from tenacity import (RetryError, retry, retry_if_result, stop_after_attempt,
@@ -34,7 +34,15 @@ from tenacity import (RetryError, retry, retry_if_result, stop_after_attempt,
 
 import config
 from base.base_crawler import AbstractLogin
+from tools.qr_bridge import write_status
 from tools import utils
+
+QRCODE_SELECTORS = (
+    "xpath=//img[@class='w-full h-full']",
+    "xpath=//img[contains(@src, 'qrcode')]",
+    "xpath=//div[contains(@class, 'qrcode')]//img",
+    "xpath=//canvas/preceding-sibling::img",
+)
 
 
 class WeiboLogin(AbstractLogin):
@@ -85,19 +93,23 @@ class WeiboLogin(AbstractLogin):
     async def login_by_qrcode(self):
         """login weibo website and keep webdriver login state"""
         utils.logger.info("[WeiboLogin.login_by_qrcode] Begin login weibo by qrcode ...")
-        await self.context_page.goto(self.weibo_sso_login_url)
+        await self.context_page.goto(self.weibo_sso_login_url, wait_until="domcontentloaded")
+        await self._wait_for_page_stable()
         # find login qrcode
-        qrcode_img_selector = "xpath=//img[@class='w-full h-full']"
-        base64_qrcode_img = await utils.find_login_qrcode(
-            self.context_page,
-            selector=qrcode_img_selector
-        )
+        qrcode_img_selector = await self._wait_for_any_selector(QRCODE_SELECTORS, timeout_ms=15000)
+        base64_qrcode_img = None
+        if qrcode_img_selector:
+            base64_qrcode_img = await utils.find_login_qrcode(
+                self.context_page,
+                selector=qrcode_img_selector
+            )
         if not base64_qrcode_img:
             utils.logger.info("[WeiboLogin.login_by_qrcode] login failed , have not found qrcode please check ....")
+            write_status("wb", "failed")
             sys.exit()
 
         # show login qrcode
-        partial_show_qrcode = functools.partial(utils.show_qrcode, base64_qrcode_img)
+        partial_show_qrcode = functools.partial(utils.show_qrcode, base64_qrcode_img, "wb")
         asyncio.get_running_loop().run_in_executor(executor=None, func=partial_show_qrcode)
 
         utils.logger.info(f"[WeiboLogin.login_by_qrcode] Waiting for scan code login, remaining time is 20s")
@@ -110,9 +122,11 @@ class WeiboLogin(AbstractLogin):
         try:
             await self.check_login_state(no_logged_in_session)
         except RetryError:
+            write_status("wb", "failed")
             utils.logger.info("[WeiboLogin.login_by_qrcode] Login weibo failed by qrcode login method ...")
             sys.exit()
 
+        write_status("wb", "success")
         wait_redirect_seconds = 5
         utils.logger.info(
             f"[WeiboLogin.login_by_qrcode] Login successful then wait for {wait_redirect_seconds} seconds redirect ...")
@@ -122,11 +136,38 @@ class WeiboLogin(AbstractLogin):
         pass
 
     async def login_by_cookies(self):
-        utils.logger.info("[WeiboLogin.login_by_qrcode] Begin login weibo by cookie ...")
+        utils.logger.info("[WeiboLogin.login_by_cookies] Begin login weibo by cookie ...")
         for key, value in utils.convert_str_cookie_to_dict(self.cookie_str).items():
-            await self.browser_context.add_cookies([{
-                'name': key,
-                'value': value,
-                'domain': ".weibo.cn",
-                'path': "/"
-            }])
+            for domain in (".weibo.cn", ".weibo.com"):
+                await self.browser_context.add_cookies([{
+                    'name': key,
+                    'value': value,
+                    'domain': domain,
+                    'path': "/"
+                }])
+        try:
+            await self.context_page.goto("https://m.weibo.cn", wait_until="domcontentloaded")
+        except Exception as exc:
+            utils.logger.warning(f"[WeiboLogin.login_by_cookies] Failed to refresh mobile homepage after setting cookies: {exc}")
+        await self._wait_for_page_stable()
+
+    async def _wait_for_page_stable(self, timeout_ms: int = 5000) -> None:
+        try:
+            await self.context_page.wait_for_load_state("domcontentloaded", timeout=timeout_ms)
+        except Exception:
+            pass
+        try:
+            await self.context_page.wait_for_load_state("networkidle", timeout=timeout_ms)
+        except Exception:
+            pass
+
+    async def _wait_for_any_selector(self, selectors: Sequence[str], timeout_ms: int = 5000) -> Optional[str]:
+        deadline = asyncio.get_running_loop().time() + timeout_ms / 1000
+        while asyncio.get_running_loop().time() < deadline:
+            for selector in selectors:
+                try:
+                    await self.context_page.locator(selector).first.wait_for(state="visible", timeout=500)
+                    return selector
+                except Exception:
+                    continue
+        return None

@@ -34,6 +34,7 @@ from tenacity import (RetryError, retry, retry_if_result, stop_after_attempt,
 
 import config
 from base.base_crawler import AbstractLogin
+from tools.qr_bridge import write_status
 from tools import utils
 
 
@@ -95,19 +96,22 @@ class BilibiliLogin(AbstractLogin):
         )
         if not base64_qrcode_img:
             utils.logger.info("[BilibiliLogin.login_by_qrcode] login failed , have not found qrcode please check ....")
+            write_status("bili", "failed")
             sys.exit()
 
         # show login qrcode
-        partial_show_qrcode = functools.partial(utils.show_qrcode, base64_qrcode_img)
+        partial_show_qrcode = functools.partial(utils.show_qrcode, base64_qrcode_img, "bili")
         asyncio.get_running_loop().run_in_executor(executor=None, func=partial_show_qrcode)
 
         utils.logger.info(f"[BilibiliLogin.login_by_qrcode] Waiting for scan code login, remaining time is 20s")
         try:
             await self.check_login_state()
         except RetryError:
+            write_status("bili", "failed")
             utils.logger.info("[BilibiliLogin.login_by_qrcode] Login bilibili failed by qrcode login method ...")
             sys.exit()
 
+        write_status("bili", "success")
         wait_redirect_seconds = 5
         utils.logger.info(
             f"[BilibiliLogin.login_by_qrcode] Login successful then wait for {wait_redirect_seconds} seconds redirect ...")

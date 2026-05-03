@@ -11,6 +11,7 @@ Django API views for MediaCrawler Backend
 import os
 import json
 import logging
+import re
 import subprocess
 import sys
 import time
@@ -61,10 +62,13 @@ from media_platform.models import (
     MonitorFeed,
 )
 from .models import CookieConfig, AIUsageRecord
+from crawler.tools.qr_bridge import clear_platform, read_qr, read_status, write_status
 
-# Data directory
-DATA_DIR = Path(__file__).parent.parent.parent / "data"
-PROJECT_ROOT = settings.BASE_DIR.parent
+# Data / crawler working directories.
+# Paths are anchored to BASE_DIR (= /app in container, = MediaCrawler-main/backend in dev).
+# Crawler subprocess runs with cwd=CRAWLER_ROOT so its os.getcwd()-based paths
+# (browser_data/, temp_image/, ...) resolve under /app/crawler/ which appuser can write.
+DATA_DIR = settings.BASE_DIR / "data"
 CRAWLER_ROOT = settings.BASE_DIR / "crawler"
 
 CRAWLER_LOCK = threading.Lock()
@@ -77,6 +81,31 @@ CRAWLER_STATE = {
     "login_type": "qrcode",
     "crawler_type": "search",
 }
+
+_LOG_LEVEL_PATTERN = re.compile(r"\b(DEBUG|INFO|WARNING|WARN|ERROR|CRITICAL|FATAL)\b")
+
+
+def _resolve_log_level(message: str, fallback: str = "INFO") -> str:
+    """Infer the real log level from the message body when subprocess streams are mixed."""
+    match = _LOG_LEVEL_PATTERN.search(message or "")
+    if not match:
+        return fallback
+    detected = match.group(1)
+    if detected == "WARN":
+        return "WARNING"
+    if detected == "FATAL":
+        return "CRITICAL"
+    return detected
+
+
+def _to_python_log_level(level: str) -> int:
+    return {
+        "DEBUG": logging.DEBUG,
+        "INFO": logging.INFO,
+        "WARNING": logging.WARNING,
+        "ERROR": logging.ERROR,
+        "CRITICAL": logging.CRITICAL,
+    }.get(level, logging.INFO)
 
 PLATFORM_PATH_ALIASES = {
     "xhs": ["xhs"],
@@ -160,10 +189,31 @@ PLATFORM_URL_FIELDS = {
     "zhihu": "content_url",
 }
 
+SUPPORTED_QR_PLATFORMS = {"xhs", "dy", "ks", "bili", "wb", "tieba", "zhihu"}
+
 
 def _build_run_cmd(args):
     """Build command to run main.py via the current Python executable."""
     return [sys.executable, str(CRAWLER_ROOT / "main.py"), *args]
+
+
+def _normalize_qr_platform(platform: str) -> str:
+    return str(platform or "").strip().lower()
+
+
+def _validate_qr_platform(platform: str) -> Optional[str]:
+    normalized = _normalize_qr_platform(platform)
+    if normalized not in SUPPORTED_QR_PLATFORMS:
+        return None
+    return normalized
+
+
+def _format_qr_code_data(raw_qr_code: Optional[str]) -> Optional[str]:
+    if not raw_qr_code:
+        return None
+    if raw_qr_code.startswith("data:image"):
+        return raw_qr_code
+    return f"data:image/png;base64,{raw_qr_code}"
 
 
 def _append_log(level: str, message: str):
@@ -175,8 +225,7 @@ def _append_log(level: str, message: str):
             "timestamp": time.time(),
         })
     # 同时输出到 Django 终端
-    log_level = logging.INFO if level == "INFO" else logging.ERROR
-    crawler_logger.log(log_level, message)
+    crawler_logger.log(_to_python_log_level(level), message)
 
 
 def _get_process():
@@ -230,10 +279,8 @@ def _stream_pipe(pipe, level: str):
             if not line:
                 break
             message = line.rstrip()
-            _append_log(level, message)
-            # 同时输出到 Django 终端
-            log_level = logging.INFO if level == "INFO" else logging.ERROR
-            crawler_logger.log(log_level, message)
+            effective_level = _resolve_log_level(message, fallback=level)
+            _append_log(effective_level, message)
     finally:
         try:
             pipe.close()
@@ -840,7 +887,7 @@ def check_environment(request):
             _build_run_cmd(["--help"]),
             capture_output=True,
             text=True,
-            cwd=PROJECT_ROOT,
+            cwd=CRAWLER_ROOT,
             timeout=30
         )
 
@@ -1015,8 +1062,17 @@ class CrawlerView(APIView):
                                 break
                             _update_state(item, login_type, crawler_type)
                             cmd = _build_run_cmd(_build_cmd_args(item))
-                            process = _start_process(cmd, item, crawler_type)
-                            _finalize_process(process)
+                            process = _start_process(
+                                cmd,
+                                item,
+                                crawler_type,
+                                login_type=login_type,
+                            )
+                            _finalize_process(
+                                process,
+                                platform=item,
+                                login_type=login_type,
+                            )
                     finally:
                         _set_process(None)
                         _set_batch_running(False)
@@ -1030,11 +1086,16 @@ class CrawlerView(APIView):
             platform = platform_list[0]
             _update_state(platform, login_type, crawler_type)
             cmd = _build_run_cmd(_build_cmd_args(platform))
-            process = _start_process(cmd, platform, crawler_type)
+            process = _start_process(
+                cmd,
+                platform,
+                crawler_type,
+                login_type=login_type,
+            )
 
             threading.Thread(
                 target=_finalize_process,
-                args=(process,),
+                args=(process, platform, login_type),
                 daemon=True,
             ).start()
 
@@ -1103,6 +1164,43 @@ class CrawlerView(APIView):
         logs = _get_logs()
         logs = logs[-limit:] if limit > 0 else logs
         return Response({"logs": logs})
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def get_login_qr(request, platform: str):
+    normalized = _validate_qr_platform(platform)
+    if not normalized:
+        return Response(
+            {"error": "Invalid platform"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    payload = read_qr(normalized) or {}
+    qr_code = payload.get("qr_code")
+    return Response({
+        "platform": normalized,
+        "qr_code": _format_qr_code_data(qr_code),
+        "updated_at": payload.get("updated_at"),
+    })
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def get_login_qr_status(request, platform: str):
+    normalized = _validate_qr_platform(platform)
+    if not normalized:
+        return Response(
+            {"error": "Invalid platform"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    payload = read_status(normalized) or {}
+    return Response({
+        "platform": normalized,
+        "status": payload.get("status", "idle"),
+        "updated_at": payload.get("updated_at"),
+    })
 
 
 # ============== Data Management ==============
@@ -1555,13 +1653,23 @@ def _extract_content_id(row: dict, platform: str) -> str:
     return None
 
 
-def _start_process(cmd, platform: str, crawler_type: str):
+def _start_process(cmd, platform: str, crawler_type: str, login_type: str = "cookie"):
+    env = os.environ.copy()
+    normalized_platform = _normalize_qr_platform(platform)
+    if login_type == "qrcode" and normalized_platform:
+        clear_platform(normalized_platform)
+        write_status(normalized_platform, "pending")
+        env["MEDIACRAWLER_QR_MODE"] = env.get("MEDIACRAWLER_QR_MODE", "web") or "web"
+
     process = subprocess.Popen(
         cmd,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        cwd=PROJECT_ROOT,
+        cwd=CRAWLER_ROOT,
+        env=env,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         bufsize=1
     )
     _set_process(process)
@@ -1581,10 +1689,16 @@ def _start_process(cmd, platform: str, crawler_type: str):
     return process
 
 
-def _finalize_process(process):
+def _finalize_process(process, platform: Optional[str] = None, login_type: str = "cookie"):
     exit_code = process.wait()
     level = "INFO" if exit_code == 0 else "ERROR"
     _append_log(level, f"Crawler exited with code {exit_code}")
+    normalized_platform = _normalize_qr_platform(platform or "")
+    if login_type == "qrcode" and normalized_platform:
+        status_payload = read_status(normalized_platform) or {}
+        current_status = status_payload.get("status")
+        if exit_code != 0 and current_status != "success":
+            write_status(normalized_platform, "failed")
     _set_process(None)
     return exit_code
 
@@ -2212,7 +2326,7 @@ def ai_keyword_analysis(request):
         prompt = f'请列出10-15个关于"{keyword}"在{platform_display}的关键词，每行一个。'
 
         payload = {
-            "model": "glm-4.7-flash",
+            "model": "glm-4.7",
             "messages": [
                 {
                     "role": "user",
@@ -2580,7 +2694,7 @@ def ai_analysis(request):
         )
 
         payload = {
-            "model": "glm-4.7-flash",
+            "model": "glm-4.7",
             "messages": [{"role": "user", "content": prompt}]
         }
 

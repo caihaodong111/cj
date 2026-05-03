@@ -130,7 +130,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 
-const API_BASE = 'http://localhost:8000/api'
+const API_BASE = '/api'
 
 const cookies = ref([])
 const loading = ref(false)

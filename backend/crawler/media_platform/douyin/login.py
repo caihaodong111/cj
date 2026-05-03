@@ -21,7 +21,7 @@
 import asyncio
 import functools
 import sys
-from typing import Optional
+from typing import Optional, Sequence
 
 from playwright.async_api import BrowserContext, Page
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
@@ -31,7 +31,37 @@ from tenacity import (RetryError, retry, retry_if_result, stop_after_attempt,
 import config
 from base.base_crawler import AbstractLogin
 from cache.cache_factory import CacheFactory
+from tools.qr_bridge import write_status
 from tools import utils
+from .help import safe_page_evaluate, wait_for_page_stable
+
+
+LOGIN_DIALOG_SELECTORS = (
+    "xpath=//div[@id='login-panel-new']",
+    "xpath=//div[contains(@class, 'login-panel')]",
+    "xpath=//div[contains(@class, 'web-login')]",
+    "xpath=//li[text() = '验证码登录']",
+)
+
+LOGIN_TRIGGER_SELECTORS = (
+    "xpath=//p[text() = '登录']",
+    "xpath=//button[text() = '登录']",
+    "xpath=//div[@role='button' and normalize-space()='登录']",
+    "text=登录",
+)
+
+QRCODE_SELECTORS = (
+    "xpath=//div[@id='animate_qrcode_container']//img",
+    "xpath=//div[contains(@class, 'qrcode')]//img",
+    "xpath=//img[contains(@alt, '二维码')]",
+    "xpath=//img[contains(@src, 'data:image')]",
+)
+
+MOBILE_LOGIN_SELECTORS = (
+    "xpath=//li[text() = '验证码登录']",
+    "xpath=//div[text() = '验证码登录']",
+    "text=验证码登录",
+)
 
 
 class DouYinLogin(AbstractLogin):
@@ -80,9 +110,13 @@ class DouYinLogin(AbstractLogin):
         try:
             await self.check_login_state()
         except RetryError:
+            if config.LOGIN_TYPE == "qrcode":
+                write_status("dy", "failed")
             utils.logger.info("[DouYinLogin.begin] login failed please confirm ...")
             sys.exit()
 
+        if config.LOGIN_TYPE == "qrcode":
+            write_status("dy", "success")
         # wait for redirect
         wait_redirect_seconds = 5
         utils.logger.info(f"[DouYinLogin.begin] Login successful then wait for {wait_redirect_seconds} seconds redirect ...")
@@ -96,7 +130,7 @@ class DouYinLogin(AbstractLogin):
 
         for page in self.browser_context.pages:
             try:
-                local_storage = await page.evaluate("() => window.localStorage")
+                local_storage = await safe_page_evaluate(page, "() => window.localStorage")
                 if local_storage.get("HasUserLogin", "") == "1":
                     return True
             except Exception as e:
@@ -110,36 +144,69 @@ class DouYinLogin(AbstractLogin):
 
     async def popup_login_dialog(self):
         """If the login dialog box does not pop up automatically, we will manually click the login button"""
-        dialog_selector = "xpath=//div[@id='login-panel-new']"
-        try:
-            # check dialog box is auto popup and wait for 10 seconds
-            await self.context_page.wait_for_selector(dialog_selector, timeout=1000 * 10)
-        except Exception as e:
-            utils.logger.error(f"[DouYinLogin.popup_login_dialog] login dialog box does not pop up automatically, error: {e}")
-            utils.logger.info("[DouYinLogin.popup_login_dialog] login dialog box does not pop up automatically, we will manually click the login button")
-            login_button_ele = self.context_page.locator("xpath=//p[text() = '登录']")
-            await login_button_ele.click()
-            await asyncio.sleep(0.5)
+        await wait_for_page_stable(self.context_page)
+
+        existing_selector = await self._wait_for_any_selector(
+            LOGIN_DIALOG_SELECTORS + QRCODE_SELECTORS,
+            timeout_ms=3000,
+        )
+        if existing_selector:
+            utils.logger.info(
+                f"[DouYinLogin.popup_login_dialog] login UI already visible via selector: {existing_selector}"
+            )
+            return
+
+        utils.logger.info(
+            "[DouYinLogin.popup_login_dialog] login UI not auto-visible, trying known login triggers"
+        )
+        clicked_selector = await self._click_first_available(LOGIN_TRIGGER_SELECTORS)
+        if not clicked_selector:
+            clicked_selector = await self._click_login_via_dom_text()
+
+        if clicked_selector:
+            utils.logger.info(
+                f"[DouYinLogin.popup_login_dialog] triggered login entry via selector: {clicked_selector}"
+            )
+            await asyncio.sleep(1)
+            opened_selector = await self._wait_for_any_selector(
+                LOGIN_DIALOG_SELECTORS + QRCODE_SELECTORS,
+                timeout_ms=10000,
+            )
+            if opened_selector:
+                utils.logger.info(
+                    f"[DouYinLogin.popup_login_dialog] login dialog became visible via selector: {opened_selector}"
+                )
+                return
+
+        await self._log_page_diagnostics(
+            "[DouYinLogin.popup_login_dialog] failed to open login dialog"
+        )
+        raise RuntimeError("Douyin login dialog was not found and login trigger could not be opened")
 
     async def login_by_qrcode(self):
         utils.logger.info("[DouYinLogin.login_by_qrcode] Begin login douyin by qrcode...")
-        qrcode_img_selector = "xpath=//div[@id='animate_qrcode_container']//img"
-        base64_qrcode_img = await utils.find_login_qrcode(
-            self.context_page,
-            selector=qrcode_img_selector
-        )
+        qrcode_img_selector = await self._wait_for_any_selector(QRCODE_SELECTORS, timeout_ms=15000)
+        base64_qrcode_img = None
+        if qrcode_img_selector:
+            base64_qrcode_img = await utils.find_login_qrcode(
+                self.context_page,
+                selector=qrcode_img_selector
+            )
         if not base64_qrcode_img:
             utils.logger.info("[DouYinLogin.login_by_qrcode] login qrcode not found please confirm ...")
+            await self._log_page_diagnostics("[DouYinLogin.login_by_qrcode] qrcode not found")
+            write_status("dy", "failed")
             sys.exit()
 
-        partial_show_qrcode = functools.partial(utils.show_qrcode, base64_qrcode_img)
+        partial_show_qrcode = functools.partial(utils.show_qrcode, base64_qrcode_img, "dy")
         asyncio.get_running_loop().run_in_executor(executor=None, func=partial_show_qrcode)
         await asyncio.sleep(2)
 
     async def login_by_mobile(self):
         utils.logger.info("[DouYinLogin.login_by_mobile] Begin login douyin by mobile ...")
-        mobile_tap_ele = self.context_page.locator("xpath=//li[text() = '验证码登录']")
-        await mobile_tap_ele.click()
+        clicked_selector = await self._click_first_available(MOBILE_LOGIN_SELECTORS)
+        if not clicked_selector:
+            raise RuntimeError("Could not locate Douyin mobile login tab")
         await self.context_page.wait_for_selector("xpath=//article[@class='web-login-mobile-code']")
         mobile_input_ele = self.context_page.locator("xpath=//input[@placeholder='手机号']")
         await mobile_input_ele.fill(self.login_phone)
@@ -272,3 +339,71 @@ class DouYinLogin(AbstractLogin):
                 'domain': ".douyin.com",
                 'path': "/"
             }])
+
+    async def _wait_for_any_selector(self, selectors: Sequence[str], timeout_ms: int = 5000) -> Optional[str]:
+        deadline = asyncio.get_running_loop().time() + timeout_ms / 1000
+        while asyncio.get_running_loop().time() < deadline:
+            for selector in selectors:
+                try:
+                    await self.context_page.locator(selector).first.wait_for(state="visible", timeout=500)
+                    return selector
+                except Exception:
+                    continue
+        return None
+
+    async def _click_first_available(self, selectors: Sequence[str], timeout_ms: int = 3000) -> Optional[str]:
+        deadline = asyncio.get_running_loop().time() + timeout_ms / 1000
+        while asyncio.get_running_loop().time() < deadline:
+            for selector in selectors:
+                try:
+                    locator = self.context_page.locator(selector).first
+                    await locator.wait_for(state="visible", timeout=500)
+                    await locator.click(timeout=1000)
+                    return selector
+                except Exception:
+                    continue
+        return None
+
+    async def _click_login_via_dom_text(self) -> Optional[str]:
+        click_result = await safe_page_evaluate(
+            self.context_page,
+            """() => {
+                const candidates = Array.from(document.querySelectorAll("button, a, div, span, p"));
+                const normalize = (value) => (value || "").replace(/\\s+/g, " ").trim();
+                for (const node of candidates) {
+                    const text = normalize(node.textContent);
+                    if (!["登录", "立即登录", "去登录"].includes(text)) continue;
+                    const style = window.getComputedStyle(node);
+                    const rect = node.getBoundingClientRect();
+                    if (style.visibility === "hidden" || style.display === "none") continue;
+                    if (rect.width === 0 || rect.height === 0) continue;
+                    node.click();
+                    return text;
+                }
+                return "";
+            }""",
+        )
+        return f"dom-text:{click_result}" if click_result else None
+
+    async def _log_page_diagnostics(self, prefix: str) -> None:
+        try:
+            current_url = self.context_page.url
+        except Exception:
+            current_url = "<unknown>"
+
+        try:
+            current_title = await self.context_page.title()
+        except Exception:
+            current_title = "<unknown>"
+
+        try:
+            body_text = await safe_page_evaluate(
+                self.context_page,
+                "() => document.body ? document.body.innerText.slice(0, 500) : ''",
+            )
+        except Exception:
+            body_text = ""
+
+        utils.logger.error(
+            f"{prefix}. url={current_url}, title={current_title}, body_preview={body_text!r}"
+        )

@@ -71,7 +71,7 @@ class DouYinClient(AbstractApiClient, ProxyRefreshMixin):
         if not params:
             return
         headers = headers or self.headers
-        local_storage: Dict = await self.playwright_page.evaluate("() => window.localStorage")  # type: ignore
+        local_storage: Dict = await safe_page_evaluate(self.playwright_page, "() => window.localStorage")  # type: ignore
         common_params = {
             "device_platform": "webapp",
             "aid": "6383",
@@ -140,7 +140,7 @@ class DouYinClient(AbstractApiClient, ProxyRefreshMixin):
         return await self.request(method="POST", url=f"{self._host}{uri}", data=data, headers=headers)
 
     async def pong(self, browser_context: BrowserContext) -> bool:
-        local_storage = await self.playwright_page.evaluate("() => window.localStorage")
+        local_storage = await safe_page_evaluate(self.playwright_page, "() => window.localStorage")
         if local_storage.get("HasUserLogin", "") == "1":
             return True
 

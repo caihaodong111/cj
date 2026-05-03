@@ -24,19 +24,67 @@
 # @Time    : 2024/6/10 02:24
 # @Desc    : Get a_bogus parameter, for learning and communication only, do not use for commercial purposes, contact author to delete if infringement
 
+import asyncio
 import random
 import re
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import execjs
-from playwright.async_api import Page
+from playwright.async_api import Error as PlaywrightError, Page
 
 from model.m_douyin import VideoUrlInfo, CreatorUrlInfo
 from tools.crawler_util import extract_url_params_to_dict
 
 JS_PATH = Path(__file__).resolve().parents[2] / "libs" / "douyin.js"
 douyin_sign_obj = execjs.compile(JS_PATH.read_text(encoding="utf-8-sig"))
+
+_NAVIGATION_ERROR_FRAGMENTS = (
+    "Execution context was destroyed",
+    "Cannot find context with specified id",
+)
+
+
+def _is_navigation_error(exc: Exception) -> bool:
+    return any(fragment in str(exc) for fragment in _NAVIGATION_ERROR_FRAGMENTS)
+
+
+async def wait_for_page_stable(page: Page, timeout_ms: int = 5000) -> None:
+    try:
+        await page.wait_for_load_state("domcontentloaded", timeout=timeout_ms)
+    except Exception:
+        pass
+
+    try:
+        await page.wait_for_load_state("networkidle", timeout=timeout_ms)
+    except Exception:
+        pass
+
+
+async def safe_page_evaluate(
+    page: Page,
+    expression: str,
+    arg: Optional[Any] = None,
+    retries: int = 3,
+    retry_delay: float = 0.5,
+):
+    last_error: Optional[Exception] = None
+
+    for attempt in range(retries):
+        try:
+            await wait_for_page_stable(page)
+            if arg is None:
+                return await page.evaluate(expression)
+            return await page.evaluate(expression, arg)
+        except PlaywrightError as exc:
+            last_error = exc
+            if not _is_navigation_error(exc) or attempt == retries - 1:
+                raise
+            await asyncio.sleep(retry_delay)
+
+    if last_error is not None:
+        raise last_error
+    raise RuntimeError("safe_page_evaluate failed without a captured error")
 
 def get_web_id():
     """

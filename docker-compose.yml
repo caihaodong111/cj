@@ -1,29 +1,63 @@
-# 修复版 docker-compose.yml
-# 适用于服务器上直接包含Dockerfile文件的情况
-# 移除了过时的version属性
-# 使用正确的Dockerfile路径
-
 services:
   backend:
-    image: mediacrawler-backend:v0.1
+    image: backend:0.1
     container_name: mediacrawler-backend
-    ports:
-      - "8000:8000"
+    env_file:
+      - ./.env
+    environment:
+      DJANGO_DEBUG: "False"
+      RUN_DB_MIGRATIONS: "1"
+      RUN_COLLECTSTATIC: "1"
+      MEDIACRAWLER_QR_MODE: "web"
+    init: true
+    ipc: host
+    shm_size: "1gb"
     restart: unless-stopped
+    expose:
+      - "8000"
+    volumes:
+      - backend_static:/app/staticfiles
+      - backend_media:/app/media
+      - backend_logs:/app/logs
+      - backend_data:/app/data
+      - backend_browser_data:/app/crawler/browser_data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
     networks:
       - mediacrawler-network
 
   frontend:
-    image: mediacrawler-frontend:v0.1
+    image: frontend:0.1
     container_name: mediacrawler-frontend
     ports:
-      - "80:80"
+      - "8080:80"
     restart: unless-stopped
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+    volumes:
+      - backend_static:/var/www/backend/static:ro
+      - backend_media:/var/www/backend/media:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
     networks:
       - mediacrawler-network
 
 networks:
   mediacrawler-network:
     driver: bridge
+
+volumes:
+  backend_static:
+  backend_media:
+  backend_logs:
+  backend_data:
+  backend_browser_data:

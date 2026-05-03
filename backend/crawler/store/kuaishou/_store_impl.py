@@ -115,8 +115,8 @@ class KuaishouDbStoreImplement(AbstractStore):
 
         # Sync to monitor_feed table
         try:
-            from api.monitor_feed_sync import async_sync_to_monitor_feed
-            await async_sync_to_monitor_feed("ks", content_item)
+            from tools.monitor_feed_sync import sync_to_monitor_feed
+            await sync_to_monitor_feed("ks", content_item)
         except Exception as e:
             logger = utils.logger
             logger.warning(f"[KuaishouDbStore] Failed to sync to monitor_feed: {e}")

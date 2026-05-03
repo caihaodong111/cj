@@ -21,7 +21,7 @@
 import asyncio
 import functools
 import sys
-from typing import Optional
+from typing import Optional, Sequence
 
 from playwright.async_api import BrowserContext, Page
 from tenacity import (RetryError, retry, retry_if_result, stop_after_attempt,
@@ -30,7 +30,29 @@ from tenacity import (RetryError, retry, retry_if_result, stop_after_attempt,
 import config
 from base.base_crawler import AbstractLogin
 from cache.cache_factory import CacheFactory
+from tools.qr_bridge import write_status
 from tools import utils
+
+LOGIN_TRIGGER_SELECTORS = (
+    "xpath=//*[@id='app']//button[contains(., '登录')]",
+    "xpath=//button[contains(., '登录')]",
+    "xpath=//div[@role='button' and contains(., '登录')]",
+    "text=登录",
+)
+
+LOGIN_DIALOG_SELECTORS = (
+    "div.login-container",
+    "xpath=//div[contains(@class, 'login-container')]",
+    "xpath=//img[contains(@class, 'qrcode-img')]",
+    "xpath=//img[contains(@alt, '二维码')]",
+)
+
+QRCODE_SELECTORS = (
+    "xpath=//img[@class='qrcode-img']",
+    "xpath=//div[contains(@class, 'login-container')]//img[contains(@class, 'qrcode')]",
+    "xpath=//div[contains(@class, 'qrcode')]//img",
+    "xpath=//img[contains(@alt, '二维码')]",
+)
 
 
 class XiaoHongShuLogin(AbstractLogin):
@@ -167,24 +189,28 @@ class XiaoHongShuLogin(AbstractLogin):
     async def login_by_qrcode(self):
         """login xiaohongshu website and keep webdriver login state"""
         utils.logger.info("[XiaoHongShuLogin.login_by_qrcode] Begin login xiaohongshu by qrcode ...")
-        # login_selector = "div.login-container > div.left > div.qrcode > img"
-        qrcode_img_selector = "xpath=//img[@class='qrcode-img']"
-        # find login qrcode
-        base64_qrcode_img = await utils.find_login_qrcode(
-            self.context_page,
-            selector=qrcode_img_selector
-        )
-        if not base64_qrcode_img:
-            utils.logger.info("[XiaoHongShuLogin.login_by_qrcode] login failed , have not found qrcode please check ....")
-            # if this website does not automatically popup login dialog box, we will manual click login button
-            await asyncio.sleep(0.5)
-            login_button_ele = self.context_page.locator("xpath=//*[@id='app']/div[1]/div[2]/div[1]/ul/div[1]/button")
-            await login_button_ele.click()
+        await self._wait_for_page_stable()
+
+        qrcode_img_selector = await self._wait_for_any_selector(QRCODE_SELECTORS, timeout_ms=5000)
+        base64_qrcode_img = None
+        if qrcode_img_selector:
             base64_qrcode_img = await utils.find_login_qrcode(
                 self.context_page,
                 selector=qrcode_img_selector
             )
+        if not base64_qrcode_img:
+            utils.logger.info("[XiaoHongShuLogin.login_by_qrcode] login failed , have not found qrcode please check ....")
+            clicked_selector = await self._open_login_dialog()
+            if clicked_selector:
+                qrcode_img_selector = await self._wait_for_any_selector(QRCODE_SELECTORS, timeout_ms=15000)
+                if qrcode_img_selector:
+                    base64_qrcode_img = await utils.find_login_qrcode(
+                        self.context_page,
+                        selector=qrcode_img_selector
+                    )
             if not base64_qrcode_img:
+                await self._log_page_diagnostics("[XiaoHongShuLogin.login_by_qrcode] qrcode not found")
+                write_status("xhs", "failed")
                 sys.exit()
 
         # get not logged session
@@ -196,16 +222,18 @@ class XiaoHongShuLogin(AbstractLogin):
         # fix issue #12
         # we need to use partial function to call show_qrcode function and run in executor
         # then current asyncio event loop will not be blocked
-        partial_show_qrcode = functools.partial(utils.show_qrcode, base64_qrcode_img)
+        partial_show_qrcode = functools.partial(utils.show_qrcode, base64_qrcode_img, "xhs")
         asyncio.get_running_loop().run_in_executor(executor=None, func=partial_show_qrcode)
 
         utils.logger.info(f"[XiaoHongShuLogin.login_by_qrcode] waiting for scan code login, remaining time is 120s")
         try:
             await self.check_login_state(no_logged_in_session)
         except RetryError:
+            write_status("xhs", "failed")
             utils.logger.info("[XiaoHongShuLogin.login_by_qrcode] Login xiaohongshu failed by qrcode login method ...")
             sys.exit()
 
+        write_status("xhs", "success")
         wait_redirect_seconds = 5
         utils.logger.info(f"[XiaoHongShuLogin.login_by_qrcode] Login successful then wait for {wait_redirect_seconds} seconds redirect ...")
         await asyncio.sleep(wait_redirect_seconds)
@@ -214,11 +242,116 @@ class XiaoHongShuLogin(AbstractLogin):
         """login xiaohongshu website by cookies"""
         utils.logger.info("[XiaoHongShuLogin.login_by_cookies] Begin login xiaohongshu by cookie ...")
         for key, value in utils.convert_str_cookie_to_dict(self.cookie_str).items():
-            if key != "web_session":  # Only set web_session cookie attribute
-                continue
             await self.browser_context.add_cookies([{
                 'name': key,
                 'value': value,
                 'domain': ".xiaohongshu.com",
                 'path': "/"
             }])
+        try:
+            await self.context_page.goto("https://www.xiaohongshu.com", wait_until="domcontentloaded")
+        except Exception as exc:
+            utils.logger.warning(f"[XiaoHongShuLogin.login_by_cookies] Failed to refresh homepage after setting cookies: {exc}")
+        await self._wait_for_page_stable()
+
+    async def _wait_for_page_stable(self, timeout_ms: int = 5000) -> None:
+        try:
+            await self.context_page.wait_for_load_state("domcontentloaded", timeout=timeout_ms)
+        except Exception:
+            pass
+        try:
+            await self.context_page.wait_for_load_state("networkidle", timeout=timeout_ms)
+        except Exception:
+            pass
+
+    async def _wait_for_any_selector(self, selectors: Sequence[str], timeout_ms: int = 5000) -> Optional[str]:
+        deadline = asyncio.get_running_loop().time() + timeout_ms / 1000
+        while asyncio.get_running_loop().time() < deadline:
+            for selector in selectors:
+                try:
+                    await self.context_page.locator(selector).first.wait_for(state="visible", timeout=500)
+                    return selector
+                except Exception:
+                    continue
+        return None
+
+    async def _click_first_available(self, selectors: Sequence[str], timeout_ms: int = 3000) -> Optional[str]:
+        deadline = asyncio.get_running_loop().time() + timeout_ms / 1000
+        while asyncio.get_running_loop().time() < deadline:
+            for selector in selectors:
+                try:
+                    locator = self.context_page.locator(selector).first
+                    await locator.wait_for(state="visible", timeout=500)
+                    await locator.click(timeout=1000)
+                    return selector
+                except Exception:
+                    continue
+        return None
+
+    async def _click_login_via_dom_text(self) -> Optional[str]:
+        try:
+            click_result = await self.context_page.evaluate(
+                """() => {
+                    const candidates = Array.from(document.querySelectorAll("button, a, div, span"));
+                    const normalize = (value) => (value || "").replace(/\\s+/g, " ").trim();
+                    for (const node of candidates) {
+                        const text = normalize(node.textContent);
+                        if (!["登录", "立即登录", "去登录"].includes(text)) continue;
+                        const style = window.getComputedStyle(node);
+                        const rect = node.getBoundingClientRect();
+                        if (style.visibility === "hidden" || style.display === "none") continue;
+                        if (rect.width === 0 || rect.height === 0) continue;
+                        node.click();
+                        return text;
+                    }
+                    return "";
+                }"""
+            )
+        except Exception:
+            return None
+        return f"dom-text:{click_result}" if click_result else None
+
+    async def _open_login_dialog(self) -> Optional[str]:
+        existing_selector = await self._wait_for_any_selector(LOGIN_DIALOG_SELECTORS + QRCODE_SELECTORS, timeout_ms=3000)
+        if existing_selector:
+            utils.logger.info(
+                f"[XiaoHongShuLogin._open_login_dialog] login UI already visible via selector: {existing_selector}"
+            )
+            return existing_selector
+
+        clicked_selector = await self._click_first_available(LOGIN_TRIGGER_SELECTORS)
+        if not clicked_selector:
+            clicked_selector = await self._click_login_via_dom_text()
+
+        if clicked_selector:
+            utils.logger.info(
+                f"[XiaoHongShuLogin._open_login_dialog] triggered login entry via selector: {clicked_selector}"
+            )
+            await asyncio.sleep(1)
+            opened_selector = await self._wait_for_any_selector(LOGIN_DIALOG_SELECTORS + QRCODE_SELECTORS, timeout_ms=10000)
+            if opened_selector:
+                return opened_selector
+
+        return None
+
+    async def _log_page_diagnostics(self, prefix: str) -> None:
+        try:
+            current_url = self.context_page.url
+        except Exception:
+            current_url = "<unknown>"
+
+        try:
+            current_title = await self.context_page.title()
+        except Exception:
+            current_title = "<unknown>"
+
+        try:
+            body_text = await self.context_page.evaluate(
+                "() => document.body ? document.body.innerText.slice(0, 500) : ''"
+            )
+        except Exception:
+            body_text = ""
+
+        utils.logger.error(
+            f"{prefix}. url={current_url}, title={current_title}, body_preview={body_text!r}"
+        )

@@ -1,12 +1,12 @@
 #!/bin/bash
 # MediaCrawler Backend - Production Deployment Script
-# Server: 20.212.53.247
+# Server: 137.116.136.208
 
 set -e
 
 echo "=========================================="
 echo "MediaCrawler Backend Deployment"
-echo "Server: 20.212.53.247"
+echo "Server: 137.116.136.208"
 echo "=========================================="
 
 # Colors for output
@@ -50,9 +50,9 @@ case "$COMMAND" in
         echo -e "${GREEN}Services started!${NC}"
         echo ""
         echo "Access the application at:"
-        echo "  - Backend API: http://20.212.53.247:8000"
-        echo "  - Health Check: http://20.212.53.247:8000/api/health"
-        echo "  - Admin Panel: http://20.212.53.247:8000/admin/"
+        echo "  - Frontend: http://137.116.136.208"
+        echo "  - Backend API: http://137.116.136.208/api/health"
+        echo "  - Admin Panel: http://137.116.136.208/admin/"
         ;;
 
     stop|down)
@@ -112,9 +112,9 @@ case "$COMMAND" in
         echo -e "${GREEN}Deployment complete!${NC}"
         echo ""
         echo "Access the application at:"
-        echo "  - Backend API: http://20.212.53.247:8000"
-        echo "  - Health Check: http://20.212.53.247:8000/api/health"
-        echo "  - Admin Panel: http://20.212.53.247:8000/admin/"
+        echo "  - Frontend: http://137.116.136.208"
+        echo "  - Backend API: http://137.116.136.208/api/health"
+        echo "  - Admin Panel: http://137.116.136.208/admin/"
         ;;
 
     status)

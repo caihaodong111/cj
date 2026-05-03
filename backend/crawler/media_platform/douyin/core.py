@@ -42,7 +42,12 @@ from var import crawler_type_var, source_keyword_var
 from .client import DouYinClient
 from .exception import DataFetchError
 from .field import PublishTimeType
-from .help import parse_video_info_from_url, parse_creator_info_from_url
+from .help import (
+    parse_creator_info_from_url,
+    parse_video_info_from_url,
+    safe_page_evaluate,
+    wait_for_page_stable,
+)
 from .login import DouYinLogin
 
 
@@ -59,6 +64,16 @@ class DouYinCrawler(AbstractCrawler):
 
     async def start(self) -> None:
         playwright_proxy_format, httpx_proxy_format = None, None
+        headless = config.HEADLESS
+        cdp_headless = config.CDP_HEADLESS
+        if config.LOGIN_TYPE == "qrcode":
+            if config.ENABLE_CDP_MODE and cdp_headless:
+                utils.logger.warning("[DouYinCrawler] 抖音二维码登录在 CDP headless 模式下不稳定，强制改为可见浏览器")
+                cdp_headless = False
+            elif not config.ENABLE_CDP_MODE and headless:
+                utils.logger.warning("[DouYinCrawler] 抖音二维码登录在 headless 模式下不稳定，强制改为可见浏览器")
+                headless = False
+
         if config.ENABLE_IP_PROXY:
             self.ip_proxy_pool = await create_ip_pool(config.IP_PROXY_POOL_COUNT, enable_validate_ip=True)
             ip_proxy_info: IpInfoModel = await self.ip_proxy_pool.get_proxy()
@@ -72,7 +87,7 @@ class DouYinCrawler(AbstractCrawler):
                     playwright,
                     playwright_proxy_format,
                     None,
-                    headless=config.CDP_HEADLESS,
+                    headless=cdp_headless,
                 )
             else:
                 utils.logger.info("[DouYinCrawler] 使用标准模式启动浏览器")
@@ -82,13 +97,13 @@ class DouYinCrawler(AbstractCrawler):
                     chromium,
                     playwright_proxy_format,
                     user_agent=None,
-                    headless=config.HEADLESS,
+                    headless=headless,
                 )
                 # stealth.min.js is a js script to prevent the website from detecting the crawler.
                 await self.browser_context.add_init_script(path="libs/stealth.min.js")
 
             self.context_page = await self.browser_context.new_page()
-            await self.context_page.goto(self.index_url)
+            await self.context_page.goto(self.index_url, wait_until="domcontentloaded")
 
             self.dy_client = await self.create_douyin_client(httpx_proxy_format)
             if not await self.dy_client.pong(browser_context=self.browser_context):
@@ -101,6 +116,7 @@ class DouYinCrawler(AbstractCrawler):
                 )
                 await login_obj.begin()
                 await self.dy_client.update_cookies(browser_context=self.browser_context)
+                await wait_for_page_stable(self.context_page)
             crawler_type_var.set(config.CRAWLER_TYPE)
             if config.CRAWLER_TYPE == "search":
                 # Search for notes and retrieve their comment information.
@@ -302,7 +318,7 @@ class DouYinCrawler(AbstractCrawler):
         douyin_client = DouYinClient(
             proxy=httpx_proxy,
             headers={
-                "User-Agent": await self.context_page.evaluate("() => navigator.userAgent"),
+                "User-Agent": await safe_page_evaluate(self.context_page, "() => navigator.userAgent"),
                 "Cookie": cookie_str,
                 "Host": "www.douyin.com",
                 "Origin": "https://www.douyin.com/",

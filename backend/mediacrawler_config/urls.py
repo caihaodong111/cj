@@ -27,6 +27,8 @@ from api.views import (
     get_sensitive_feed,
     get_all_feed,
     get_platform_sentiment_stats,
+    get_login_qr,
+    get_login_qr_status,
     CrawlerView,
     # Cookie Management
     list_cookies,
@@ -53,6 +55,8 @@ urlpatterns = [
 
     # API: Crawler Control
     path("api/crawler/<str:action>", CrawlerView.as_view(), name="crawler_action"),
+    path("api/login/qr/<str:platform>", get_login_qr, name="get_login_qr"),
+    path("api/login/qr/<str:platform>/status", get_login_qr_status, name="get_login_qr_status"),
 
     # API: Data Management
     path("api/data/files", list_data_files, name="list_data_files"),
