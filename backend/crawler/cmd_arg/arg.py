@@ -299,6 +299,14 @@ async def parse_cmd(argv: Optional[Sequence[str]] = None):
                 rich_help_panel="Proxy Configuration",
             ),
         ] = config.IP_PROXY_PROVIDER_NAME,
+        cdp_url: Annotated[
+            str,
+            typer.Option(
+                "--cdp_url",
+                help="Optional external Chrome CDP endpoint, e.g. http://127.0.0.1:9222 or ws://host:port/devtools/browser/...",
+                rich_help_panel="Runtime Configuration",
+            ),
+        ] = config.EXTERNAL_CDP_URL,
     ) -> SimpleNamespace:
         """MediaCrawler 命令行入口"""
 
@@ -330,6 +338,7 @@ async def parse_cmd(argv: Optional[Sequence[str]] = None):
         config.ENABLE_IP_PROXY = enable_ip_proxy_value
         config.IP_PROXY_POOL_COUNT = ip_proxy_pool_count
         config.IP_PROXY_PROVIDER_NAME = ip_proxy_provider_name
+        config.EXTERNAL_CDP_URL = (cdp_url or "").strip()
 
         # Set platform-specific ID lists for detail/creator mode
         if specified_id_list:
@@ -365,6 +374,7 @@ async def parse_cmd(argv: Optional[Sequence[str]] = None):
             get_comment=config.ENABLE_GET_COMMENTS,
             get_sub_comment=config.ENABLE_GET_SUB_COMMENTS,
             headless=config.HEADLESS,
+            cdp_url=config.EXTERNAL_CDP_URL,
             save_data_option=config.SAVE_DATA_OPTION,
             init_db=init_db_value,
             cookies=config.COOKIES,

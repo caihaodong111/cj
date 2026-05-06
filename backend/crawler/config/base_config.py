@@ -53,6 +53,12 @@ ENABLE_CDP_MODE = True
 # If the port is occupied, the system will automatically try the next available port
 CDP_DEBUG_PORT = 9222
 
+# Optional external CDP endpoint.
+# Supports values like:
+#   http://127.0.0.1:9222
+#   ws://127.0.0.1:9222/devtools/browser/xxxx
+EXTERNAL_CDP_URL = ""
+
 # Custom browser path (optional)
 # If it is empty, the system will automatically detect the installation path of Chrome/Edge
 # Windows example: "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"

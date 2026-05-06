@@ -99,6 +99,22 @@
         </div>
       </div>
 
+      <div class="form-row">
+        <div class="form-group full-width">
+          <label>外部 Chrome CDP 地址（可选）</label>
+          <input
+            type="text"
+            v-model="config.cdp_url"
+            placeholder="http://用户电脑IP:9222 或 ws://用户电脑IP:9222/devtools/browser/..."
+            :disabled="isRunning"
+            class="cyber-input"
+          />
+          <p class="warning-hint">
+            填了这个地址后，后端会优先连接用户电脑上的真实 Chrome，不再依赖服务器里的虚拟桌面扫码。
+          </p>
+        </div>
+      </div>
+
       <div class="form-actions">
         <button
           v-if="!isRunning"
@@ -195,7 +211,8 @@ const config = ref({
   enable_comments: false,
   enable_sub_comments: false,
   cookies: '',
-  headless: true
+  headless: true,
+  cdp_url: ''
 })
 
 const platformLabels = {
@@ -354,17 +371,23 @@ const startCrawler = async () => {
     }
 
     // 二维码登录时强制关闭无头模式，否则用户无法看到二维码
+    const useExternalCdp = Boolean(requestConfig.cdp_url && requestConfig.cdp_url.trim())
+
     if (requestConfig.login_type === 'qrcode') {
       requestConfig.headless = true
-      console.log('[前端] 二维码登录模式走无头浏览器，由 Web QR bridge 提供二维码')
-      openQrModal(requestConfig.platform)
+      if (!useExternalCdp) {
+        console.log('[前端] 二维码登录模式走无头浏览器，由 Web QR bridge 提供二维码')
+        openQrModal(requestConfig.platform)
+      } else {
+        console.log('[前端] 二维码登录模式使用外部 CDP 浏览器，请在用户电脑上的 Chrome 页面完成扫码')
+      }
     }
 
     emit('platform-change', requestConfig.platform)
     console.log('[前端] 发送启动请求到 /api/crawler/start')
     const response = await axios.post('/api/crawler/start', requestConfig)
     console.log('[前端] 响应:', response.data)
-    if (requestConfig.login_type === 'qrcode') {
+    if (requestConfig.login_type === 'qrcode' && !useExternalCdp) {
       await startQrPolling(requestConfig.platform)
     }
     await fetchStatus()

@@ -66,17 +66,29 @@ class WeiboCrawler(AbstractCrawler):
         self.cdp_manager = None
         self.ip_proxy_pool = None  # Proxy IP pool for automatic proxy refresh
 
+    @staticmethod
+    def _supports_headed_browser() -> bool:
+        if sys.platform.startswith("linux"):
+            return bool(os.getenv("DISPLAY") or os.getenv("WAYLAND_DISPLAY"))
+        return True
+
     async def start(self):
         playwright_proxy_format, httpx_proxy_format = None, None
         headless = config.HEADLESS
         cdp_headless = config.CDP_HEADLESS
         if config.LOGIN_TYPE == "qrcode":
-            if config.ENABLE_CDP_MODE and cdp_headless:
-                utils.logger.warning("[WeiboCrawler] 微博二维码登录在 CDP headless 模式下不稳定，强制改为可见浏览器")
-                cdp_headless = False
-            elif not config.ENABLE_CDP_MODE and headless:
-                utils.logger.warning("[WeiboCrawler] 微博二维码登录在 headless 模式下不稳定，强制改为可见浏览器")
-                headless = False
+            if self._supports_headed_browser():
+                if config.ENABLE_CDP_MODE and cdp_headless:
+                    utils.logger.warning("[WeiboCrawler] 微博二维码登录在 CDP headless 模式下不稳定，强制改为可见浏览器")
+                    cdp_headless = False
+                elif not config.ENABLE_CDP_MODE and headless:
+                    utils.logger.warning("[WeiboCrawler] 微博二维码登录在 headless 模式下不稳定，强制改为可见浏览器")
+                    headless = False
+            else:
+                utils.logger.warning(
+                    "[WeiboCrawler] 当前 Linux 环境无 DISPLAY/WAYLAND_DISPLAY，无法启动可见浏览器；"
+                    "二维码登录将保持 headless。若需服务器扫码登录，请为容器配置 Xvfb 或改用外部 CDP 浏览器。"
+                )
         if config.ENABLE_IP_PROXY:
             self.ip_proxy_pool = await create_ip_pool(config.IP_PROXY_POOL_COUNT, enable_validate_ip=True)
             ip_proxy_info: IpInfoModel = await self.ip_proxy_pool.get_proxy()

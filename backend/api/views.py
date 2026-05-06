@@ -1033,6 +1033,8 @@ class CrawlerView(APIView):
                     cmd_args.extend(["--save_data_option", save_option])
                 if start_page := data.get("start_page"):
                     cmd_args.extend(["--start", str(start_page)])
+                if cdp_url := data.get("cdp_url"):
+                    cmd_args.extend(["--cdp_url", str(cdp_url).strip()])
                 cookies = data.get("cookies")
                 if not cookies and login_type == "cookie":
                     cookies = CookieConfig.get_active_cookie(target_platform)

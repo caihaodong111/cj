@@ -59,6 +59,12 @@ class TieBaCrawler(AbstractCrawler):
         self._page_extractor = TieBaExtractor()
         self.cdp_manager = None
 
+    @staticmethod
+    def _supports_headed_browser() -> bool:
+        if sys.platform.startswith("linux"):
+            return bool(os.getenv("DISPLAY") or os.getenv("WAYLAND_DISPLAY"))
+        return True
+
     async def start(self) -> None:
         """
         Start the crawler
@@ -69,12 +75,18 @@ class TieBaCrawler(AbstractCrawler):
         headless = config.HEADLESS
         cdp_headless = config.CDP_HEADLESS
         if config.LOGIN_TYPE == "qrcode":
-            if config.ENABLE_CDP_MODE and cdp_headless:
-                utils.logger.warning("[BaiduTieBaCrawler] 贴吧二维码登录在 CDP headless 模式下不稳定，强制改为可见浏览器")
-                cdp_headless = False
-            elif not config.ENABLE_CDP_MODE and headless:
-                utils.logger.warning("[BaiduTieBaCrawler] 贴吧二维码登录在 headless 模式下不稳定，强制改为可见浏览器")
-                headless = False
+            if self._supports_headed_browser():
+                if config.ENABLE_CDP_MODE and cdp_headless:
+                    utils.logger.warning("[BaiduTieBaCrawler] 贴吧二维码登录在 CDP headless 模式下不稳定，强制改为可见浏览器")
+                    cdp_headless = False
+                elif not config.ENABLE_CDP_MODE and headless:
+                    utils.logger.warning("[BaiduTieBaCrawler] 贴吧二维码登录在 headless 模式下不稳定，强制改为可见浏览器")
+                    headless = False
+            else:
+                utils.logger.warning(
+                    "[BaiduTieBaCrawler] 当前 Linux 环境无 DISPLAY/WAYLAND_DISPLAY，无法启动可见浏览器；"
+                    "二维码登录将保持 headless。若需服务器扫码登录，请为容器配置 Xvfb 或改用外部 CDP 浏览器。"
+                )
         if config.ENABLE_IP_PROXY:
             utils.logger.info(
                 "[BaiduTieBaCrawler.start] Begin create ip proxy pool ..."

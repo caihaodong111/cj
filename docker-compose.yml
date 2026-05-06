@@ -9,10 +9,17 @@ services:
       RUN_DB_MIGRATIONS: "1"
       RUN_COLLECTSTATIC: "1"
       MEDIACRAWLER_QR_MODE: "web"
+      ENABLE_REMOTE_DESKTOP: "1"
+      XVFB_DISPLAY: ":99"
+      XVFB_SCREEN: "1600x900x24"
+      VNC_PORT: "5900"
+      NOVNC_PORT: "6080"
     init: true
     ipc: host
     shm_size: "1gb"
     restart: unless-stopped
+    ports:
+      - "6080:6080"
     expose:
       - "8000"
     volumes:

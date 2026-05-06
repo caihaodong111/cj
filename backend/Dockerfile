@@ -56,6 +56,7 @@ RUN sed -i 's|deb.debian.org|mirrors.tuna.tsinghua.edu.cn|g; s|security.debian.o
         fonts-freefont-ttf \
         gosu \
         nodejs \
+        fluxbox \
         libasound2 \
         libatk-bridge2.0-0 \
         libatk1.0-0 \
@@ -84,7 +85,11 @@ RUN sed -i 's|deb.debian.org|mirrors.tuna.tsinghua.edu.cn|g; s|security.debian.o
         libxkbcommon0 \
         libxrender1 \
         libxrandr2 \
-        libxshmfence1 && \
+        libxshmfence1 \
+        novnc \
+        websockify \
+        x11vnc \
+        xvfb && \
     rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /opt/venv /opt/venv
@@ -103,7 +108,7 @@ RUN mkdir -p /app/logs /app/staticfiles /app/media /app/data /app/data/qr_bridge
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
-EXPOSE 8000
+EXPOSE 8000 6080
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=5 \
     CMD curl -f http://localhost:8000/api/health || exit 1
