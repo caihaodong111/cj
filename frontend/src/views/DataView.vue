@@ -1020,12 +1020,35 @@ const refreshCurrentPlatform = async ({ refreshStats = false } = {}) => {
   }
 }
 
+const fetchCrawlerStatus = async ({ refreshOnIdle = false } = {}) => {
+  try {
+    const res = await axios.get('/api/crawler/status')
+    const nextStatus = res.data.status
+    const previousStatus = crawlerStatus.value
+
+    crawlerStatus.value = nextStatus
+
+    if (nextStatus === 'running' && !crawlerStatusPollingTimer.value) {
+      startCrawlerStatusPolling()
+    } else if (crawlerStatusPollingTimer.value) {
+      clearInterval(crawlerStatusPollingTimer.value)
+      crawlerStatusPollingTimer.value = null
+    }
+
+    if (refreshOnIdle && previousStatus !== 'idle' && nextStatus === 'idle') {
+      await refreshCurrentPlatform({ refreshStats: true })
+    }
+  } catch (e) {
+    console.error('获取爬虫状态失败:', e)
+  }
+}
+
 const onCrawlerStatusChange = async (newStatus) => {
   crawlerStatus.value = newStatus
   await refreshCurrentPlatform({ refreshStats: true })
 
   // 如果爬虫正在运行，启动状态轮询确保及时更新
-  if (newStatus === 'running') {
+  if (newStatus === 'running' && !crawlerStatusPollingTimer.value) {
     startCrawlerStatusPolling()
   }
 }
@@ -1038,22 +1061,7 @@ const startCrawlerStatusPolling = () => {
   }
   // 每2秒检查一次状态
   crawlerStatusPollingTimer.value = setInterval(async () => {
-    try {
-      const res = await axios.get('/api/crawler/status')
-      const newStatus = res.data.status
-      // 只有状态变化时才更新
-      if (crawlerStatus.value !== newStatus) {
-        crawlerStatus.value = newStatus
-        if (newStatus === 'idle') {
-          // 爬虫停止，清除轮询
-          clearInterval(crawlerStatusPollingTimer.value)
-          crawlerStatusPollingTimer.value = null
-          await refreshCurrentPlatform({ refreshStats: true })
-        }
-      }
-    } catch (e) {
-      console.error('获取爬虫状态失败:', e)
-    }
+    await fetchCrawlerStatus({ refreshOnIdle: true })
   }, 2000)
 }
 
@@ -1076,6 +1084,7 @@ const fetchPageData = async () => {
 // Lifecycle
 onMounted(async () => {
   await fetchConfig()
+  await fetchCrawlerStatus()
   const initialPlatform = route.query?.platform
   if (initialPlatform) {
     await selectPlatform(initialPlatform)

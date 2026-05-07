@@ -110,7 +110,7 @@
             class="cyber-input"
           />
           <p class="warning-hint">
-            填了这个地址后，后端会优先连接用户电脑上的真实 Chrome，不再依赖服务器里的虚拟桌面扫码。
+            不填写时，后端会自动拉起本机 Chrome；填写后，会优先连接你指定的现有 Chrome 调试端口。
           </p>
         </div>
       </div>
@@ -135,44 +135,6 @@
       </div>
     </div>
 
-    <div v-if="qrModal.visible" class="qr-modal-overlay" @click.self="closeQrModal">
-      <div class="qr-modal">
-        <div class="qr-modal-header">
-          <div>
-            <h3>扫码登录</h3>
-            <p>{{ qrModal.platformLabel }} 登录会话</p>
-          </div>
-          <button type="button" class="qr-close-btn" @click="closeQrModal">×</button>
-        </div>
-
-        <div class="qr-status-pill" :class="`is-${qrModal.status}`">
-          {{ getQrStatusLabel(qrModal.status) }}
-        </div>
-
-        <div class="qr-image-panel">
-          <img v-if="qrModal.imageUrl" :src="qrModal.imageUrl" :alt="`${qrModal.platformLabel} 登录二维码`" class="qr-image" />
-          <div v-else class="qr-placeholder">
-            <span class="qr-spinner"></span>
-            <span>等待二维码生成...</span>
-          </div>
-        </div>
-
-        <p class="qr-hint">
-          {{ qrModal.status === 'success' ? '登录成功，爬虫会继续执行。' : qrModal.status === 'failed' ? '登录失败，请关闭后重试。' : '请使用对应平台 App 扫码确认登录。' }}
-        </p>
-
-        <p v-if="qrModal.error" class="qr-error">{{ qrModal.error }}</p>
-
-        <div class="qr-actions">
-          <button type="button" class="cyber-btn cyber-btn-secondary" @click="refreshQrState">
-            刷新
-          </button>
-          <button type="button" class="cyber-btn cyber-btn-primary" @click="closeQrModal">
-            {{ qrModal.status === 'success' ? '完成' : '关闭' }}
-          </button>
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
@@ -195,7 +157,6 @@ const status = ref('idle')
 const starting = ref(false)
 const stopping = ref(false)
 let statusInterval = null
-let qrInterval = null
 
 // Computed
 const isRunning = computed(() => status.value === 'running')
@@ -213,25 +174,6 @@ const config = ref({
   cookies: '',
   headless: true,
   cdp_url: ''
-})
-
-const platformLabels = {
-  xhs: '小红书',
-  dy: '抖音',
-  ks: '快手',
-  bili: 'B站',
-  wb: '微博',
-  tieba: '贴吧',
-  zhihu: '知乎'
-}
-
-const qrModal = ref({
-  visible: false,
-  platform: '',
-  platformLabel: '',
-  status: 'idle',
-  imageUrl: '',
-  error: ''
 })
 
 watch(
@@ -255,94 +197,21 @@ const fetchPlatforms = async () => {
   }
 }
 
-const fetchStatus = async () => {
+const fetchStatus = async ({ emitIfUnchanged = false } = {}) => {
   try {
     const res = await axios.get('/api/crawler/status')
     const newStatus = res.data.status
+    const previousStatus = status.value
 
-    // 只有状态变化时才通知父组件
-    if (status.value !== newStatus) {
-      status.value = newStatus
+    status.value = newStatus
+
+    // 组件重新挂载时也要把当前状态同步给父组件，避免父级残留旧状态。
+    if (previousStatus !== newStatus || emitIfUnchanged) {
       emit('crawler-status-change', newStatus)
     }
   } catch (e) {
     console.error('获取状态失败:', e)
   }
-}
-
-const stopQrPolling = () => {
-  if (qrInterval) {
-    clearInterval(qrInterval)
-    qrInterval = null
-  }
-}
-
-const resetQrModal = () => {
-  qrModal.value = {
-    visible: false,
-    platform: '',
-    platformLabel: '',
-    status: 'idle',
-    imageUrl: '',
-    error: ''
-  }
-}
-
-const openQrModal = (platform) => {
-  qrModal.value = {
-    visible: true,
-    platform,
-    platformLabel: platformLabels[platform] || platform,
-    status: 'pending',
-    imageUrl: '',
-    error: ''
-  }
-}
-
-const closeQrModal = () => {
-  stopQrPolling()
-  resetQrModal()
-}
-
-const getQrStatusLabel = (statusValue) => {
-  const labels = {
-    idle: '待启动',
-    pending: '等待扫码',
-    success: '登录成功',
-    failed: '登录失败'
-  }
-  return labels[statusValue] || '等待扫码'
-}
-
-const refreshQrState = async () => {
-  const platform = qrModal.value.platform
-  if (!platform) return
-
-  try {
-    const [qrRes, statusRes] = await Promise.all([
-      axios.get(`/api/login/qr/${platform}`),
-      axios.get(`/api/login/qr/${platform}/status`)
-    ])
-
-    qrModal.value.imageUrl = qrRes.data?.qr_code || ''
-    qrModal.value.status = statusRes.data?.status || 'pending'
-    qrModal.value.error = ''
-
-    if (qrModal.value.status === 'success' || qrModal.value.status === 'failed') {
-      stopQrPolling()
-    }
-  } catch (e) {
-    qrModal.value.error = e.response?.data?.error || e.message || '二维码状态获取失败'
-  }
-}
-
-const startQrPolling = async (platform) => {
-  stopQrPolling()
-  openQrModal(platform)
-  await refreshQrState()
-  qrInterval = setInterval(async () => {
-    await refreshQrState()
-  }, 2000)
 }
 
 const startCrawler = async () => {
@@ -370,36 +239,23 @@ const startCrawler = async () => {
       start_page: 1       // 默认从第1页开始
     }
 
-    // 二维码登录时强制关闭无头模式，否则用户无法看到二维码
-    const useExternalCdp = Boolean(requestConfig.cdp_url && requestConfig.cdp_url.trim())
-
     if (requestConfig.login_type === 'qrcode') {
-      requestConfig.headless = true
-      if (!useExternalCdp) {
-        console.log('[前端] 二维码登录模式走无头浏览器，由 Web QR bridge 提供二维码')
-        openQrModal(requestConfig.platform)
-      } else {
-        console.log('[前端] 二维码登录模式使用外部 CDP 浏览器，请在用户电脑上的 Chrome 页面完成扫码')
-      }
+      requestConfig.headless = false
+      console.log('[前端] 二维码登录模式走真实浏览器/CDP，请在打开的 Chrome 页面完成扫码')
     }
 
     emit('platform-change', requestConfig.platform)
     console.log('[前端] 发送启动请求到 /api/crawler/start')
     const response = await axios.post('/api/crawler/start', requestConfig)
     console.log('[前端] 响应:', response.data)
-    if (requestConfig.login_type === 'qrcode' && !useExternalCdp) {
-      await startQrPolling(requestConfig.platform)
+    if (requestConfig.login_type === 'qrcode') {
+      window.alert('已启动真实浏览器，请在打开的 Chrome 页面完成扫码登录。')
     }
     await fetchStatus()
   } catch (e) {
     const errorMsg = e.response?.data?.error || e.response?.data?.detail || e.message
     console.error('[前端] 启动爬虫错误:', e)
     console.error('[前端] 错误响应:', e.response?.data)
-    if (config.value.login_type === 'qrcode') {
-      qrModal.value.error = errorMsg
-      qrModal.value.status = 'failed'
-      stopQrPolling()
-    }
     window.alert(`启动爬虫失败: ${errorMsg}`)
   } finally {
     starting.value = false
@@ -423,7 +279,7 @@ const stopCrawler = async () => {
 // Lifecycle
 onMounted(async () => {
   await fetchPlatforms()
-  await fetchStatus()
+  await fetchStatus({ emitIfUnchanged: true })
 
   // 每2秒轮询状态
   statusInterval = setInterval(async () => {
@@ -435,7 +291,6 @@ onUnmounted(() => {
   if (statusInterval) {
     clearInterval(statusInterval)
   }
-  stopQrPolling()
 })
 </script>
 
