@@ -182,6 +182,7 @@ class BrowserLauncher:
                 )
 
             self.browser_process = process
+            utils.logger.info(f"[BrowserLauncher] Browser process started with PID {process.pid}")
             return process
 
         except Exception as e:
@@ -196,6 +197,13 @@ class BrowserLauncher:
 
         start_time = time.time()
         while time.time() - start_time < timeout:
+            process = self.browser_process
+            if process and process.poll() is not None:
+                utils.logger.error(
+                    f"[BrowserLauncher] Browser process exited before CDP port {debug_port} became ready "
+                    f"(pid={process.pid}, exit_code={process.returncode})"
+                )
+                return False
             try:
                 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                     s.settimeout(1)
@@ -208,7 +216,19 @@ class BrowserLauncher:
 
             time.sleep(0.5)
 
-        utils.logger.error(f"[BrowserLauncher] Browser failed to be ready within {timeout} seconds")
+        process = self.browser_process
+        if process and process.poll() is not None:
+            utils.logger.error(
+                f"[BrowserLauncher] Browser process exited while waiting for port {debug_port} "
+                f"(pid={process.pid}, exit_code={process.returncode})"
+            )
+        elif process:
+            utils.logger.error(
+                f"[BrowserLauncher] Browser failed to expose CDP port {debug_port} within {timeout} seconds "
+                f"(pid={process.pid} still running)"
+            )
+        else:
+            utils.logger.error(f"[BrowserLauncher] Browser failed to be ready within {timeout} seconds")
         return False
 
     def get_browser_info(self, browser_path: str) -> Tuple[str, str]:

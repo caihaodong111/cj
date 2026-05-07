@@ -24,6 +24,8 @@ import socket
 import httpx
 import signal
 import atexit
+import shutil
+import tempfile
 from urllib.parse import urlparse
 from typing import Optional, Dict, Any
 from playwright.async_api import Browser, BrowserContext, Playwright
@@ -47,6 +49,7 @@ class CDPBrowserManager:
         self.external_cdp_url: str = ""
         self.owns_browser_process = False
         self.uses_existing_context = False
+        self.temporary_user_data_dir: Optional[str] = None
 
     def _register_cleanup_handlers(self):
         """
@@ -199,22 +202,30 @@ class CDPBrowserManager:
             utils.logger.warning(f"[CDPBrowserManager] CDP connection test failed: {e}")
             return False
 
-    async def _launch_browser(self, browser_path: str, headless: bool):
-        """
-        Launch browser process
-        """
-        # Set user data directory (if save login state is enabled)
-        user_data_dir = None
-        if config.SAVE_LOGIN_STATE:
-            user_data_dir = os.path.join(
-                os.getcwd(),
-                "browser_data",
-                f"cdp_{config.USER_DATA_DIR % config.PLATFORM}",
-            )
+    def _get_default_user_data_dir(self) -> Optional[str]:
+        if not config.SAVE_LOGIN_STATE:
+            return None
+        return os.path.join(
+            os.getcwd(),
+            "browser_data",
+            f"cdp_{config.USER_DATA_DIR % config.PLATFORM}",
+        )
+
+    def _create_temporary_user_data_dir(self) -> str:
+        browser_data_root = os.path.join(os.getcwd(), "browser_data")
+        os.makedirs(browser_data_root, exist_ok=True)
+        temp_dir = tempfile.mkdtemp(
+            prefix=f"cdp_{config.PLATFORM}_fallback_",
+            dir=browser_data_root,
+        )
+        self.temporary_user_data_dir = temp_dir
+        return temp_dir
+
+    async def _launch_browser_once(self, browser_path: str, headless: bool, user_data_dir: Optional[str]):
+        if user_data_dir:
             os.makedirs(user_data_dir, exist_ok=True)
             utils.logger.info(f"[CDPBrowserManager] User data directory: {user_data_dir}")
 
-        # Launch browser
         self.launcher.browser_process = self.launcher.launch_browser(
             browser_path=browser_path,
             debug_port=self.debug_port,
@@ -222,20 +233,47 @@ class CDPBrowserManager:
             user_data_dir=user_data_dir,
         )
 
-        # Wait for browser to be ready
         if not self.launcher.wait_for_browser_ready(
             self.debug_port, config.BROWSER_LAUNCH_TIMEOUT
         ):
             raise RuntimeError(f"Browser failed to start within {config.BROWSER_LAUNCH_TIMEOUT} seconds")
 
-        # Extra wait for CDP service to fully start
         await asyncio.sleep(1)
 
-        # Test CDP connection
         if not await self._test_cdp_connection(self.debug_port):
             utils.logger.warning(
                 "[CDPBrowserManager] CDP connection test failed, but will continue to try connecting"
             )
+
+    async def _launch_browser(self, browser_path: str, headless: bool):
+        """
+        Launch browser process
+        """
+        user_data_dir = self._get_default_user_data_dir()
+
+        try:
+            await self._launch_browser_once(browser_path, headless, user_data_dir)
+            return
+        except Exception as e:
+            should_retry_with_temp_profile = (
+                os.name == "nt"
+                and bool(user_data_dir)
+                and not self.external_cdp_url
+            )
+            if not should_retry_with_temp_profile:
+                raise
+
+            utils.logger.warning(
+                "[CDPBrowserManager] Browser launch with fixed profile failed on Windows. "
+                f"Will retry with a temporary user-data-dir. Original error: {e}"
+            )
+            self.launcher.cleanup()
+
+        fallback_user_data_dir = self._create_temporary_user_data_dir()
+        utils.logger.warning(
+            f"[CDPBrowserManager] Falling back to temporary user-data-dir: {fallback_user_data_dir}"
+        )
+        await self._launch_browser_once(browser_path, headless, fallback_user_data_dir)
 
     async def _get_browser_websocket_url(self, debug_port: int) -> str:
         """
@@ -472,6 +510,24 @@ class CDPBrowserManager:
 
         except Exception as e:
             utils.logger.error(f"[CDPBrowserManager] Error during resource cleanup: {e}")
+        finally:
+            if self.temporary_user_data_dir:
+                try:
+                    shutil.rmtree(self.temporary_user_data_dir, ignore_errors=True)
+                    if os.path.exists(self.temporary_user_data_dir):
+                        utils.logger.warning(
+                            f"[CDPBrowserManager] Temporary user-data-dir still exists after cleanup: {self.temporary_user_data_dir}"
+                        )
+                    else:
+                        utils.logger.info(
+                            f"[CDPBrowserManager] Removed temporary user-data-dir: {self.temporary_user_data_dir}"
+                        )
+                except Exception as cleanup_error:
+                    utils.logger.warning(
+                        f"[CDPBrowserManager] Failed to remove temporary user-data-dir: {cleanup_error}"
+                    )
+                finally:
+                    self.temporary_user_data_dir = None
 
     def is_connected(self) -> bool:
         """
