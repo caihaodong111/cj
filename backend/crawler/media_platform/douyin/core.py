@@ -120,7 +120,22 @@ class DouYinCrawler(AbstractCrawler):
             await self.context_page.goto(self.index_url, wait_until="domcontentloaded")
 
             self.dy_client = await self.create_douyin_client(httpx_proxy_format)
-            if not await self.dy_client.pong(browser_context=self.browser_context):
+            is_logged_in = await self.dy_client.pong(browser_context=self.browser_context)
+            try:
+                local_storage = await safe_page_evaluate(self.context_page, "() => window.localStorage")
+            except Exception:
+                local_storage = {}
+            current_cookie = await self.browser_context.cookies()
+            _, cookie_dict = utils.convert_cookies(current_cookie)
+            utils.logger.info(
+                "[DouYinCrawler.start] login diagnostics: pong=%s HasUserLogin=%s LOGIN_STATUS=%s xmst_present=%s cookie_count=%s",
+                is_logged_in,
+                local_storage.get("HasUserLogin", ""),
+                cookie_dict.get("LOGIN_STATUS", ""),
+                bool(local_storage.get("xmst")),
+                len(current_cookie),
+            )
+            if not is_logged_in:
                 login_obj = DouYinLogin(
                     login_type=config.LOGIN_TYPE,
                     login_phone="",  # you phone number

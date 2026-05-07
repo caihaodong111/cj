@@ -72,6 +72,54 @@ class DouYinClient(AbstractApiClient, ProxyRefreshMixin):
             return
         headers = headers or self.headers
         local_storage: Dict = await safe_page_evaluate(self.playwright_page, "() => window.localStorage")  # type: ignore
+        navigator_info: Dict = await safe_page_evaluate(  # type: ignore
+            self.playwright_page,
+            """() => ({
+                language: navigator.language,
+                platform: navigator.platform,
+                userAgent: navigator.userAgent,
+                hardwareConcurrency: navigator.hardwareConcurrency,
+                deviceMemory: navigator.deviceMemory,
+                onLine: navigator.onLine,
+            })"""
+        )
+        screen_info: Dict = await safe_page_evaluate(  # type: ignore
+            self.playwright_page,
+            """() => ({
+                width: window.screen.width,
+                height: window.screen.height,
+            })"""
+        )
+
+        user_agent = headers.get("User-Agent", "")
+        browser_platform = navigator_info.get("platform") or "Win32"
+        browser_language = navigator_info.get("language") or "zh-CN"
+        cpu_core_num = str(navigator_info.get("hardwareConcurrency") or 8)
+        device_memory = str(navigator_info.get("deviceMemory") or 8)
+        browser_online = "true" if navigator_info.get("onLine", True) else "false"
+        screen_width = str(screen_info.get("width") or 1920)
+        screen_height = str(screen_info.get("height") or 1080)
+
+        browser_name = "Chrome"
+        browser_version = "125.0.0.0"
+        engine_version = "125.0.0.0"
+        os_name = "Windows"
+        os_version = "10"
+
+        ua_lower = user_agent.lower()
+        if "windows" not in ua_lower and "mac os x" in ua_lower:
+            os_name = "Mac OS"
+            os_version = "10.15.7"
+        elif "linux" in ua_lower:
+            os_name = "Linux"
+            os_version = ""
+
+        import re
+        chrome_match = re.search(r"Chrome/([\d.]+)", user_agent)
+        if chrome_match:
+            browser_version = chrome_match.group(1)
+            engine_version = chrome_match.group(1)
+
         common_params = {
             "device_platform": "webapp",
             "aid": "6383",
@@ -81,25 +129,27 @@ class DouYinClient(AbstractApiClient, ProxyRefreshMixin):
             "update_version_code": "170400",
             "pc_client_type": "1",
             "cookie_enabled": "true",
-            "browser_language": "zh-CN",
-            "browser_platform": "MacIntel",
-            "browser_name": "Chrome",
-            "browser_version": "125.0.0.0",
-            "browser_online": "true",
+            "browser_language": browser_language,
+            "browser_platform": browser_platform,
+            "browser_name": browser_name,
+            "browser_version": browser_version,
+            "browser_online": browser_online,
             "engine_name": "Blink",
-            "os_name": "Mac OS",
-            "os_version": "10.15.7",
-            "cpu_core_num": "8",
-            "device_memory": "8",
-            "engine_version": "109.0",
+            "os_name": os_name,
+            "os_version": os_version,
+            "cpu_core_num": cpu_core_num,
+            "device_memory": device_memory,
+            "engine_version": engine_version,
             "platform": "PC",
-            "screen_width": "2560",
-            "screen_height": "1440",
+            "screen_width": screen_width,
+            "screen_height": screen_height,
             'effective_type': '4g',
             "round_trip_time": "50",
             "webid": get_web_id(),
-            "msToken": local_storage.get("xmst"),
         }
+        ms_token = local_storage.get("xmst")
+        if ms_token:
+            common_params["msToken"] = ms_token
         params.update(common_params)
         query_string = urllib.parse.urlencode(params)
 
@@ -192,7 +242,27 @@ class DouYinClient(AbstractApiClient, ProxyRefreshMixin):
         referer_url = f"https://www.douyin.com/search/{keyword}?aid=f594bbd9-a0e2-4651-9319-ebe3cb6298c1&type=general"
         headers = copy.copy(self.headers)
         headers["Referer"] = urllib.parse.quote(referer_url, safe=':/')
-        return await self.get("/aweme/v1/web/general/search/single/", query_params, headers=headers)
+        res = await self.get("/aweme/v1/web/general/search/single/", query_params, headers=headers)
+        data = res.get("data")
+        utils.logger.info(
+            "[DouYinClient.search_info_by_keyword] keyword=%s offset=%s search_id=%s "
+            "data_len=%s has_more=%s status_code=%s message=%s logid=%s",
+            keyword,
+            offset,
+            search_id or "-",
+            len(data) if isinstance(data, list) else "n/a",
+            res.get("has_more"),
+            res.get("status_code"),
+            res.get("status_msg") or res.get("message") or "",
+            res.get("extra", {}).get("logid", ""),
+        )
+        if data in (None, []):
+            utils.logger.warning(
+                "[DouYinClient.search_info_by_keyword] empty search response keys=%s extra=%s",
+                sorted(res.keys()),
+                res.get("extra", {}),
+            )
+        return res
 
     async def get_video_by_id(self, aweme_id: str) -> Any:
         """
