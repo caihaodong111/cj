@@ -40,12 +40,10 @@ from django.http import JsonResponse, FileResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.utils.decorators import method_decorator
-from django.utils.dateparse import parse_datetime, parse_date
 from django.utils import timezone
 from django.views import View
 
 # 导入情绪分析服务
-from api.sentiment_service import analyze_sentiment
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -61,7 +59,9 @@ from media_platform.models import (
     ZhihuContent,
     MonitorFeed,
 )
-from .models import CookieConfig, AIUsageRecord
+from media_platform.time_utils import coerce_timestamp_ms
+from .models import CookieConfig, AIUsageRecord, CrawlerSettings
+from crawler import config as crawler_runtime_config
 from crawler.tools.qr_bridge import clear_platform, read_qr, read_status, write_status
 
 # Data / crawler working directories.
@@ -191,6 +191,14 @@ PLATFORM_URL_FIELDS = {
 
 SUPPORTED_QR_PLATFORMS = {"xhs", "dy", "ks", "bili", "wb", "tieba", "zhihu"}
 
+DEFAULT_CRAWLER_SETTINGS = {
+    "max_concurrency_num": max(int(getattr(crawler_runtime_config, "MAX_CONCURRENCY_NUM", 1)), 1),
+    "request_interval_ms": max(int(float(getattr(crawler_runtime_config, "CRAWLER_MAX_SLEEP_SEC", 2)) * 1000), 0),
+    "enable_media_download": bool(getattr(crawler_runtime_config, "ENABLE_GET_MEIDAS", False)),
+}
+MONITOR_FEED_DEFAULT_PAGE_SIZE = 100
+MONITOR_FEED_MAX_PAGE_SIZE = 100
+
 
 def _build_run_cmd(args):
     """Build command to run main.py via the current Python executable."""
@@ -214,6 +222,103 @@ def _format_qr_code_data(raw_qr_code: Optional[str]) -> Optional[str]:
     if raw_qr_code.startswith("data:image"):
         return raw_qr_code
     return f"data:image/png;base64,{raw_qr_code}"
+
+
+def _parse_bool_value(value, field_name: str) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"1", "true", "yes", "y", "on"}:
+            return True
+        if normalized in {"0", "false", "no", "n", "off"}:
+            return False
+    raise ValueError(f"{field_name} 必须是布尔值")
+
+
+def _normalize_crawler_settings_payload(payload) -> dict:
+    payload = payload or {}
+
+    try:
+        max_concurrency_num = int(
+            payload.get("max_concurrency_num", DEFAULT_CRAWLER_SETTINGS["max_concurrency_num"])
+        )
+    except (TypeError, ValueError) as exc:
+        raise ValueError("并发线程数必须是整数") from exc
+
+    if max_concurrency_num < 1:
+        raise ValueError("并发线程数必须大于等于 1")
+
+    try:
+        request_interval_ms = int(
+            payload.get("request_interval_ms", DEFAULT_CRAWLER_SETTINGS["request_interval_ms"])
+        )
+    except (TypeError, ValueError) as exc:
+        raise ValueError("请求间隔必须是整数") from exc
+
+    if request_interval_ms < 0:
+        raise ValueError("请求间隔必须大于等于 0")
+
+    enable_media_download = _parse_bool_value(
+        payload.get("enable_media_download", DEFAULT_CRAWLER_SETTINGS["enable_media_download"]),
+        "媒体下载开关",
+    )
+
+    return {
+        "max_concurrency_num": max_concurrency_num,
+        "request_interval_ms": request_interval_ms,
+        "enable_media_download": enable_media_download,
+    }
+
+
+def _get_crawler_settings_values(settings_obj: Optional[CrawlerSettings] = None) -> dict:
+    settings_obj = settings_obj or CrawlerSettings.get_solo()
+    return {
+        "max_concurrency_num": settings_obj.max_concurrency_num,
+        "request_interval_ms": settings_obj.request_interval_ms,
+        "enable_media_download": settings_obj.enable_media_download,
+    }
+
+
+def _serialize_crawler_settings(settings_obj: Optional[CrawlerSettings] = None) -> dict:
+    settings_obj = settings_obj or CrawlerSettings.get_solo()
+    payload = _get_crawler_settings_values(settings_obj)
+    payload["updated_at"] = settings_obj.updated_at.isoformat() if settings_obj.updated_at else None
+    return payload
+
+
+def _get_effective_crawler_settings(overrides=None) -> dict:
+    current_settings = _get_crawler_settings_values()
+    merged_settings = current_settings.copy()
+
+    for field in ("max_concurrency_num", "request_interval_ms", "enable_media_download"):
+        if field in (overrides or {}) and overrides.get(field) not in (None, ""):
+            merged_settings[field] = overrides.get(field)
+
+    return _normalize_crawler_settings_payload(merged_settings)
+
+
+def _get_bounded_pagination_params(
+    request,
+    *,
+    default_page_size: int,
+    max_page_size: int,
+) -> tuple[int, int, int]:
+    try:
+        page = int(request.GET.get("page", 1))
+    except (TypeError, ValueError):
+        page = 1
+
+    try:
+        raw_page_size = int(request.GET.get("page_size", default_page_size))
+    except (TypeError, ValueError):
+        raw_page_size = default_page_size
+
+    page = max(1, page)
+    page_size = max(1, min(raw_page_size, max_page_size))
+    return page, page_size, (page - 1) * page_size
 
 
 def _append_log(level: str, message: str):
@@ -289,29 +394,7 @@ def _stream_pipe(pipe, level: str):
 
 
 def _to_millis(value):
-    if value is None:
-        return None
-    if isinstance(value, (int, float)):
-        ts = int(value)
-        return ts if ts > 1_000_000_000_000 else ts * 1000
-    if isinstance(value, datetime):
-        return int(value.timestamp() * 1000)
-    raw = str(value).strip()
-    if not raw:
-        return None
-    if raw.isdigit():
-        ts = int(raw)
-        return ts if ts > 1_000_000_000_000 else ts * 1000
-    parsed = parse_datetime(raw)
-    if parsed is None:
-        parsed_date = parse_date(raw)
-        if parsed_date:
-            parsed = datetime(parsed_date.year, parsed_date.month, parsed_date.day)
-    if parsed is None:
-        return None
-    if timezone.is_naive(parsed):
-        parsed = timezone.make_aware(parsed, timezone.get_current_timezone())
-    return int(parsed.timestamp() * 1000)
+    return coerce_timestamp_ms(value)
 
 
 def _pick_first_value(row: dict, fields):
@@ -328,25 +411,17 @@ def _pick_first_value(row: dict, fields):
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def get_monitor_feed(request):
-    """Get latest feed items from monitor_feed table with pagination support.
+    """Get latest feed items from monitor_feed table.
 
-    优化版本：
-    1. 使用数据库聚合计算统计数据，避免全表扫描
-    2. 仅对需要的数据进行情绪分析（sentiment_score为None时）
-    3. 使用更高效的分页查询
+    This endpoint is read-only and caps page size to protect the list view.
     """
-    from django.db.models import Count, Avg, Case, When, IntegerField, F
+    from django.db.models import Count, Avg, Case, When, IntegerField
 
-    # 获取分页参数
-    try:
-        page = max(1, int(request.GET.get("page", 1)))
-        page_size = max(1, int(request.GET.get("page_size", 100)))
-    except ValueError:
-        page = 1
-        page_size = 100
-
-    # 计算 offset
-    offset = (page - 1) * page_size
+    page, page_size, offset = _get_bounded_pagination_params(
+        request,
+        default_page_size=MONITOR_FEED_DEFAULT_PAGE_SIZE,
+        max_page_size=MONITOR_FEED_MAX_PAGE_SIZE,
+    )
 
     items = []
 
@@ -395,26 +470,8 @@ def get_monitor_feed(request):
         content_text = row.get("content") or ""
         sentiment = row.get("sentiment") or "neutral"
         sentiment_score = row.get("sentiment_score")
-        sentiment_labels = row.get("sentiment_labels")
+        sentiment_labels = row.get("sentiment_labels") or {}
         is_sensitive = row.get("is_sensitive")
-
-        # ============== 优化3: 仅对需要的数据进行情绪分析 ==============
-        # 只有当 sentiment_score 为 None 时才进行分析
-        if sentiment_score is None:
-            sentiment_result = analyze_sentiment(content_text)
-            sentiment = sentiment_result.get("sentiment", sentiment)
-            sentiment_score = sentiment_result.get("score", 0)
-            sentiment_labels = sentiment_result.get("labels", {})
-
-            # 可选：异步更新数据库，下次查询时就不需要再分析了
-            try:
-                MonitorFeed.objects.filter(id=row.get("id")).update(
-                    sentiment=sentiment,
-                    sentiment_score=sentiment_score,
-                    sentiment_labels=sentiment_labels,
-                )
-            except Exception:
-                pass  # 更新失败不影响返回数据
 
         if is_sensitive is None:
             is_sensitive = bool(sentiment_labels.get("sensitive")) or sentiment == "sensitive"
@@ -429,10 +486,10 @@ def get_monitor_feed(request):
             "content": content_text,
             "author": row.get("author") or "",
             "url": row.get("url") or "",
-            "created_at": row.get("created_at") or 0,
+            "created_at": _to_millis(row.get("created_at")) or 0,
             "sentiment": sentiment,
-            "sentiment_score": sentiment_score or 0,
-            "sentiment_labels": sentiment_labels or {},
+            "sentiment_score": 0 if sentiment_score is None else sentiment_score,
+            "sentiment_labels": sentiment_labels,
             "is_sensitive": bool(is_sensitive),
         })
 
@@ -470,14 +527,11 @@ def get_sensitive_feed(request):
     platform = request.GET.get("platform")
     sort_by = request.GET.get("sort_by")
     sort_order = request.GET.get("sort_order", "asc").lower()
-    try:
-        page = max(1, int(request.GET.get("page", 1)))
-        page_size = max(1, int(request.GET.get("page_size", 50)))
-    except ValueError:
-        page = 1
-        page_size = 50
-
-    offset = (page - 1) * page_size
+    page, page_size, offset = _get_bounded_pagination_params(
+        request,
+        default_page_size=50,
+        max_page_size=MONITOR_FEED_MAX_PAGE_SIZE,
+    )
     queryset = MonitorFeed.objects.filter(
         models.Q(is_sensitive=True) | models.Q(sentiment="sensitive")
     )
@@ -511,7 +565,7 @@ def get_sensitive_feed(request):
         )
         return Response({
             "items": items,
-            "latest_update_ts": latest_update_ts,
+            "latest_update_ts": _to_millis(latest_update_ts) or 0,
             "pagination": {
                 "page": page,
                 "page_size": page_size,
@@ -569,7 +623,7 @@ def get_sensitive_feed(request):
             "content": row.get("content") or "",
             "author": row.get("author") or "",
             "url": row.get("url") or "",
-            "created_at": row.get("created_at") or 0,
+            "created_at": _to_millis(row.get("created_at")) or 0,
             "sentiment": row.get("sentiment") or "sensitive",
             "sentiment_score": row.get("sentiment_score") or 0,
             "sentiment_labels": row.get("sentiment_labels") or {},
@@ -580,7 +634,7 @@ def get_sensitive_feed(request):
 
     return Response({
         "items": items,
-        "latest_update_ts": latest_update_ts,
+        "latest_update_ts": _to_millis(latest_update_ts) or 0,
         "pagination": {
             "page": page,
             "page_size": page_size,
@@ -600,14 +654,11 @@ def get_all_feed(request):
     platform = request.GET.get("platform")
     sort_by = request.GET.get("sort_by")
     sort_order = request.GET.get("sort_order", "asc").lower()
-    try:
-        page = max(1, int(request.GET.get("page", 1)))
-        page_size = max(1, int(request.GET.get("page_size", 50)))
-    except ValueError:
-        page = 1
-        page_size = 50
-
-    offset = (page - 1) * page_size
+    page, page_size, offset = _get_bounded_pagination_params(
+        request,
+        default_page_size=50,
+        max_page_size=MONITOR_FEED_MAX_PAGE_SIZE,
+    )
     queryset = MonitorFeed.objects.all()
     if platform:
         queryset = queryset.filter(platform=platform)
@@ -687,7 +738,7 @@ def get_all_feed(request):
             "content": row.get("content") or "",
             "author": row.get("author") or "",
             "url": row.get("url") or "",
-            "created_at": row.get("created_at") or 0,
+            "created_at": _to_millis(row.get("created_at")) or 0,
             "sentiment": sentiment,
             "sentiment_score": row.get("sentiment_score") or 0,
             "sentiment_labels": sentiment_labels,
@@ -698,7 +749,7 @@ def get_all_feed(request):
 
     return Response({
         "items": items,
-        "latest_update_ts": latest_update_ts,
+        "latest_update_ts": _to_millis(latest_update_ts) or 0,
         "pagination": {
             "page": page,
             "page_size": page_size,
@@ -747,11 +798,11 @@ def _fetch_from_platform_tables(limit: int = None) -> list:
             # tieba
             "SELECT 'tieba' as platform, '贴吧' as platform_name, note_id as content_id, "
             "CONCAT_WS(' ', IFNULL(`title`, ''), IFNULL(`desc`, '')) as content, user_nickname as author, "
-            "note_url as url, 0 as created_at, COALESCE(source_keyword, '') as source_keyword FROM tieba_note",
+            "note_url as url, publish_time as created_at, COALESCE(source_keyword, '') as source_keyword FROM tieba_note",
             # zhihu
             "SELECT 'zhihu' as platform, '知乎' as platform_name, content_id as content_id, "
             "CONCAT_WS(' ', IFNULL(`title`, ''), IFNULL(`desc`, ''), IFNULL(`content_text`, '')) as content, user_nickname as author, "
-            "content_url as url, 0 as created_at, COALESCE(source_keyword, '') as source_keyword FROM zhihu_content",
+            "content_url as url, created_time as created_at, COALESCE(source_keyword, '') as source_keyword FROM zhihu_content",
         ]
 
         all_rows = []
@@ -781,7 +832,7 @@ def _fetch_from_platform_tables(limit: int = None) -> list:
                 "content": row.get("content") or "",
                 "author": row.get("author") or "",
                 "url": row.get("url") or "",
-                "created_at": row.get("created_at") or 0,
+                "created_at": _to_millis(row.get("created_at")) or 0,
             })
 
     except Exception as e:
@@ -822,11 +873,11 @@ def _fetch_from_platform_tables_paginated(page: int = 1, page_size: int = 100) -
             # tieba
             "SELECT 'tieba' as platform, '贴吧' as platform_name, note_id as content_id, "
             "CONCAT_WS(' ', IFNULL(`title`, ''), IFNULL(`desc`, '')) as content, user_nickname as author, "
-            "note_url as url, 0 as created_at, COALESCE(source_keyword, '') as source_keyword FROM tieba_note",
+            "note_url as url, publish_time as created_at, COALESCE(source_keyword, '') as source_keyword FROM tieba_note",
             # zhihu
             "SELECT 'zhihu' as platform, '知乎' as platform_name, content_id as content_id, "
             "CONCAT_WS(' ', IFNULL(`title`, ''), IFNULL(`desc`, ''), IFNULL(`content_text`, '')) as content, user_nickname as author, "
-            "content_url as url, 0 as created_at, COALESCE(source_keyword, '') as source_keyword FROM zhihu_content",
+            "content_url as url, created_time as created_at, COALESCE(source_keyword, '') as source_keyword FROM zhihu_content",
         ]
 
         all_rows = []
@@ -857,7 +908,7 @@ def _fetch_from_platform_tables_paginated(page: int = 1, page_size: int = 100) -
                 "content": row.get("content") or "",
                 "author": row.get("author") or "",
                 "url": row.get("url") or "",
-                "created_at": row.get("created_at") or 0,
+                "created_at": _to_millis(row.get("created_at")) or 0,
             })
 
     except Exception as e:
@@ -961,6 +1012,33 @@ def get_config_options(request):
     })
 
 
+@api_view(["GET", "PUT"])
+@permission_classes([AllowAny])
+def crawler_settings_api(request):
+    crawler_settings = CrawlerSettings.get_solo()
+
+    if request.method == "GET":
+        return Response({"settings": _serialize_crawler_settings(crawler_settings)})
+
+    try:
+        normalized_settings = _normalize_crawler_settings_payload(request.data)
+    except ValueError as exc:
+        return Response(
+            {"error": str(exc)},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    crawler_settings.max_concurrency_num = normalized_settings["max_concurrency_num"]
+    crawler_settings.request_interval_ms = normalized_settings["request_interval_ms"]
+    crawler_settings.enable_media_download = normalized_settings["enable_media_download"]
+    crawler_settings.save()
+
+    return Response({
+        "message": "爬虫配置已保存，新的爬虫任务会使用该配置",
+        "settings": _serialize_crawler_settings(crawler_settings),
+    })
+
+
 # ============== Crawler Control ==============
 
 class CrawlerView(APIView):
@@ -999,6 +1077,14 @@ class CrawlerView(APIView):
             login_type = data.get("login_type", "qrcode")
             crawler_type = data.get("crawler_type", "search")
 
+            try:
+                runtime_settings = _get_effective_crawler_settings(data)
+            except ValueError as exc:
+                return Response(
+                    {"error": str(exc)},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
             platform_list = data.get("platforms") or platform
             if isinstance(platform_list, str):
                 platform_list = [p.strip() for p in platform_list.split(",") if p.strip()]
@@ -1025,6 +1111,9 @@ class CrawlerView(APIView):
                     "--lt", login_type,
                     "--type", crawler_type,
                     "--save_data_path", str(DATA_DIR),
+                    "--max_concurrency_num", str(runtime_settings["max_concurrency_num"]),
+                    "--crawl_interval_ms", str(runtime_settings["request_interval_ms"]),
+                    "--enable_get_media", "true" if runtime_settings["enable_media_download"] else "false",
                 ]
 
                 if keywords := data.get("keywords"):
@@ -1250,7 +1339,7 @@ def _get_db_preview_row(platform: str, obj) -> dict:
         if val:
             content_parts.append(str(val))
     content = " ".join(content_parts).strip()
-    time_value = getattr(obj, time_field, None) if time_field else None
+    time_value = _to_millis(getattr(obj, time_field, None)) if time_field else None
 
     # Get sentiment and is_sensitive from platform table first
     sentiment = getattr(obj, "sentiment", None)
@@ -1331,9 +1420,10 @@ def _get_monitor_feed_data(platform: str, limit: int = 100, page: int = 1) -> tu
 
         rows = []
         for feed in queryset[offset:offset + limit]:
+            created_at = _to_millis(feed.created_at) or 0
             row_data = {
-                "create_time": feed.created_at,
-                "created_time": feed.created_at,
+                "create_time": created_at,
+                "created_time": created_at,
                 "content": feed.content,
                 "desc": None,
                 "title": None,
@@ -1383,6 +1473,7 @@ def _fetch_platform_feed_data(platform: str, page: int, page_size: int) -> tuple
         latest_update_ts = queryset.aggregate(
             max_ts=models.Max(Coalesce("last_modify_ts", "add_ts", 0))
         ).get("max_ts") or 0
+        latest_update_ts = _to_millis(latest_update_ts) or 0
 
         total_count = queryset.count()
         total_pages = (total_count + page_size - 1) // page_size if total_count > 0 else 1
@@ -1409,7 +1500,7 @@ def _fetch_platform_feed_data(platform: str, page: int, page_size: int) -> tuple
 
             content_id = getattr(obj, id_field, None) if id_field else None
             content_id_str = str(content_id) if content_id is not None else ""
-            created_at = getattr(obj, time_field, None) if time_field else 0
+            created_at = _to_millis(getattr(obj, time_field, None)) if time_field else None
             author = getattr(obj, author_field, None) if author_field else None
             url = getattr(obj, url_field, None) if url_field else None
 
@@ -2006,7 +2097,7 @@ def get_data_stats(request):
             except Exception:
                 latest_ts = 0
 
-        stats["updated_at_by_platform"][platform] = int(latest_ts or 0)
+        stats["updated_at_by_platform"][platform] = _to_millis(latest_ts) or 0
 
     return Response(stats)
 
@@ -2264,8 +2355,6 @@ def ai_keyword_analysis(request):
 
     # 获取 API Key
     api_key = os.environ.get('ZHIPU_API_KEY')
-    print(f"[DEBUG] API Key 存在: {bool(api_key)}")
-    print(f"[DEBUG] API Key 格式: {api_key[:20]}..." if api_key else "[DEBUG] API Key: None")
 
     # 获取请求参数
     data = request.data

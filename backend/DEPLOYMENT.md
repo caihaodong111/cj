@@ -138,7 +138,7 @@ docker compose logs -f backend
 | API 根路径 | http://39.105.122.26:8000/ |
 | 健康检查 | http://39.105.122.26:8000/api/health |
 | 管理后台 | http://39.105.122.26:8000/admin/ |
-| API 文档 | http://39.105.122.26:8000/api/docs |
+| 配置选项 | http://39.105.122.26:8000/api/config/options |
 
 ## 常用运维命令
 

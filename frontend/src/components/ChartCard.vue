@@ -12,7 +12,7 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
-import * as echarts from 'echarts'
+import { echarts } from '../utils/echarts'
 
 const props = defineProps({
   title: {

@@ -67,16 +67,48 @@ cp .env.example .env
 | 变量 | 说明 | 默认值 |
 |--------|------|--------|
 | `DB_ENGINE` | 数据库引擎 | `sqlite3` |
-| `DB_NAME` | 数据库名 | - |
-| `DB_USER` | 数据库用户 | - |
-| `DB_PASSWORD` | 数据库密码 | - |
-| `DB_HOST` | 数据库主机 | `localhost` |
-| `DB_PORT` | 数据库端口 | - |
+| `DB_NAME` | 数据库名 / SQLite 文件名 | `db.sqlite3`（当 `DB_ENGINE=sqlite3`；MySQL/PostgreSQL 必填） |
+| `DB_USER` | 数据库用户 | MySQL 必填；PostgreSQL 默认为 `postgres` |
+| `DB_PASSWORD` | 数据库密码 | 空 |
+| `DB_HOST` | 数据库主机 | `localhost`（MySQL/PostgreSQL） |
+| `DB_PORT` | 数据库端口 | `3306` / `5432`（按引擎） |
 
 支持的数据引擎：
 - `sqlite3` - SQLite（默认）
+- `sqlite` - SQLite（`sqlite3` 的兼容别名）
 - `mysql` - MySQL
 - `postgresql` - PostgreSQL
+- `postgres` - PostgreSQL（`postgresql` 的兼容别名）
+
+如果没有 `.env`，后端会默认使用本地 SQLite 数据库文件 `backend/db.sqlite3`，不会再隐式连接远程 MySQL。
+
+示例：
+
+```env
+# 默认本地开发
+DB_ENGINE=sqlite3
+DB_NAME=db.sqlite3
+```
+
+```env
+# MySQL
+DB_ENGINE=mysql
+DB_NAME=media_crawler
+DB_USER=root
+DB_PASSWORD=your_password
+DB_HOST=localhost
+DB_PORT=3306
+```
+
+```env
+# PostgreSQL
+DB_ENGINE=postgresql
+DB_NAME=media_crawler
+DB_USER=postgres
+DB_PASSWORD=your_password
+DB_HOST=localhost
+DB_PORT=5432
+```
 
 ### 服务器配置
 

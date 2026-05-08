@@ -4,6 +4,7 @@
 
 import os
 from pathlib import Path
+from django.core.exceptions import ImproperlyConfigured
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -69,33 +70,129 @@ TEMPLATES = [{
 
 WSGI_APPLICATION = "mediacrawler_config.wsgi.application"
 
-# Database - MySQL (from .env)
-import pymysql
-pymysql.__version__ = "2.2.1"
-pymysql.version_info = (2, 2, 1, "final", 0)
-pymysql.install_as_MySQLdb()
-
-DB_ENGINE = os.environ.get('DB_ENGINE', 'mysql')
-DB_NAME = os.environ.get('DB_NAME', 'lxr')
-DB_USER = os.environ.get('DB_USER', 'lxr')
-DB_PASSWORD = os.environ.get('DB_PASSWORD', 'lxr123123')
-DB_HOST = os.environ.get('DB_HOST', '39.105.122.26')
-DB_PORT = os.environ.get('DB_PORT', '3306')
-
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.mysql",
-        "NAME": DB_NAME,
-        "USER": DB_USER,
-        "PASSWORD": DB_PASSWORD,
-        "HOST": DB_HOST,
-        "PORT": DB_PORT,
-        "OPTIONS": {
-            "charset": "utf8mb4",
-            "init_command": "SET sql_mode='STRICT_TRANS_TABLES'",
-        },
-    }
+# Database
+SUPPORTED_DB_ENGINES = {
+    "sqlite": "sqlite3",
+    "sqlite3": "sqlite3",
+    "mysql": "mysql",
+    "postgres": "postgresql",
+    "postgresql": "postgresql",
 }
+
+
+def _get_env(name: str, default: str = "") -> str:
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    return value.strip()
+
+
+def _normalize_db_engine(raw_engine: str) -> str:
+    normalized = (raw_engine or "sqlite3").strip().lower()
+    try:
+        return SUPPORTED_DB_ENGINES[normalized]
+    except KeyError as exc:
+        supported = ", ".join(sorted(SUPPORTED_DB_ENGINES))
+        raise ImproperlyConfigured(
+            f"Unsupported DB_ENGINE '{raw_engine}'. Supported values: {supported}."
+        ) from exc
+
+
+def _require_database_setting(name: str, value: str, engine: str) -> str:
+    if value:
+        return value
+    raise ImproperlyConfigured(f"{name} must be set when DB_ENGINE='{engine}'.")
+
+
+def _resolve_sqlite_db_name(raw_name: str):
+    if raw_name == ":memory:":
+        return raw_name
+
+    db_path = Path(raw_name)
+    if not db_path.is_absolute():
+        db_path = BASE_DIR / db_path
+    return db_path
+
+
+DB_ENGINE = _normalize_db_engine(os.environ.get("DB_ENGINE"))
+DB_NAME = ""
+DB_USER = ""
+DB_PASSWORD = ""
+DB_HOST = ""
+DB_PORT = ""
+
+if DB_ENGINE == "sqlite3":
+    DB_NAME = _get_env("DB_NAME", "db.sqlite3")
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": _resolve_sqlite_db_name(DB_NAME),
+        }
+    }
+elif DB_ENGINE == "mysql":
+    import pymysql
+
+    pymysql.__version__ = "2.2.1"
+    pymysql.version_info = (2, 2, 1, "final", 0)
+    pymysql.install_as_MySQLdb()
+
+    DB_NAME = _require_database_setting(
+        "DB_NAME",
+        _get_env("DB_NAME") or _get_env("MYSQL_DB_NAME"),
+        DB_ENGINE,
+    )
+    DB_USER = _require_database_setting(
+        "DB_USER",
+        _get_env("DB_USER") or _get_env("MYSQL_DB_USER"),
+        DB_ENGINE,
+    )
+    DB_PASSWORD = (
+        _get_env("DB_PASSWORD")
+        or _get_env("MYSQL_DB_PASSWORD")
+        or _get_env("MYSQL_DB_PWD")
+    )
+    DB_HOST = _get_env("DB_HOST") or _get_env("MYSQL_DB_HOST", "localhost")
+    DB_PORT = _get_env("DB_PORT") or _get_env("MYSQL_DB_PORT", "3306")
+
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.mysql",
+            "NAME": DB_NAME,
+            "USER": DB_USER,
+            "PASSWORD": DB_PASSWORD,
+            "HOST": DB_HOST,
+            "PORT": DB_PORT,
+            "OPTIONS": {
+                "charset": "utf8mb4",
+                "init_command": "SET sql_mode='STRICT_TRANS_TABLES'",
+            },
+        }
+    }
+else:
+    DB_NAME = _require_database_setting(
+        "DB_NAME",
+        _get_env("DB_NAME") or _get_env("POSTGRES_DB_NAME"),
+        DB_ENGINE,
+    )
+    DB_USER = _get_env("DB_USER") or _get_env("POSTGRES_DB_USER", "postgres")
+    DB_PASSWORD = (
+        _get_env("DB_PASSWORD")
+        or _get_env("POSTGRES_DB_PASSWORD")
+        or _get_env("POSTGRES_DB_PWD")
+    )
+    DB_HOST = _get_env("DB_HOST") or _get_env("POSTGRES_DB_HOST", "localhost")
+    DB_PORT = _get_env("DB_PORT") or _get_env("POSTGRES_DB_PORT", "5432")
+
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": DB_NAME,
+            "USER": DB_USER,
+            "PASSWORD": DB_PASSWORD,
+            "HOST": DB_HOST,
+            "PORT": DB_PORT,
+        }
+    }
 
 # Password Validation
 AUTH_PASSWORD_VALIDATORS = [

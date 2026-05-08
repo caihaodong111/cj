@@ -21,11 +21,15 @@
 import os
 
 # mysql config
-MYSQL_DB_PWD = os.getenv("MYSQL_DB_PWD") or os.getenv("DB_PASSWORD", "lxr123123")
-MYSQL_DB_USER = os.getenv("MYSQL_DB_USER") or os.getenv("DB_USER", "lxr")
-MYSQL_DB_HOST = os.getenv("MYSQL_DB_HOST") or os.getenv("DB_HOST", "39.105.122.26")
+MYSQL_DB_PWD = (
+    os.getenv("MYSQL_DB_PWD")
+    or os.getenv("MYSQL_DB_PASSWORD")
+    or os.getenv("DB_PASSWORD", "")
+)
+MYSQL_DB_USER = os.getenv("MYSQL_DB_USER") or os.getenv("DB_USER", "root")
+MYSQL_DB_HOST = os.getenv("MYSQL_DB_HOST") or os.getenv("DB_HOST", "localhost")
 MYSQL_DB_PORT = os.getenv("MYSQL_DB_PORT") or os.getenv("DB_PORT", 3306)
-MYSQL_DB_NAME = os.getenv("MYSQL_DB_NAME") or os.getenv("DB_NAME", "lxr")
+MYSQL_DB_NAME = os.getenv("MYSQL_DB_NAME") or os.getenv("DB_NAME", "media_crawler")
 
 mysql_db_config = {
     "user": MYSQL_DB_USER,
@@ -69,11 +73,15 @@ mongodb_config = {
 }
 
 # postgres config
-POSTGRES_DB_PWD = os.getenv("POSTGRES_DB_PWD", "123456")
-POSTGRES_DB_USER = os.getenv("POSTGRES_DB_USER", "postgres")
-POSTGRES_DB_HOST = os.getenv("POSTGRES_DB_HOST", "localhost")
-POSTGRES_DB_PORT = os.getenv("POSTGRES_DB_PORT", 5432)
-POSTGRES_DB_NAME = os.getenv("POSTGRES_DB_NAME", "media_crawler")
+POSTGRES_DB_PWD = (
+    os.getenv("POSTGRES_DB_PWD")
+    or os.getenv("POSTGRES_DB_PASSWORD")
+    or os.getenv("DB_PASSWORD", "")
+)
+POSTGRES_DB_USER = os.getenv("POSTGRES_DB_USER") or os.getenv("DB_USER", "postgres")
+POSTGRES_DB_HOST = os.getenv("POSTGRES_DB_HOST") or os.getenv("DB_HOST", "localhost")
+POSTGRES_DB_PORT = os.getenv("POSTGRES_DB_PORT") or os.getenv("DB_PORT", 5432)
+POSTGRES_DB_NAME = os.getenv("POSTGRES_DB_NAME") or os.getenv("DB_NAME", "media_crawler")
 
 postgres_db_config = {
     "user": POSTGRES_DB_USER,

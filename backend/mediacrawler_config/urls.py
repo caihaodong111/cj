@@ -19,6 +19,7 @@ from api.views import (
     check_environment,
     get_platforms,
     get_config_options,
+    crawler_settings_api,
     list_data_files,
     get_file_content,
     download_file,
@@ -52,6 +53,7 @@ urlpatterns = [
     path("api/env/check", check_environment, name="check_environment"),
     path("api/config/platforms", get_platforms, name="get_platforms"),
     path("api/config/options", get_config_options, name="get_config_options"),
+    path("api/config/crawler", crawler_settings_api, name="crawler_settings_api"),
 
     # API: Crawler Control
     path("api/crawler/<str:action>", CrawlerView.as_view(), name="crawler_action"),
@@ -88,9 +90,11 @@ urlpatterns = [
             {
                 "message": "MediaCrawler Backend API",
                 "version": "1.0.0",
-                "docs": "/api/docs",
                 "admin": "/admin/",
                 "health": "/api/health",
+                "platforms": "/api/config/platforms",
+                "config": "/api/config/options",
+                "crawler_status": "/api/crawler/status",
             }
         ),
     ),

@@ -59,23 +59,44 @@
           </div>
           <div class="config-item">
             <label>并发线程数</label>
-            <input type="number" value="4" />
+            <input
+              v-model.number="crawlerSettings.max_concurrency_num"
+              type="number"
+              min="1"
+              step="1"
+              :disabled="configLoading || configSaving"
+            />
           </div>
           <div class="config-item">
             <label>请求间隔 (ms)</label>
-            <input type="number" value="1000" />
+            <input
+              v-model.number="crawlerSettings.request_interval_ms"
+              type="number"
+              min="0"
+              step="100"
+              :disabled="configLoading || configSaving"
+            />
           </div>
           <div class="config-item">
-            <label>包含图片下载</label>
+            <label>包含图片/视频下载</label>
             <label class="switch">
-              <input type="checkbox" checked>
+              <input
+                v-model="crawlerSettings.enable_media_download"
+                type="checkbox"
+                :disabled="configLoading || configSaving"
+              >
               <span class="slider round"></span>
             </label>
+          </div>
+          <div v-if="configStatus.message" class="config-status" :class="configStatus.type">
+            {{ configStatus.message }}
           </div>
         </div>
 
         <div class="actions">
-          <button class="btn-primary">保存配置</button>
+          <button class="btn-primary" :disabled="configLoading || configSaving" @click="saveCrawlerSettings">
+            {{ configSaving ? '保存中...' : configLoading ? '加载中...' : '保存配置' }}
+          </button>
         </div>
       </div>
 
@@ -134,9 +155,18 @@ const API_BASE = '/api'
 
 const cookies = ref([])
 const loading = ref(false)
+const configLoading = ref(false)
+const configSaving = ref(false)
+const configStatus = ref({ type: '', message: '' })
 const showAddModal = ref(false)
 const showEditModal = ref(false)
 const editingId = ref(null)
+
+const crawlerSettings = ref({
+  max_concurrency_num: 1,
+  request_interval_ms: 2000,
+  enable_media_download: false
+})
 
 const formData = ref({
   platform: '',
@@ -150,6 +180,34 @@ const openAddModal = () => {
   showAddModal.value = true
 }
 
+const setConfigStatus = (type = '', message = '') => {
+  configStatus.value = { type, message }
+}
+
+const fetchCrawlerSettings = async () => {
+  configLoading.value = true
+  try {
+    const response = await fetch(`${API_BASE}/config/crawler`)
+    const data = await response.json().catch(() => ({}))
+
+    if (!response.ok) {
+      throw new Error(data.error || '获取爬虫配置失败')
+    }
+
+    crawlerSettings.value = {
+      max_concurrency_num: data.settings?.max_concurrency_num ?? 1,
+      request_interval_ms: data.settings?.request_interval_ms ?? 2000,
+      enable_media_download: Boolean(data.settings?.enable_media_download)
+    }
+    setConfigStatus()
+  } catch (error) {
+    console.error('获取爬虫配置失败:', error)
+    setConfigStatus('error', `获取爬虫配置失败: ${error.message}`)
+  } finally {
+    configLoading.value = false
+  }
+}
+
 const fetchCookies = async () => {
   loading.value = true
   try {
@@ -161,6 +219,60 @@ const fetchCookies = async () => {
     alert('获取 Cookie 列表失败: ' + error.message)
   } finally {
     loading.value = false
+  }
+}
+
+const validateCrawlerSettings = () => {
+  const { max_concurrency_num, request_interval_ms } = crawlerSettings.value
+
+  if (!Number.isInteger(max_concurrency_num) || max_concurrency_num < 1) {
+    return '并发线程数必须是大于等于 1 的整数'
+  }
+
+  if (!Number.isInteger(request_interval_ms) || request_interval_ms < 0) {
+    return '请求间隔必须是大于等于 0 的整数'
+  }
+
+  return ''
+}
+
+const saveCrawlerSettings = async () => {
+  const validationMessage = validateCrawlerSettings()
+  if (validationMessage) {
+    setConfigStatus('error', validationMessage)
+    return
+  }
+
+  configSaving.value = true
+  setConfigStatus()
+
+  try {
+    const response = await fetch(`${API_BASE}/config/crawler`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(crawlerSettings.value)
+    })
+
+    const data = await response.json().catch(() => ({}))
+
+    if (!response.ok) {
+      throw new Error(data.error || '保存爬虫配置失败')
+    }
+
+    crawlerSettings.value = {
+      max_concurrency_num: data.settings?.max_concurrency_num ?? crawlerSettings.value.max_concurrency_num,
+      request_interval_ms: data.settings?.request_interval_ms ?? crawlerSettings.value.request_interval_ms,
+      enable_media_download: Boolean(
+        data.settings?.enable_media_download ?? crawlerSettings.value.enable_media_download
+      )
+    }
+
+    setConfigStatus('success', data.message || '保存成功，新的爬虫任务会使用该配置')
+  } catch (error) {
+    console.error('保存爬虫配置失败:', error)
+    setConfigStatus('error', `保存爬虫配置失败: ${error.message}`)
+  } finally {
+    configSaving.value = false
   }
 }
 
@@ -251,6 +363,7 @@ const closeModal = () => {
 
 onMounted(() => {
   fetchCookies()
+  fetchCrawlerSettings()
 })
 </script>
 
@@ -714,6 +827,13 @@ onMounted(() => {
   box-shadow: 0 5px 15px rgba(255, 215, 0, 0.3);
 }
 
+.btn-primary:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+  transform: none;
+  box-shadow: none;
+}
+
 .btn-secondary {
   background: transparent;
   color: rgba(255, 255, 255, 0.85);
@@ -749,6 +869,11 @@ onMounted(() => {
   width: 100px;
 }
 
+.config-item input[type="number"]:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .switch {
   position: relative;
   display: inline-block;
@@ -760,6 +885,11 @@ onMounted(() => {
   opacity: 0;
   width: 0;
   height: 0;
+}
+
+.switch input:disabled + .slider {
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 .slider {
@@ -802,6 +932,25 @@ input:checked + .slider:before {
 
 .slider.round:before {
   border-radius: 50%;
+}
+
+.config-status {
+  margin-top: 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 10px;
+  font-size: 0.9rem;
+}
+
+.config-status.success {
+  background: rgba(61, 179, 116, 0.12);
+  border: 1px solid rgba(61, 179, 116, 0.28);
+  color: #8ff0b4;
+}
+
+.config-status.error {
+  background: rgba(255, 82, 82, 0.12);
+  border: 1px solid rgba(255, 82, 82, 0.28);
+  color: #ffb3aa;
 }
 
 .actions {

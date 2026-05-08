@@ -6,6 +6,21 @@
 
 from django.db import models
 
+from crawler import config as crawler_runtime_config
+
+
+def _default_max_concurrency_num() -> int:
+    return max(int(getattr(crawler_runtime_config, "MAX_CONCURRENCY_NUM", 1)), 1)
+
+
+def _default_request_interval_ms() -> int:
+    crawl_interval_sec = float(getattr(crawler_runtime_config, "CRAWLER_MAX_SLEEP_SEC", 2))
+    return max(int(crawl_interval_sec * 1000), 0)
+
+
+def _default_enable_media_download() -> bool:
+    return bool(getattr(crawler_runtime_config, "ENABLE_GET_MEIDAS", False))
+
 
 class AIUsageRecord(models.Model):
     """AI使用记录模型，用于记录深度分析功能的AI调用"""
@@ -150,3 +165,48 @@ class CookieConfig(models.Model):
             return config.cookies if config else ""
         except Exception:
             return ""
+
+
+class CrawlerSettings(models.Model):
+    """持久化爬虫运行参数，供设置页和启动接口共用。"""
+
+    singleton_key = models.CharField(
+        max_length=32,
+        unique=True,
+        default="default",
+        editable=False,
+        verbose_name="单例键",
+    )
+    max_concurrency_num = models.PositiveIntegerField(
+        default=_default_max_concurrency_num,
+        verbose_name="并发线程数",
+    )
+    request_interval_ms = models.PositiveIntegerField(
+        default=_default_request_interval_ms,
+        verbose_name="请求间隔(毫秒)",
+    )
+    enable_media_download = models.BooleanField(
+        default=_default_enable_media_download,
+        verbose_name="是否下载图片/视频",
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="创建时间",
+    )
+    updated_at = models.DateTimeField(
+        auto_now=True,
+        verbose_name="更新时间",
+    )
+
+    class Meta:
+        db_table = "crawler_settings"
+        verbose_name = "爬虫设置"
+        verbose_name_plural = "爬虫设置"
+
+    def __str__(self):
+        return "全局爬虫设置"
+
+    @classmethod
+    def get_solo(cls):
+        settings_obj, _ = cls.objects.get_or_create(singleton_key="default")
+        return settings_obj

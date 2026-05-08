@@ -1,0 +1,86 @@
+/* ==========================================================================
+   Element Plus 下拉菜单全局样式 - 透明玻璃质感（非 scoped）
+   ========================================================================== */
+
+/* --- 1. Popper 容器覆盖 --- */
+.analysis-dropdown.el-popper {
+  background-color: rgba(20, 25, 35, 0.75) !important;
+  backdrop-filter: blur(40px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(40px) saturate(180%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 20px !important;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+  z-index: 9999 !important;
+}
+
+/* --- 2. 下拉菜单容器 --- */
+.analysis-dropdown .el-select-dropdown {
+  background-color: transparent !important;
+  backdrop-filter: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+  margin-top: 0 !important;
+}
+
+.analysis-dropdown .el-select-dropdown__wrap {
+  background-color: transparent !important;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+}
+
+.analysis-dropdown .el-select-dropdown__wrap::-webkit-scrollbar {
+  width: 4px;
+}
+
+.analysis-dropdown .el-select-dropdown__wrap::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+
+.analysis-dropdown .el-select-dropdown__wrap::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.analysis-dropdown .el-popper__arrow {
+  display: none !important;
+}
+
+/* --- 3. 选项列表项 --- */
+.analysis-dropdown .el-select-dropdown__list {
+  background-color: transparent !important;
+  padding: 6px 8px !important;
+}
+
+.analysis-dropdown .el-select-dropdown__item {
+  color: #8da0b7 !important;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+  font-size: 13px !important;
+  height: 36px !important;
+  line-height: 36px !important;
+  margin: 1px 4px !important;
+  border-radius: 8px !important;
+  padding: 0 12px !important;
+  transition: all 0.15s ease !important;
+  font-weight: 400 !important;
+}
+
+.analysis-dropdown .el-select-dropdown__item.hover,
+.analysis-dropdown .el-select-dropdown__item:hover {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+  color: #ffffff !important;
+}
+
+.analysis-dropdown .el-select-dropdown__item.is-selected {
+  background: rgba(255, 170, 0, 0.15) !important;
+  color: #ffaa00 !important;
+  font-weight: 500 !important;
+}
+
+.analysis-dropdown .el-select-dropdown__item.is-disabled {
+  color: rgba(255, 255, 255, 0.2) !important;
+  pointer-events: none;
+}

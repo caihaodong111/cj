@@ -37,6 +37,7 @@ import config
 from base.base_crawler import AbstractStore
 from database.db_session import get_session
 from database.models import ZhihuContent, ZhihuComment, ZhihuCreator
+from media_platform.time_utils import coerce_timestamp_ms
 from tools import utils, words
 from var import crawler_type_var
 from tools.async_file_writer import AsyncFileWriter
@@ -103,26 +104,29 @@ class ZhihuDbStoreImplement(AbstractStore):
         Args:
             content_item: content item dict
         """
-        content_id = content_item.get("content_id")
+        normalized_item = dict(content_item)
+        normalized_item["created_time"] = coerce_timestamp_ms(content_item.get("created_time"))
+        normalized_item["updated_time"] = coerce_timestamp_ms(content_item.get("updated_time"))
+        content_id = normalized_item.get("content_id")
         async with get_session() as session:
             stmt = select(ZhihuContent).where(ZhihuContent.content_id == content_id)
             result = await session.execute(stmt)
             existing_content = result.scalars().first()
             if existing_content:
-                for key, value in content_item.items():
+                for key, value in normalized_item.items():
                     if hasattr(existing_content, key):
                         setattr(existing_content, key, value)
             else:
-                if "add_ts" not in content_item:
-                    content_item["add_ts"] = utils.get_current_timestamp()
-                new_content = ZhihuContent(**content_item)
+                if "add_ts" not in normalized_item:
+                    normalized_item["add_ts"] = utils.get_current_timestamp()
+                new_content = ZhihuContent(**normalized_item)
                 session.add(new_content)
             await session.commit()
 
         # Sync to monitor_feed table
         try:
             from tools.monitor_feed_sync import sync_to_monitor_feed
-            await sync_to_monitor_feed("zhihu", content_item)
+            await sync_to_monitor_feed("zhihu", normalized_item)
         except Exception as e:
             logger = utils.logger
             logger.warning(f"[ZhihuDbStore] Failed to sync to monitor_feed: {e}")

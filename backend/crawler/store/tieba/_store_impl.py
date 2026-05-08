@@ -36,6 +36,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import config
 from base.base_crawler import AbstractStore
 from database.models import TiebaNote, TiebaComment, TiebaCreator
+from media_platform.time_utils import coerce_timestamp_ms
 from tools import utils, words
 from database.db_session import get_session
 from var import crawler_type_var
@@ -104,23 +105,25 @@ class TieBaDbStoreImplement(AbstractStore):
         Args:
             content_item: content item dict
         """
-        note_id = content_item.get("note_id")
+        normalized_item = dict(content_item)
+        normalized_item["publish_time"] = coerce_timestamp_ms(content_item.get("publish_time"))
+        note_id = normalized_item.get("note_id")
         async with get_session() as session:
             stmt = select(TiebaNote).where(TiebaNote.note_id == note_id)
             res = await session.execute(stmt)
             db_note = res.scalar_one_or_none()
             if db_note:
-                for key, value in content_item.items():
+                for key, value in normalized_item.items():
                     setattr(db_note, key, value)
             else:
-                db_note = TiebaNote(**content_item)
+                db_note = TiebaNote(**normalized_item)
                 session.add(db_note)
             await session.commit()
 
         # Sync to monitor_feed table
         try:
             from tools.monitor_feed_sync import sync_to_monitor_feed
-            await sync_to_monitor_feed("tieba", content_item)
+            await sync_to_monitor_feed("tieba", normalized_item)
         except Exception as e:
             logger = utils.logger
             logger.warning(f"[TiebaDbStore] Failed to sync to monitor_feed: {e}")

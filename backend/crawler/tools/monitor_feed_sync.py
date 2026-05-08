@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from typing import Dict, Optional
+from typing import Dict
 
 from sqlalchemy import select, func
 
@@ -15,6 +15,7 @@ from database.models import (
     TiebaNote,
     ZhihuContent,
 )
+from media_platform.time_utils import coerce_timestamp_ms
 from tools.time_util import get_current_timestamp
 
 
@@ -57,12 +58,8 @@ def _get_created_at(content_item: Dict) -> int:
         or content_item.get("create_time")
         or content_item.get("created_time")
         or content_item.get("publish_time")
-        or 0
     )
-    try:
-        return int(created_at)
-    except (ValueError, TypeError):
-        return 0
+    return coerce_timestamp_ms(created_at) or 0
 
 
 async def _sync_with_session(session, platform: str, content_item: Dict) -> bool:
@@ -163,13 +160,6 @@ def _safe_attr(obj, name: str):
     return getattr(obj, name, None)
 
 
-def _safe_int(value) -> int:
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return 0
-
-
 def _model_to_content_item(platform: str, record) -> Dict:
     if platform == "xhs":
         return {
@@ -227,7 +217,7 @@ def _model_to_content_item(platform: str, record) -> Dict:
             "desc": _safe_attr(record, "desc"),
             "user_nickname": _safe_attr(record, "user_nickname"),
             "note_url": _safe_attr(record, "note_url"),
-            "publish_time": _safe_int(_safe_attr(record, "publish_time")),
+            "publish_time": _safe_attr(record, "publish_time"),
             "source_keyword": _safe_attr(record, "source_keyword"),
         }
     if platform == "zhihu":
@@ -238,7 +228,7 @@ def _model_to_content_item(platform: str, record) -> Dict:
             "content_text": _safe_attr(record, "content_text"),
             "user_nickname": _safe_attr(record, "user_nickname"),
             "content_url": _safe_attr(record, "content_url"),
-            "created_time": _safe_int(_safe_attr(record, "created_time")),
+            "created_time": _safe_attr(record, "created_time"),
             "source_keyword": _safe_attr(record, "source_keyword"),
         }
     return {}

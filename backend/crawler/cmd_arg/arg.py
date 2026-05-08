@@ -266,6 +266,23 @@ async def parse_cmd(argv: Optional[Sequence[str]] = None):
                 rich_help_panel="Performance Configuration",
             ),
         ] = config.MAX_CONCURRENCY_NUM,
+        crawl_interval_ms: Annotated[
+            int,
+            typer.Option(
+                "--crawl_interval_ms",
+                help="Request interval in milliseconds between crawler actions",
+                rich_help_panel="Performance Configuration",
+            ),
+        ] = int(config.CRAWLER_MAX_SLEEP_SEC * 1000),
+        enable_get_media: Annotated[
+            str,
+            typer.Option(
+                "--enable_get_media",
+                help="Whether to download images or videos, supports yes/true/t/y/1 or no/false/f/n/0",
+                rich_help_panel="Media Configuration",
+                show_default=True,
+            ),
+        ] = str(config.ENABLE_GET_MEIDAS),
         save_data_path: Annotated[
             str,
             typer.Option(
@@ -313,8 +330,14 @@ async def parse_cmd(argv: Optional[Sequence[str]] = None):
         enable_comment = _to_bool(get_comment)
         enable_sub_comment = _to_bool(get_sub_comment)
         enable_headless = _to_bool(headless)
+        enable_media_download = _to_bool(enable_get_media)
         enable_ip_proxy_value = _to_bool(enable_ip_proxy)
         init_db_value = init_db.value if init_db else None
+
+        if max_concurrency_num < 1:
+            raise typer.BadParameter("--max_concurrency_num must be greater than or equal to 1")
+        if crawl_interval_ms < 0:
+            raise typer.BadParameter("--crawl_interval_ms must be greater than or equal to 0")
 
         # Parse specified_id and creator_id into lists
         specified_id_list = [id.strip() for id in specified_id.split(",") if id.strip()] if specified_id else []
@@ -334,6 +357,8 @@ async def parse_cmd(argv: Optional[Sequence[str]] = None):
         config.COOKIES = cookies
         config.CRAWLER_MAX_COMMENTS_COUNT_SINGLENOTES = max_comments_count_singlenotes
         config.MAX_CONCURRENCY_NUM = max_concurrency_num
+        config.CRAWLER_MAX_SLEEP_SEC = crawl_interval_ms / 1000
+        config.ENABLE_GET_MEIDAS = enable_media_download
         config.SAVE_DATA_PATH = save_data_path
         config.ENABLE_IP_PROXY = enable_ip_proxy_value
         config.IP_PROXY_POOL_COUNT = ip_proxy_pool_count
@@ -374,6 +399,9 @@ async def parse_cmd(argv: Optional[Sequence[str]] = None):
             get_comment=config.ENABLE_GET_COMMENTS,
             get_sub_comment=config.ENABLE_GET_SUB_COMMENTS,
             headless=config.HEADLESS,
+            max_concurrency_num=config.MAX_CONCURRENCY_NUM,
+            crawl_interval_ms=crawl_interval_ms,
+            enable_get_media=config.ENABLE_GET_MEIDAS,
             cdp_url=config.EXTERNAL_CDP_URL,
             save_data_option=config.SAVE_DATA_OPTION,
             init_db=init_db_value,

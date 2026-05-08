@@ -12,6 +12,7 @@ django.setup()
 
 from api.sentiment_service import analyze_sentiment
 from media_platform.models import MonitorFeed
+from media_platform.time_utils import coerce_timestamp_ms
 
 PLATFORM_NAMES = {
     "xhs": "小红书",
@@ -22,6 +23,16 @@ PLATFORM_NAMES = {
     "tieba": "贴吧",
     "zhihu": "知乎",
 }
+
+
+def _extract_created_at_ms(content_item: dict) -> int:
+    created_at = (
+        content_item.get("time")
+        or content_item.get("create_time")
+        or content_item.get("created_time")
+        or content_item.get("publish_time")
+    )
+    return coerce_timestamp_ms(created_at) or 0
 
 
 def _sync_to_monitor_feed_sync(platform: str, content_item: dict):
@@ -51,17 +62,7 @@ def _sync_to_monitor_feed_sync(platform: str, content_item: dict):
         url = str(content_item.get("note_url") or content_item.get("aweme_url") or
                    content_item.get("video_url") or content_item.get("content_url") or "")
 
-        created_at = (
-            content_item.get("time")
-            or content_item.get("create_time")
-            or content_item.get("created_time")
-            or content_item.get("publish_time")
-            or 0
-        )
-        try:
-            created_at = int(created_at)
-        except (ValueError, TypeError):
-            created_at = 0
+        created_at = _extract_created_at_ms(content_item)
 
         sentiment_result = analyze_sentiment(content)
         sentiment = sentiment_result.get("sentiment", "neutral")

@@ -185,7 +185,7 @@ chmod +x deploy.sh
 | **API根路径** | http://39.105.122.26:8000/ | Django API |
 | **健康检查** | http://39.105.122.26/api/health | 服务健康状态 |
 | **管理后台** | http://39.105.122.26/admin/ | Django Admin |
-| **API文档** | http://39.105.122.26:8000/api/docs | API 文档 |
+| **配置选项** | http://39.105.122.26/api/config/options | 平台与运行配置接口 |
 
 ## 常用运维命令
 

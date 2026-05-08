@@ -1,9 +1,10 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import MainLayout from '../layouts/MainLayout.vue'
-import DashboardView from '../views/DashboardView.vue'
-import AnalysisView from '../views/AnalysisView.vue'
-import DataView from '../views/DataView.vue'
-import SettingsView from '../views/SettingsView.vue'
+
+const DashboardView = () => import('../views/DashboardView.vue')
+const AnalysisView = () => import('../views/AnalysisView.vue')
+const DataView = () => import('../views/DataView.vue')
+const SettingsView = () => import('../views/SettingsView.vue')
 
 const routes = [
     {
