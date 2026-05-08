@@ -41,6 +41,7 @@ from proxy.proxy_ip_pool import IpInfoModel, create_ip_pool
 from store import kuaishou as kuaishou_store
 from tools import utils
 from tools.cdp_browser import CDPBrowserManager
+from tools.qr_bridge import write_status
 from var import comment_tasks_var, crawler_type_var, source_keyword_var
 
 from .client import KuaishouClient
@@ -135,6 +136,8 @@ class KuaishouCrawler(AbstractCrawler):
                     utils.logger.error("[KuaishouCrawler.start] Cookie login failed or expired before crawl started")
                     if config.LOGIN_TYPE == "cookie":
                         sys.exit(1)
+            elif config.LOGIN_TYPE == "qrcode":
+                write_status("ks", "success")
 
             crawler_type_var.set(config.CRAWLER_TYPE)
             if config.CRAWLER_TYPE == "search":

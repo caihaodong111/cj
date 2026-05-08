@@ -141,8 +141,40 @@
 
         <div v-else class="support-card">
           <div>
-            <p class="support-card-title">扫码登录</p>
-            <p class="support-card-body">启动后进入二维码面板，服务端部署可直接打开 noVNC 扫码。</p>
+            <p class="support-card-title">{{ qrSupportTitle }}</p>
+            <p class="support-card-body">{{ qrSupportBody }}</p>
+          </div>
+          <button
+            v-if="showNoVncShortcut"
+            type="button"
+            class="cyber-btn cyber-btn-secondary support-card-action"
+            :disabled="isRunning"
+            @click="openRemoteDesktop"
+          >
+            打开 noVNC
+          </button>
+        </div>
+
+        <div v-if="config.login_type === 'qrcode'" class="form-row qr-mode-row">
+          <div class="form-group">
+            <label>扫码浏览器</label>
+            <el-select v-model="config.qr_browser_mode" :disabled="isRunning" class="crawler-select" popper-class="crawler-dropdown" :teleported="false">
+              <el-option label="独立浏览器（推荐）" value="isolated" />
+              <el-option label="外部 Chrome CDP" value="external_cdp" />
+            </el-select>
+            <p class="field-hint">{{ qrBrowserModeHint }}</p>
+          </div>
+
+          <div v-if="isExternalCdpMode" class="form-group">
+            <label>外部 CDP 地址</label>
+            <input
+              type="text"
+              v-model="config.external_cdp_url"
+              placeholder="例如：http://127.0.0.1:9222"
+              :disabled="isRunning"
+              class="cyber-input"
+            />
+            <p class="field-hint">只有在你明确要复用已开启调试端口的 Chrome 时才需要填写。</p>
           </div>
         </div>
       </section>
@@ -204,7 +236,7 @@
         <p v-if="qrDialog.error" class="qr-error">{{ qrDialog.error }}</p>
 
         <div class="qr-actions">
-          <button type="button" class="cyber-btn cyber-btn-secondary" @click="openRemoteDesktop">
+          <button v-if="showNoVncShortcut" type="button" class="cyber-btn cyber-btn-secondary" @click="openRemoteDesktop">
             打开 noVNC
           </button>
           <button
@@ -272,14 +304,21 @@ const remoteDesktopUrl = computed(() => {
   const host = window.location.hostname || '服务器IP'
   return `http://${host}:6080`
 })
+const isExternalCdpMode = computed(() => config.value.login_type === 'qrcode' && normalizeQrBrowserMode(config.value.qr_browser_mode) === 'external_cdp')
+const showNoVncShortcut = computed(() => config.value.login_type === 'qrcode' && !isExternalCdpMode.value)
 const qrDialogPlatformLabel = computed(() => getPlatformLabel(qrDialog.value.platform))
 const qrDialogTitle = computed(() => `${qrDialogPlatformLabel.value} 扫码登录`)
-const qrDialogSubtitle = computed(() => '扫码完成后任务继续执行，前端会自动同步状态。')
+const qrDialogSubtitle = computed(() => {
+  if (qrDialog.value.status === 'success' && !qrDialog.value.image) {
+    return '已检测到当前平台仍处于登录态，任务正在继续执行。'
+  }
+  return '仅在当前任务确实需要扫码时显示二维码。'
+})
 const qrStatusText = computed(() => {
   const textMap = {
-    idle: '等待启动',
+    idle: '检查登录状态',
     pending: '等待扫码',
-    success: '登录成功',
+    success: qrDialog.value.image ? '登录成功' : '已复用登录态',
     failed: '登录失败'
   }
   return textMap[qrDialog.value.status] || qrDialog.value.status || '等待启动'
@@ -289,14 +328,27 @@ const qrPlaceholderText = computed(() => {
     return '二维码生成失败或登录流程已中断'
   }
   if (qrDialog.value.status === 'success') {
-    return '登录已成功，等待后端同步页面状态'
+    return qrDialog.value.image
+      ? '登录已成功，等待后端同步页面状态'
+      : '当前平台已复用登录态，无需再次扫码'
   }
-  return '正在等待后端生成二维码...'
+  if (qrDialog.value.status === 'pending') {
+    return '二维码同步中，请稍候...'
+  }
+  return '正在检查当前平台是否仍处于登录态，如需扫码会自动显示二维码。'
 })
 const qrPrimaryHint = computed(() => {
-  return `服务器部署请打开 ${remoteDesktopUrl.value} 完成扫码；本地部署可直接在当前环境中操作。`
+  if (isExternalCdpMode.value) {
+    return '后台页面会保持当前界面；如需扫码，请在你连接的外部 Chrome 页面中完成。'
+  }
+  return `后台页面会保持当前界面；本地部署请在独立浏览器中扫码，服务器部署请打开 ${remoteDesktopUrl.value} 完成扫码。`
 })
-const qrSecondaryHint = computed(() => '二维码和登录状态每 2 秒自动刷新。')
+const qrSecondaryHint = computed(() => {
+  if (isExternalCdpMode.value) {
+    return '登录状态每 2 秒自动刷新；只有真正需要扫码时才会弹出二维码。'
+  }
+  return '系统会优先使用独立浏览器或 noVNC 完成扫码，后台页不会强制切换到目标平台。'
+})
 const qrUpdatedAtText = computed(() => {
   if (!qrDialog.value.updatedAt) return ''
   const updatedAt = new Date(qrDialog.value.updatedAt * 1000)
@@ -309,7 +361,24 @@ const loginTypeMeta = computed(() => {
     if (cookieState.value.loading) return '检测系统 Cookie'
     return cookieState.value.exists ? '复用系统 Cookie' : '当前平台无可用 Cookie'
   }
-  return '启动后进入二维码面板'
+  return isExternalCdpMode.value
+    ? '当前页保持不动，扫码在外部 Chrome 中进行'
+    : '当前页保持不动，扫码在独立浏览器或 noVNC 中进行'
+})
+const qrSupportTitle = computed(() => {
+  return isExternalCdpMode.value ? '扫码登录 / 外部 Chrome' : '扫码登录 / 独立浏览器'
+})
+const qrSupportBody = computed(() => {
+  if (isExternalCdpMode.value) {
+    return '后台前端会留在当前页面，任务会在你连接的外部 Chrome CDP 上下文中打开平台登录页。'
+  }
+  return '后台前端会留在当前页面，任务会在独立浏览器标签页或服务器 noVNC 浏览器中打开平台登录页。'
+})
+const qrBrowserModeHint = computed(() => {
+  if (isExternalCdpMode.value) {
+    return '适合本地调试或需要复用现有浏览器环境的场景，必须提供可访问的 Chrome DevTools 地址。'
+  }
+  return '推荐：使用系统单独拉起的浏览器配置目录，扫码过程不会打断当前后台界面。'
 })
 const statusMetaText = computed(() => {
   return isRunning.value
@@ -343,8 +412,46 @@ const config = ref({
   creator_ids: '',
   enable_comments: false,
   enable_sub_comments: false,
-  headless: true
+  headless: true,
+  qr_browser_mode: 'isolated',
+  external_cdp_url: ''
 })
+
+const QR_BROWSER_PREFS_KEY = 'mediacrawler.qr_browser_prefs'
+
+const normalizeQrBrowserMode = (mode) => {
+  return mode === 'external_cdp' ? 'external_cdp' : 'isolated'
+}
+
+const loadQrBrowserPrefs = () => {
+  if (typeof window === 'undefined') return
+
+  try {
+    const rawPrefs = window.localStorage.getItem(QR_BROWSER_PREFS_KEY)
+    if (!rawPrefs) return
+
+    const parsedPrefs = JSON.parse(rawPrefs)
+    config.value.qr_browser_mode = normalizeQrBrowserMode(parsedPrefs?.qr_browser_mode)
+    config.value.external_cdp_url = typeof parsedPrefs?.external_cdp_url === 'string'
+      ? parsedPrefs.external_cdp_url
+      : ''
+  } catch (e) {
+    console.warn('读取扫码浏览器偏好失败:', e)
+  }
+}
+
+const persistQrBrowserPrefs = () => {
+  if (typeof window === 'undefined') return
+
+  try {
+    window.localStorage.setItem(QR_BROWSER_PREFS_KEY, JSON.stringify({
+      qr_browser_mode: normalizeQrBrowserMode(config.value.qr_browser_mode),
+      external_cdp_url: config.value.external_cdp_url || ''
+    }))
+  } catch (e) {
+    console.warn('保存扫码浏览器偏好失败:', e)
+  }
+}
 
 const getPlatformLabel = (platformValue) => {
   const matched = platforms.value.find((item) => item.value === platformValue)
@@ -383,12 +490,34 @@ const openRemoteDesktop = () => {
 const applyQrPayload = (platform, qrPayload = {}, statusPayload = {}) => {
   if (platform !== qrDialog.value.platform) return
 
-  qrDialog.value.image = qrPayload.qr_code || ''
+  const previousStatus = qrDialog.value.status
+  const wasVisible = qrDialog.value.visible
+  const nextImage = qrPayload.qr_code || ''
+  const nextStatus = statusPayload.status || (nextImage ? 'pending' : 'idle')
+
+  qrDialog.value.image = nextImage
   qrDialog.value.updatedAt = qrPayload.updated_at || statusPayload.updated_at || null
-  qrDialog.value.status = statusPayload.status || (qrPayload.qr_code ? 'pending' : 'idle')
+  qrDialog.value.status = nextStatus
   qrDialog.value.error = ''
 
-  if (qrDialog.value.status === 'success' || qrDialog.value.status === 'failed') {
+  if (nextStatus === 'success' && !nextImage) {
+    qrDialog.value.visible = false
+    if (previousStatus !== 'success') {
+      setFormMessage('success', `${getPlatformLabel(platform)} 已检测到现有登录态，无需再次扫码。`)
+    }
+  } else if (nextStatus === 'failed') {
+    qrDialog.value.visible = true
+    if (previousStatus !== 'failed') {
+      setFormMessage('error', `${getPlatformLabel(platform)} 登录流程失败，未能获取可用二维码。`)
+    }
+  } else if (nextImage || nextStatus === 'pending') {
+    qrDialog.value.visible = true
+    if (!wasVisible) {
+      setFormMessage('info', '二维码已准备好，请在面板中完成扫码。')
+    }
+  }
+
+  if (nextStatus === 'success' || nextStatus === 'failed') {
     stopQrPolling()
   }
 }
@@ -429,9 +558,9 @@ const startQrPolling = () => {
 const openQrDialog = (platform) => {
   qrDialog.value = {
     ...createQrDialogState(),
-    visible: true,
+    visible: false,
     platform,
-    status: 'pending'
+    status: 'idle'
   }
   startQrPolling()
 }
@@ -511,6 +640,13 @@ watch(
 )
 
 watch(
+  () => [config.value.qr_browser_mode, config.value.external_cdp_url],
+  () => {
+    persistQrBrowserPrefs()
+  }
+)
+
+watch(
   () => config.value.enable_comments,
   (enabled) => {
     if (!enabled) {
@@ -581,17 +717,35 @@ const startCrawler = async () => {
 
     if (requestConfig.login_type === 'qrcode') {
       requestConfig.headless = false
+      requestConfig.qr_browser_mode = normalizeQrBrowserMode(requestConfig.qr_browser_mode)
+
+      if (requestConfig.qr_browser_mode === 'external_cdp') {
+        const cdpUrl = (requestConfig.external_cdp_url || '').trim()
+        if (!cdpUrl) {
+          setFormMessage('error', '外部 Chrome CDP 模式需要先填写可访问的 CDP 地址。')
+          return
+        }
+        requestConfig.cdp_url = cdpUrl
+      }
     }
 
     if (!requestConfig.enable_comments) {
       requestConfig.enable_sub_comments = false
     }
 
+    delete requestConfig.qr_browser_mode
+    delete requestConfig.external_cdp_url
+
     emit('platform-change', requestConfig.platform)
     await axios.post('/api/crawler/start', requestConfig)
     if (requestConfig.login_type === 'qrcode') {
       openQrDialog(requestConfig.platform)
-      setFormMessage('info', '任务已提交，请在二维码面板中完成扫码。')
+      setFormMessage(
+        'info',
+        requestConfig.cdp_url
+          ? '任务已提交，后台页面会保持当前界面；如需扫码，请在外部 Chrome 页面中完成。'
+          : '任务已提交，后台页面会保持当前界面；如需扫码，请在独立浏览器或 noVNC 中完成。'
+      )
     } else {
       setFormMessage('success', '任务已提交，平台数据开始更新。')
     }
@@ -622,6 +776,7 @@ const stopCrawler = async () => {
 
 // Lifecycle
 onMounted(async () => {
+  loadQrBrowserPrefs()
   await fetchPlatforms()
   await fetchStatus({ emitIfUnchanged: true })
   await fetchActiveCookieStatus(config.value.platform)
@@ -899,6 +1054,11 @@ onUnmounted(() => {
     rgba(255, 255, 255, 0.03);
 }
 
+.support-card-action {
+  flex-shrink: 0;
+  align-self: center;
+}
+
 .support-card-title {
   margin: 0;
   font-size: 13px;
@@ -911,6 +1071,10 @@ onUnmounted(() => {
   color: #8ba0bf;
   font-size: 12px;
   line-height: 1.65;
+}
+
+.qr-mode-row {
+  margin-top: 14px;
 }
 
 .support-pill {

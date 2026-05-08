@@ -38,6 +38,7 @@ from proxy.proxy_ip_pool import IpInfoModel, create_ip_pool
 from store import douyin as douyin_store
 from tools import utils
 from tools.cdp_browser import CDPBrowserManager
+from tools.qr_bridge import write_status
 from var import crawler_type_var, source_keyword_var
 
 from .client import DouYinClient
@@ -146,6 +147,8 @@ class DouYinCrawler(AbstractCrawler):
                 await login_obj.begin()
                 await self.dy_client.update_cookies(browser_context=self.browser_context)
                 await wait_for_page_stable(self.context_page)
+            elif config.LOGIN_TYPE == "qrcode":
+                write_status("dy", "success")
             crawler_type_var.set(config.CRAWLER_TYPE)
             if config.CRAWLER_TYPE == "search":
                 # Search for notes and retrieve their comment information.

@@ -86,15 +86,19 @@ class DouYinLogin(AbstractLogin):
             The verification accuracy of the slider verification is not very good... If there are no special requirements, it is recommended not to use Douyin login, or use cookie login
         """
 
-        # popup login dialog
-        await self.popup_login_dialog()
-
         # select login type
         if config.LOGIN_TYPE == "qrcode":
-            await self.login_by_qrcode()
+            if await self._is_logged_in_once():
+                utils.logger.info("[DouYinLogin.begin] Existing login session detected, skip QR login.")
+                write_status("dy", "success")
+            else:
+                await self.popup_login_dialog()
+                await self.login_by_qrcode()
         elif config.LOGIN_TYPE == "phone":
+            await self.popup_login_dialog()
             await self.login_by_mobile()
         elif config.LOGIN_TYPE == "cookie":
+            await self.popup_login_dialog()
             await self.login_by_cookies()
         else:
             raise ValueError("[DouYinLogin.begin] Invalid Login Type Currently only supported qrcode or phone or cookie ...")
@@ -125,6 +129,9 @@ class DouYinLogin(AbstractLogin):
     @retry(stop=stop_after_attempt(600), wait=wait_fixed(1), retry=retry_if_result(lambda value: value is False))
     async def check_login_state(self):
         """Check if the current login status is successful and return True otherwise return False"""
+        return await self._is_logged_in_once()
+
+    async def _is_logged_in_once(self) -> bool:
         current_cookie = await self.browser_context.cookies()
         _, cookie_dict = utils.convert_cookies(current_cookie)
 
@@ -185,6 +192,10 @@ class DouYinLogin(AbstractLogin):
 
     async def login_by_qrcode(self):
         utils.logger.info("[DouYinLogin.login_by_qrcode] Begin login douyin by qrcode...")
+        if await self._is_logged_in_once():
+            utils.logger.info("[DouYinLogin.login_by_qrcode] Existing login session detected, skip QR login.")
+            write_status("dy", "success")
+            return
         qrcode_img_selector = await self._wait_for_any_selector(QRCODE_SELECTORS, timeout_ms=15000)
         base64_qrcode_img = None
         if qrcode_img_selector:

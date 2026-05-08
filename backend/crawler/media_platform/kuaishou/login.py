@@ -72,6 +72,11 @@ class KuaishouLogin(AbstractLogin):
         else:
             raise ValueError("[KuaishouLogin.begin] Invalid Login Type Currently only supported qrcode or phone or cookie ...")
 
+    async def _is_logged_in_once(self) -> bool:
+        current_cookie = await self.browser_context.cookies()
+        _, cookie_dict = utils.convert_cookies(current_cookie)
+        return bool(cookie_dict.get("passToken"))
+
     @retry(stop=stop_after_attempt(600), wait=wait_fixed(1), retry=retry_if_result(lambda value: value is False))
     async def check_login_state(self) -> bool:
         """
@@ -79,17 +84,16 @@ class KuaishouLogin(AbstractLogin):
             retry decorator will retry 20 times if the return value is False, and the retry interval is 1 second
             if max retry times reached, raise RetryError
         """
-        current_cookie = await self.browser_context.cookies()
-        _, cookie_dict = utils.convert_cookies(current_cookie)
-        kuaishou_pass_token = cookie_dict.get("passToken")
-        if kuaishou_pass_token:
-            return True
-        return False
+        return await self._is_logged_in_once()
 
     async def login_by_qrcode(self):
         """login kuaishou website and keep webdriver login state"""
         utils.logger.info("[KuaishouLogin.login_by_qrcode] Begin login kuaishou by qrcode ...")
         await self._wait_for_page_stable()
+        if await self._is_logged_in_once():
+            utils.logger.info("[KuaishouLogin.login_by_qrcode] Existing login session detected, skip QR login.")
+            write_status("ks", "success")
+            return
 
         qrcode_img_selector = await self._wait_for_any_selector(QRCODE_SELECTORS, timeout_ms=5000)
         if not qrcode_img_selector:

@@ -1751,7 +1751,6 @@ def _start_process(cmd, platform: str, crawler_type: str, login_type: str = "coo
     normalized_platform = _normalize_qr_platform(platform)
     if login_type == "qrcode" and normalized_platform:
         clear_platform(normalized_platform)
-        write_status(normalized_platform, "pending")
         env["MEDIACRAWLER_QR_MODE"] = env.get("MEDIACRAWLER_QR_MODE", "web") or "web"
 
     process = subprocess.Popen(

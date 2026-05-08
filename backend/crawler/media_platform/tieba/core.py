@@ -39,6 +39,7 @@ from proxy.proxy_ip_pool import IpInfoModel, ProxyIpPool, create_ip_pool
 from store import tieba as tieba_store
 from tools import utils
 from tools.cdp_browser import CDPBrowserManager
+from tools.qr_bridge import write_status
 from var import crawler_type_var, source_keyword_var
 
 from .client import BaiduTieBaClient
@@ -149,6 +150,8 @@ class TieBaCrawler(AbstractCrawler):
                 if not await self.tieba_client.pong(browser_context=self.browser_context):
                     utils.logger.error("[BaiduTieBaCrawler.start] Cookie/qrcode login failed or expired before crawl started")
                     sys.exit(1)
+            elif config.LOGIN_TYPE == "qrcode":
+                write_status("tieba", "success")
 
             crawler_type_var.set(config.CRAWLER_TYPE)
             if config.CRAWLER_TYPE == "search":

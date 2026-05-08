@@ -75,6 +75,9 @@ class XiaoHongShuLogin(AbstractLogin):
         """
         Verify login status using dual-check: UI elements and Cookies.
         """
+        return await self._is_logged_in_once(no_logged_in_session)
+
+    async def _is_logged_in_once(self, no_logged_in_session: Optional[str] = None) -> bool:
         # 1. Priority check: Check if the "Me" (Profile) node appears in the sidebar
         try:
             # Selector for elements containing "Me" text with a link pointing to the profile
@@ -100,8 +103,11 @@ class XiaoHongShuLogin(AbstractLogin):
         current_web_session = cookie_dict.get("web_session")
         
         # If web_session has changed, consider the login successful
-        if current_web_session and current_web_session != no_logged_in_session:
-            utils.logger.info("[XiaoHongShuLogin.check_login_state] Login status confirmed by Cookie (web_session changed).")
+        if current_web_session and (not no_logged_in_session or current_web_session != no_logged_in_session):
+            if no_logged_in_session:
+                utils.logger.info("[XiaoHongShuLogin.check_login_state] Login status confirmed by Cookie (web_session changed).")
+            else:
+                utils.logger.info("[XiaoHongShuLogin.check_login_state] Existing web_session detected.")
             return True
 
         return False
@@ -190,6 +196,10 @@ class XiaoHongShuLogin(AbstractLogin):
         """login xiaohongshu website and keep webdriver login state"""
         utils.logger.info("[XiaoHongShuLogin.login_by_qrcode] Begin login xiaohongshu by qrcode ...")
         await self._wait_for_page_stable()
+        if await self._is_logged_in_once():
+            utils.logger.info("[XiaoHongShuLogin.login_by_qrcode] Existing login session detected, skip QR login.")
+            write_status("xhs", "success")
+            return
 
         qrcode_img_selector = await self._wait_for_any_selector(QRCODE_SELECTORS, timeout_ms=5000)
         base64_qrcode_img = None

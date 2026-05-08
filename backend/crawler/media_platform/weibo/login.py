@@ -81,18 +81,25 @@ class WeiboLogin(AbstractLogin):
             retry decorator will retry 20 times if the return value is False, and the retry interval is 1 second
             if max retry times reached, raise RetryError
         """
+        return await self._is_logged_in_once(no_logged_in_session)
+
+    async def _is_logged_in_once(self, no_logged_in_session: Optional[str] = None) -> bool:
         current_cookie = await self.browser_context.cookies()
         _, cookie_dict = utils.convert_cookies(current_cookie)
         if cookie_dict.get("SSOLoginState"):
             return True
         current_web_session = cookie_dict.get("WBPSESS")
-        if current_web_session != no_logged_in_session:
+        if current_web_session and (not no_logged_in_session or current_web_session != no_logged_in_session):
             return True
         return False
 
     async def login_by_qrcode(self):
         """login weibo website and keep webdriver login state"""
         utils.logger.info("[WeiboLogin.login_by_qrcode] Begin login weibo by qrcode ...")
+        if await self._is_logged_in_once():
+            utils.logger.info("[WeiboLogin.login_by_qrcode] Existing login session detected, skip QR login.")
+            write_status("wb", "success")
+            return
         await self.context_page.goto(self.weibo_sso_login_url, wait_until="domcontentloaded")
         await self._wait_for_page_stable()
         # find login qrcode

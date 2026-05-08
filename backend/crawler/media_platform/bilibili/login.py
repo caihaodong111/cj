@@ -65,6 +65,11 @@ class BilibiliLogin(AbstractLogin):
             raise ValueError(
                 "[BilibiliLogin.begin] Invalid Login Type Currently only supported qrcode or phone or cookie ...")
 
+    async def _is_logged_in_once(self) -> bool:
+        current_cookie = await self.browser_context.cookies()
+        _, cookie_dict = utils.convert_cookies(current_cookie)
+        return bool(cookie_dict.get("SESSDATA", "") or cookie_dict.get("DedeUserID"))
+
     @retry(stop=stop_after_attempt(600), wait=wait_fixed(1), retry=retry_if_result(lambda value: value is False))
     async def check_login_state(self) -> bool:
         """
@@ -72,15 +77,15 @@ class BilibiliLogin(AbstractLogin):
             retry decorator will retry 20 times if the return value is False, and the retry interval is 1 second
             if max retry times reached, raise RetryError
         """
-        current_cookie = await self.browser_context.cookies()
-        _, cookie_dict = utils.convert_cookies(current_cookie)
-        if cookie_dict.get("SESSDATA", "") or cookie_dict.get("DedeUserID"):
-            return True
-        return False
+        return await self._is_logged_in_once()
 
     async def login_by_qrcode(self):
         """login bilibili website and keep webdriver login state"""
         utils.logger.info("[BilibiliLogin.login_by_qrcode] Begin login bilibili by qrcode ...")
+        if await self._is_logged_in_once():
+            utils.logger.info("[BilibiliLogin.login_by_qrcode] Existing login session detected, skip QR login.")
+            write_status("bili", "success")
+            return
 
         # click login button
         login_button_ele = self.context_page.locator(

@@ -42,6 +42,7 @@ from proxy.proxy_ip_pool import IpInfoModel, create_ip_pool
 from store import zhihu as zhihu_store
 from tools import utils
 from tools.cdp_browser import CDPBrowserManager
+from tools.qr_bridge import write_status
 from var import crawler_type_var, source_keyword_var
 
 from .client import ZhiHuClient
@@ -141,6 +142,8 @@ class ZhihuCrawler(AbstractCrawler):
                 if not await self.zhihu_client.pong():
                     utils.logger.error("[ZhihuCrawler.start] Cookie/qrcode login failed or expired before crawl started")
                     sys.exit(1)
+            elif config.LOGIN_TYPE == "qrcode":
+                write_status("zhihu", "success")
 
             # Zhihu's search API requires opening the search page first to access cookies, homepage alone won't work
             utils.logger.info(

@@ -43,6 +43,7 @@ from proxy.proxy_ip_pool import IpInfoModel, create_ip_pool
 from store import weibo as weibo_store
 from tools import utils
 from tools.cdp_browser import CDPBrowserManager
+from tools.qr_bridge import write_status
 from var import crawler_type_var, source_keyword_var
 
 from .client import WeiboClient
@@ -146,6 +147,8 @@ class WeiboCrawler(AbstractCrawler):
                         sys.exit(1)
                     if config.LOGIN_TYPE == "qrcode":
                         sys.exit(1)
+            elif config.LOGIN_TYPE == "qrcode":
+                write_status("wb", "success")
 
             crawler_type_var.set(config.CRAWLER_TYPE)
             if config.CRAWLER_TYPE == "search":

@@ -60,6 +60,11 @@ class ZhiHuLogin(AbstractLogin):
         self.login_phone = login_phone
         self.cookie_str = cookie_str
 
+    async def _is_logged_in_once(self) -> bool:
+        current_cookie = await self.browser_context.cookies()
+        _, cookie_dict = utils.convert_cookies(current_cookie)
+        return bool(cookie_dict.get("z_c0"))
+
     @retry(stop=stop_after_attempt(600), wait=wait_fixed(1), retry=retry_if_result(lambda value: value is False))
     async def check_login_state(self) -> bool:
         """
@@ -67,12 +72,7 @@ class ZhiHuLogin(AbstractLogin):
         Returns:
 
         """
-        current_cookie = await self.browser_context.cookies()
-        _, cookie_dict = utils.convert_cookies(current_cookie)
-        current_web_session = cookie_dict.get("z_c0")
-        if current_web_session:
-            return True
-        return False
+        return await self._is_logged_in_once()
 
     async def begin(self):
         """Start login zhihu"""
@@ -94,6 +94,10 @@ class ZhiHuLogin(AbstractLogin):
         """login zhihu website and keep webdriver login state"""
         utils.logger.info("[ZhiHu.login_by_qrcode] Begin login zhihu by qrcode ...")
         await self._wait_for_page_stable()
+        if await self._is_logged_in_once():
+            utils.logger.info("[ZhiHu.login_by_qrcode] Existing login session detected, skip QR login.")
+            write_status("zhihu", "success")
+            return
         qrcode_img_selector = await self._wait_for_any_selector(QRCODE_SELECTORS, timeout_ms=10000)
         # find login qrcode
         base64_qrcode_img = None
