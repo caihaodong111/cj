@@ -1,140 +1,226 @@
 <template>
   <div class="crawler-control">
-    <!-- 配置表单 -->
+    <div class="overview-grid">
+      <div class="overview-card primary">
+        <span class="overview-label">当前平台</span>
+        <strong class="overview-value">{{ getPlatformLabel(config.platform) }}</strong>
+        <span class="overview-meta">跟随当前数据源</span>
+      </div>
+
+      <div class="overview-card">
+        <span class="overview-label">登录方式</span>
+        <strong class="overview-value">{{ loginTypeLabel }}</strong>
+        <span class="overview-meta">{{ loginTypeMeta }}</span>
+      </div>
+
+      <div class="overview-card" :class="isRunning ? 'running' : 'idle'">
+        <span class="overview-label">任务状态</span>
+        <strong class="overview-value">{{ isRunning ? '更新中' : '待启动' }}</strong>
+        <span class="overview-meta">{{ statusMetaText }}</span>
+      </div>
+    </div>
+
+    <div v-if="formMessage" class="inline-notice" :class="formMessage.type">
+      {{ formMessage.text }}
+    </div>
+
     <div class="config-form">
-      <div class="form-row">
-        <div class="form-group">
-          <label>平台</label>
-          <el-select v-model="config.platform" :disabled="isRunning" class="crawler-select" popper-class="crawler-dropdown" :teleported="false">
-            <el-option v-for="p in platforms" :key="p.value" :label="p.label" :value="p.value" />
-          </el-select>
+      <section class="form-section">
+        <div class="section-header">
+          <div>
+            <h3 class="section-title">任务配置</h3>
+          </div>
         </div>
 
-        <div class="form-group">
-          <label>登录方式</label>
-          <el-select v-model="config.login_type" :disabled="isRunning" class="crawler-select" popper-class="crawler-dropdown" :teleported="false">
-            <el-option label="二维码登录" value="qrcode" />
-            <el-option label="Cookie 登录" value="cookie" />
-          </el-select>
+        <div class="form-row">
+          <div class="form-group">
+            <label>平台</label>
+            <el-select v-model="config.platform" :disabled="isRunning" class="crawler-select" popper-class="crawler-dropdown" :teleported="false">
+              <el-option v-for="p in platforms" :key="p.value" :label="p.label" :value="p.value" />
+            </el-select>
+          </div>
+
+          <div class="form-group">
+            <label>登录方式</label>
+            <el-select v-model="config.login_type" :disabled="isRunning" class="crawler-select" popper-class="crawler-dropdown" :teleported="false">
+              <el-option label="Cookie 登录" value="cookie" />
+              <el-option label="扫码登录" value="qrcode" />
+            </el-select>
+          </div>
+
+          <div class="form-group">
+            <label>更新模式</label>
+            <el-select v-model="config.crawler_type" :disabled="isRunning" class="crawler-select" popper-class="crawler-dropdown" :teleported="false">
+              <el-option label="搜索模式" value="search" />
+              <el-option label="详情模式" value="detail" />
+              <el-option label="创作者模式" value="creator" />
+            </el-select>
+          </div>
+        </div>
+      </section>
+
+      <section class="form-section">
+        <div class="section-header">
+          <div>
+            <h3 class="section-title">{{ scopeTitle }}</h3>
+            <p v-if="crawlerTypeHint" class="section-description">{{ crawlerTypeHint }}</p>
+          </div>
         </div>
 
-        <div class="form-group">
-          <label>爬取模式</label>
-          <el-select v-model="config.crawler_type" :disabled="isRunning" class="crawler-select" popper-class="crawler-dropdown" :teleported="false">
-            <el-option label="搜索模式" value="search" />
-            <el-option label="详情模式" value="detail" />
-            <el-option label="创作者模式" value="creator" />
-          </el-select>
-        </div>
-      </div>
+        <div class="form-row">
+          <div class="form-group full-width" v-if="config.crawler_type === 'search'">
+            <input
+              type="text"
+              v-model="config.keywords"
+              placeholder="例如：品牌名, 产品词, 事件词"
+              :disabled="isRunning"
+              class="cyber-input"
+            />
+            <p class="field-hint">多个关键词用逗号分隔。</p>
+          </div>
 
-      <!-- 根据爬取模式显示不同字段 -->
-      <div class="form-row" v-if="config.crawler_type === 'search'">
-        <div class="form-group full-width">
-          <label>搜索关键词（逗号分隔）</label>
-          <input
-            type="text"
-            v-model="config.keywords"
-            placeholder="美食,旅游,科技"
-            :disabled="isRunning"
-            class="cyber-input"
-          />
-        </div>
-      </div>
+          <div class="form-group full-width" v-else-if="config.crawler_type === 'detail'">
+            <input
+              type="text"
+              v-model="config.specified_ids"
+              placeholder="例如：12345678,87654321"
+              :disabled="isRunning"
+              class="cyber-input"
+            />
+            <p class="field-hint">多个 ID 用逗号分隔。</p>
+          </div>
 
-      <div class="form-row" v-else-if="config.crawler_type === 'detail'">
-        <div class="form-group full-width">
-          <label>笔记 ID（逗号分隔）</label>
-          <input
-            type="text"
-            v-model="config.specified_ids"
-            placeholder="12345678,87654321"
-            :disabled="isRunning"
-            class="cyber-input"
-          />
+          <div class="form-group full-width" v-else>
+            <input
+              type="text"
+              v-model="config.creator_ids"
+              placeholder="例如：user123,user456"
+              :disabled="isRunning"
+              class="cyber-input"
+            />
+            <p class="field-hint">多个 ID 用逗号分隔。</p>
+          </div>
         </div>
-      </div>
+      </section>
 
-      <div class="form-row" v-else-if="config.crawler_type === 'creator'">
-        <div class="form-group full-width">
-          <label>创作者 ID（逗号分隔）</label>
-          <input
-            type="text"
-            v-model="config.creator_ids"
-            placeholder="user123,user456"
-            :disabled="isRunning"
-            class="cyber-input"
-          />
+      <section class="form-section">
+        <div class="section-header">
+          <div>
+            <h3 class="section-title">采集选项</h3>
+          </div>
         </div>
-      </div>
 
-      <div class="form-row">
-        <div class="form-group checkbox-group">
-          <label class="cyber-checkbox">
+        <div class="checkbox-group">
+          <label class="cyber-checkbox" :class="{ 'is-disabled': isRunning }">
             <input type="checkbox" v-model="config.enable_comments" :disabled="isRunning" />
-            <span>获取评论</span>
+            <span>抓取评论</span>
           </label>
-          <label class="cyber-checkbox">
-            <input type="checkbox" v-model="config.enable_sub_comments" :disabled="isRunning" />
-            <span>子评论</span>
+
+          <label class="cyber-checkbox" :class="{ 'is-disabled': isRunning || !config.enable_comments }">
+            <input type="checkbox" v-model="config.enable_sub_comments" :disabled="isRunning || !config.enable_comments" />
+            <span>抓取子评论</span>
           </label>
-          <label class="cyber-checkbox">
+
+          <label class="cyber-checkbox" :class="{ 'is-disabled': isRunning || config.login_type === 'qrcode' }">
             <input type="checkbox" v-model="config.headless" :disabled="isRunning || config.login_type === 'qrcode'" />
             <span>无头模式</span>
-            <span v-if="config.login_type === 'qrcode'" class="warning-hint">(二维码登录时需关闭)</span>
           </label>
         </div>
-      </div>
 
-      <div class="form-row" v-if="config.login_type === 'cookie'">
-        <div class="form-group full-width">
-          <label>Cookies（可选）</label>
-          <input
-            type="text"
-            v-model="config.cookies"
-            placeholder="a1=xxx; a2=yyy"
-            :disabled="isRunning"
-            class="cyber-input"
-          />
+        <div v-if="config.login_type === 'cookie'" class="support-card" :class="{ warning: !cookieState.exists }">
+          <div>
+            <p class="support-card-title">{{ cookieState.exists ? '已检测到有效 Cookie' : '未检测到有效 Cookie' }}</p>
+            <p class="support-card-body">
+              {{ cookieState.exists ? '启动时自动使用系统设置中的激活 Cookie。' : '请先在系统设置中启用当前平台的 Cookie。' }}
+            </p>
+          </div>
+          <span class="support-pill" :class="cookieState.exists ? 'success' : 'warning'">
+            {{ cookieState.loading ? '检测中' : (cookieState.exists ? '可直接启动' : '需先配置') }}
+          </span>
         </div>
-      </div>
 
-      <div class="form-row">
-        <div class="form-group full-width">
-          <label>外部 Chrome CDP 地址（可选）</label>
-          <input
-            type="text"
-            v-model="config.cdp_url"
-            placeholder="http://用户电脑IP:9222 或 ws://用户电脑IP:9222/devtools/browser/..."
-            :disabled="isRunning"
-            class="cyber-input"
-          />
-          <p class="warning-hint">
-            不填写时，后端会自动拉起本机 Chrome；填写后，会优先连接你指定的现有 Chrome 调试端口。
-          </p>
+        <div v-else class="support-card">
+          <div>
+            <p class="support-card-title">扫码登录</p>
+            <p class="support-card-body">启动后进入二维码面板，服务端部署可直接打开 noVNC 扫码。</p>
+          </div>
         </div>
-      </div>
+      </section>
 
       <div class="form-actions">
         <button
           v-if="!isRunning"
           @click="startCrawler"
-          class="cyber-btn cyber-btn-primary"
-          :disabled="starting"
+          class="cyber-btn cyber-btn-primary action-btn"
+          :disabled="starting || (config.login_type === 'cookie' && !cookieState.exists)"
         >
-          {{ starting ? '启动中...' : '启动' }}
+          <span class="action-btn-kicker">{{ starting ? 'Submitting' : 'Update Task' }}</span>
+          <span class="action-btn-label">{{ starting ? '提交中...' : '提交更新任务' }}</span>
         </button>
         <button
           v-else
           @click="stopCrawler"
-          class="cyber-btn cyber-btn-danger"
+          class="cyber-btn cyber-btn-danger action-btn"
           :disabled="stopping"
         >
-          {{ stopping ? '停止中...' : '停止' }}
+          <span class="action-btn-kicker">{{ stopping ? 'Stopping' : 'Stop Task' }}</span>
+          <span class="action-btn-label">{{ stopping ? '停止中...' : '停止更新任务' }}</span>
         </button>
       </div>
     </div>
 
+    <div v-if="qrDialog.visible" class="qr-modal-overlay" @click.self="closeQrDialog">
+      <div class="qr-modal">
+        <div class="qr-modal-header">
+          <div>
+            <h3>{{ qrDialogTitle }}</h3>
+            <p>{{ qrDialogSubtitle }}</p>
+          </div>
+          <button type="button" class="qr-close-btn" aria-label="关闭" @click="closeQrDialog">
+            ×
+          </button>
+        </div>
+
+        <div class="qr-status-pill" :class="`is-${qrDialog.status}`">
+          {{ qrStatusText }}
+        </div>
+
+        <div class="qr-image-panel">
+          <img
+            v-if="qrDialog.image"
+            :src="qrDialog.image"
+            :alt="`${qrDialogPlatformLabel} 二维码`"
+            class="qr-image"
+          />
+          <div v-else class="qr-placeholder">
+            <div class="qr-spinner"></div>
+            <span>{{ qrPlaceholderText }}</span>
+          </div>
+        </div>
+
+        <p class="qr-hint">{{ qrPrimaryHint }}</p>
+        <p class="qr-hint qr-meta">{{ qrSecondaryHint }}</p>
+        <p v-if="qrUpdatedAtText" class="qr-hint qr-meta">最近更新时间：{{ qrUpdatedAtText }}</p>
+        <p v-if="qrDialog.error" class="qr-error">{{ qrDialog.error }}</p>
+
+        <div class="qr-actions">
+          <button type="button" class="cyber-btn cyber-btn-secondary" @click="openRemoteDesktop">
+            打开 noVNC
+          </button>
+          <button
+            type="button"
+            class="cyber-btn cyber-btn-secondary"
+            :disabled="qrDialog.loading"
+            @click="refreshQrDialog"
+          >
+            {{ qrDialog.loading ? '刷新中...' : '刷新二维码' }}
+          </button>
+          <button type="button" class="cyber-btn cyber-btn-primary" @click="closeQrDialog">
+            关闭
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -156,25 +242,232 @@ const platforms = ref([])
 const status = ref('idle')
 const starting = ref(false)
 const stopping = ref(false)
+const formMessage = ref(null)
+const cookieState = ref({
+  loading: false,
+  exists: false,
+  platform: ''
+})
 let statusInterval = null
+let qrInterval = null
+
+const createQrDialogState = () => ({
+  visible: false,
+  platform: '',
+  image: '',
+  status: 'idle',
+  error: '',
+  updatedAt: null,
+  loading: false
+})
+
+const qrDialog = ref(createQrDialogState())
 
 // Computed
 const isRunning = computed(() => status.value === 'running')
+const remoteDesktopUrl = computed(() => {
+  if (typeof window === 'undefined') {
+    return 'http://服务器IP:6080'
+  }
+  const host = window.location.hostname || '服务器IP'
+  return `http://${host}:6080`
+})
+const qrDialogPlatformLabel = computed(() => getPlatformLabel(qrDialog.value.platform))
+const qrDialogTitle = computed(() => `${qrDialogPlatformLabel.value} 扫码登录`)
+const qrDialogSubtitle = computed(() => '扫码完成后任务继续执行，前端会自动同步状态。')
+const qrStatusText = computed(() => {
+  const textMap = {
+    idle: '等待启动',
+    pending: '等待扫码',
+    success: '登录成功',
+    failed: '登录失败'
+  }
+  return textMap[qrDialog.value.status] || qrDialog.value.status || '等待启动'
+})
+const qrPlaceholderText = computed(() => {
+  if (qrDialog.value.status === 'failed') {
+    return '二维码生成失败或登录流程已中断'
+  }
+  if (qrDialog.value.status === 'success') {
+    return '登录已成功，等待后端同步页面状态'
+  }
+  return '正在等待后端生成二维码...'
+})
+const qrPrimaryHint = computed(() => {
+  return `服务器部署请打开 ${remoteDesktopUrl.value} 完成扫码；本地部署可直接在当前环境中操作。`
+})
+const qrSecondaryHint = computed(() => '二维码和登录状态每 2 秒自动刷新。')
+const qrUpdatedAtText = computed(() => {
+  if (!qrDialog.value.updatedAt) return ''
+  const updatedAt = new Date(qrDialog.value.updatedAt * 1000)
+  if (Number.isNaN(updatedAt.getTime())) return ''
+  return updatedAt.toLocaleString()
+})
+const loginTypeLabel = computed(() => config.value.login_type === 'cookie' ? 'Cookie 登录' : '扫码登录')
+const loginTypeMeta = computed(() => {
+  if (config.value.login_type === 'cookie') {
+    if (cookieState.value.loading) return '检测系统 Cookie'
+    return cookieState.value.exists ? '复用系统 Cookie' : '当前平台无可用 Cookie'
+  }
+  return '启动后进入二维码面板'
+})
+const statusMetaText = computed(() => {
+  return isRunning.value
+    ? '后端任务执行中'
+    : '可提交更新任务'
+})
+const scopeTitle = computed(() => {
+  const textMap = {
+    search: '搜索关键词',
+    detail: '内容 ID',
+    creator: '创作者 ID'
+  }
+  return textMap[config.value.crawler_type] || '更新范围'
+})
+const crawlerTypeHint = computed(() => {
+  const textMap = {
+    search: '',
+    detail: '输入内容 ID，补抓单条内容详情。',
+    creator: '输入创作者 ID，更新指定账号内容。'
+  }
+  return textMap[config.value.crawler_type] || ''
+})
 
 // Config
 const config = ref({
   platform: 'xhs',
-  login_type: 'qrcode',
+  login_type: 'cookie',
   crawler_type: 'search',
   keywords: '',
   specified_ids: '',
   creator_ids: '',
   enable_comments: false,
   enable_sub_comments: false,
-  cookies: '',
-  headless: true,
-  cdp_url: ''
+  headless: true
 })
+
+const getPlatformLabel = (platformValue) => {
+  const matched = platforms.value.find((item) => item.value === platformValue)
+  return matched?.label || platformValue || '平台'
+}
+
+const setFormMessage = (type, text) => {
+  formMessage.value = { type, text }
+}
+
+const clearFormMessage = () => {
+  formMessage.value = null
+}
+
+const stopQrPolling = () => {
+  if (qrInterval) {
+    clearInterval(qrInterval)
+    qrInterval = null
+  }
+}
+
+const closeQrDialog = () => {
+  stopQrPolling()
+  qrDialog.value = {
+    ...qrDialog.value,
+    visible: false,
+    error: '',
+    loading: false
+  }
+}
+
+const openRemoteDesktop = () => {
+  window.open(remoteDesktopUrl.value, '_blank', 'noopener,noreferrer')
+}
+
+const applyQrPayload = (platform, qrPayload = {}, statusPayload = {}) => {
+  if (platform !== qrDialog.value.platform) return
+
+  qrDialog.value.image = qrPayload.qr_code || ''
+  qrDialog.value.updatedAt = qrPayload.updated_at || statusPayload.updated_at || null
+  qrDialog.value.status = statusPayload.status || (qrPayload.qr_code ? 'pending' : 'idle')
+  qrDialog.value.error = ''
+
+  if (qrDialog.value.status === 'success' || qrDialog.value.status === 'failed') {
+    stopQrPolling()
+  }
+}
+
+const fetchQrDialogData = async ({ silent = false } = {}) => {
+  const platform = qrDialog.value.platform
+  if (!platform) return
+
+  if (!silent) {
+    qrDialog.value.loading = true
+  }
+
+  try {
+    const [qrRes, statusRes] = await Promise.all([
+      axios.get(`/api/login/qr/${platform}`),
+      axios.get(`/api/login/qr/${platform}/status`)
+    ])
+    applyQrPayload(platform, qrRes.data, statusRes.data)
+  } catch (e) {
+    if (platform !== qrDialog.value.platform) return
+    const errorMsg = e.response?.data?.error || e.message || '获取二维码失败'
+    qrDialog.value.error = errorMsg
+  } finally {
+    if (platform === qrDialog.value.platform) {
+      qrDialog.value.loading = false
+    }
+  }
+}
+
+const startQrPolling = () => {
+  stopQrPolling()
+  void fetchQrDialogData()
+  qrInterval = setInterval(() => {
+    void fetchQrDialogData({ silent: true })
+  }, 2000)
+}
+
+const openQrDialog = (platform) => {
+  qrDialog.value = {
+    ...createQrDialogState(),
+    visible: true,
+    platform,
+    status: 'pending'
+  }
+  startQrPolling()
+}
+
+const refreshQrDialog = async () => {
+  await fetchQrDialogData()
+}
+
+const fetchActiveCookieStatus = async (platform = config.value.platform) => {
+  if (!platform) return
+
+  cookieState.value = {
+    ...cookieState.value,
+    loading: true,
+    platform
+  }
+
+  try {
+    const res = await axios.get('/api/cookies/active', {
+      params: { platform }
+    })
+    if (platform !== config.value.platform) return
+    cookieState.value = {
+      loading: false,
+      exists: Boolean(res.data?.exists),
+      platform
+    }
+  } catch (e) {
+    if (platform !== config.value.platform) return
+    cookieState.value = {
+      loading: false,
+      exists: false,
+      platform
+    }
+  }
+}
 
 watch(
   () => props.currentPlatform,
@@ -187,11 +480,53 @@ watch(
   { immediate: true }
 )
 
+watch(
+  () => config.value.platform,
+  (nextPlatform) => {
+    if (!nextPlatform) return
+    clearFormMessage()
+    void fetchActiveCookieStatus(nextPlatform)
+  },
+  { immediate: true }
+)
+
+watch(
+  () => config.value.login_type,
+  (nextLoginType) => {
+    clearFormMessage()
+    if (nextLoginType === 'qrcode') {
+      config.value.headless = false
+    }
+    if (nextLoginType !== 'qrcode' && qrDialog.value.visible) {
+      closeQrDialog()
+    }
+  }
+)
+
+watch(
+  () => config.value.crawler_type,
+  () => {
+    clearFormMessage()
+  }
+)
+
+watch(
+  () => config.value.enable_comments,
+  (enabled) => {
+    if (!enabled) {
+      config.value.enable_sub_comments = false
+    }
+  }
+)
+
 // Methods
 const fetchPlatforms = async () => {
   try {
     const res = await axios.get('/api/config/platforms')
     platforms.value = res.data.platforms
+    if (!platforms.value.some(item => item.value === config.value.platform) && platforms.value[0]) {
+      config.value.platform = platforms.value[0].value
+    }
   } catch (e) {
     console.error('获取平台列表失败:', e)
   }
@@ -215,62 +550,71 @@ const fetchStatus = async ({ emitIfUnchanged = false } = {}) => {
 }
 
 const startCrawler = async () => {
-  console.log('[前端] 准备启动爬虫，配置:', config.value)
+  clearFormMessage()
   starting.value = true
   try {
-    // 验证输入
-    if (config.value.crawler_type === 'search' && !config.value.keywords) {
-      console.warn('请输入搜索关键词')
-      return
-    }
-    if (config.value.crawler_type === 'detail' && !config.value.specified_ids) {
-      console.warn('请输入笔记 ID')
-      return
-    }
-    if (config.value.crawler_type === 'creator' && !config.value.creator_ids) {
-      console.warn('请输入创作者 ID')
+    if (config.value.login_type === 'cookie' && !cookieState.value.exists) {
+      setFormMessage('error', '当前平台还没有可用 Cookie，请先到系统设置中配置并启用。')
       return
     }
 
-    // 构建请求配置，添加默认值
+    if (config.value.crawler_type === 'search' && !config.value.keywords.trim()) {
+      setFormMessage('error', '请输入至少一个搜索关键词。')
+      return
+    }
+
+    if (config.value.crawler_type === 'detail' && !config.value.specified_ids.trim()) {
+      setFormMessage('error', '请输入至少一个内容 ID。')
+      return
+    }
+
+    if (config.value.crawler_type === 'creator' && !config.value.creator_ids.trim()) {
+      setFormMessage('error', '请输入至少一个创作者 ID。')
+      return
+    }
+
     const requestConfig = {
       ...config.value,
-      save_option: 'db',  // 默认保存到数据库
-      start_page: 1       // 默认从第1页开始
+      save_option: 'db',
+      start_page: 1
     }
 
     if (requestConfig.login_type === 'qrcode') {
       requestConfig.headless = false
-      console.log('[前端] 二维码登录模式走真实浏览器/CDP，请在打开的 Chrome 页面完成扫码')
+    }
+
+    if (!requestConfig.enable_comments) {
+      requestConfig.enable_sub_comments = false
     }
 
     emit('platform-change', requestConfig.platform)
-    console.log('[前端] 发送启动请求到 /api/crawler/start')
-    const response = await axios.post('/api/crawler/start', requestConfig)
-    console.log('[前端] 响应:', response.data)
+    await axios.post('/api/crawler/start', requestConfig)
     if (requestConfig.login_type === 'qrcode') {
-      window.alert('已启动真实浏览器，请在打开的 Chrome 页面完成扫码登录。')
+      openQrDialog(requestConfig.platform)
+      setFormMessage('info', '任务已提交，请在二维码面板中完成扫码。')
+    } else {
+      setFormMessage('success', '任务已提交，平台数据开始更新。')
     }
     await fetchStatus()
   } catch (e) {
     const errorMsg = e.response?.data?.error || e.response?.data?.detail || e.message
-    console.error('[前端] 启动爬虫错误:', e)
-    console.error('[前端] 错误响应:', e.response?.data)
-    window.alert(`启动爬虫失败: ${errorMsg}`)
+    setFormMessage('error', `启动失败：${errorMsg}`)
   } finally {
     starting.value = false
   }
 }
 
 const stopCrawler = async () => {
+  clearFormMessage()
   stopping.value = true
   try {
     await axios.post('/api/crawler/stop')
-    console.log('[前端] 正在停止爬虫...')
+    closeQrDialog()
     await fetchStatus()
+    setFormMessage('info', '已发送停止指令，任务状态会在后端完成同步后更新。')
   } catch (e) {
-    const errorMsg = e.response?.data?.detail || e.message
-    console.error('停止爬虫错误:', e)
+    const errorMsg = e.response?.data?.error || e.response?.data?.detail || e.message
+    setFormMessage('error', `停止失败：${errorMsg}`)
   } finally {
     stopping.value = false
   }
@@ -280,8 +624,8 @@ const stopCrawler = async () => {
 onMounted(async () => {
   await fetchPlatforms()
   await fetchStatus({ emitIfUnchanged: true })
+  await fetchActiveCookieStatus(config.value.platform)
 
-  // 每2秒轮询状态
   statusInterval = setInterval(async () => {
     await fetchStatus()
   }, 2000)
@@ -291,25 +635,476 @@ onUnmounted(() => {
   if (statusInterval) {
     clearInterval(statusInterval)
   }
+  stopQrPolling()
 })
 </script>
 
 <style scoped>
-/* === 赛博朋克科技风格 === */
 .crawler-control {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  gap: 14px;
+  max-height: 72vh;
   overflow-y: auto;
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
   color: #fff;
+  padding-right: 6px;
 }
 
-.config-form {
-  padding: 16px 20px;
+.crawler-control::-webkit-scrollbar {
+  width: 5px;
+}
+
+.crawler-control::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.crawler-control::-webkit-scrollbar-thumb {
+  background: rgba(0, 204, 255, 0.26);
+  border-radius: 999px;
+}
+
+.crawler-control::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 204, 255, 0.42);
+}
+
+.overview-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.overview-card {
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    radial-gradient(circle at top right, rgba(0, 204, 255, 0.1), transparent 45%),
+    rgba(255, 255, 255, 0.03);
   display: flex;
   flex-direction: column;
   gap: 14px;
+}
+
+.overview-card.primary {
+  background:
+    radial-gradient(circle at top right, rgba(255, 170, 0, 0.12), transparent 45%),
+    radial-gradient(circle at bottom left, rgba(0, 204, 255, 0.1), transparent 40%),
+    rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 170, 0, 0.16);
+}
+
+.overview-card.running {
+  border-color: rgba(255, 170, 0, 0.2);
+  box-shadow: 0 0 24px rgba(255, 170, 0, 0.08);
+}
+
+.overview-label {
+  font-size: 10px;
+  letter-spacing: 1.8px;
+  text-transform: uppercase;
+  color: rgba(255, 170, 0, 0.74);
+}
+
+.overview-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: #f3f8ff;
+  letter-spacing: 0.2px;
+}
+
+.overview-meta {
+  color: #89a0c1;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.inline-notice {
+  padding: 12px 14px;
+  border-radius: 16px;
+  font-size: 13px;
+  line-height: 1.6;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.inline-notice.info {
+  color: #d9ecff;
+  background: rgba(0, 204, 255, 0.08);
+  border-color: rgba(0, 204, 255, 0.18);
+}
+
+.inline-notice.success {
+  color: #d8f7ea;
+  background: rgba(32, 195, 115, 0.1);
+  border-color: rgba(32, 195, 115, 0.2);
+}
+
+.inline-notice.error {
+  color: #ffd7d7;
+  background: rgba(255, 77, 109, 0.1);
+  border-color: rgba(255, 77, 109, 0.22);
+}
+
+.config-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.form-section {
+  padding: 16px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    radial-gradient(circle at top right, rgba(0, 204, 255, 0.06), transparent 45%),
+    rgba(255, 255, 255, 0.025);
+}
+
+.section-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.section-title {
+  margin: 0;
+  font-size: 14px;
+  color: #f1f6ff;
+  letter-spacing: 0.3px;
+}
+
+.section-description {
+  margin: 5px 0 0;
+  color: #8298b7;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.form-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.form-group {
+  flex: 1;
+  min-width: 150px;
+}
+
+.form-group.full-width {
+  flex: 1 1 100%;
+}
+
+.form-group > label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.72);
+  font-weight: 500;
+  letter-spacing: 0.3px;
+}
+
+.field-hint {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: #8399b8;
+  line-height: 1.55;
+}
+
+.cyber-input {
+  width: 100%;
+  padding: 10px 12px;
+  background: rgba(10, 10, 15, 0.78);
+  border: 1px solid rgba(0, 204, 255, 0.16);
+  border-radius: 14px;
+  color: #fff;
+  font-size: 13px;
+  transition: all 0.18s ease;
+}
+
+.cyber-input:focus {
+  outline: none;
+  border-color: rgba(255, 170, 0, 0.45);
+  box-shadow: 0 0 14px rgba(255, 170, 0, 0.16);
+  background: rgba(16, 18, 28, 0.88);
+}
+
+.cyber-input::placeholder {
+  color: rgba(255, 255, 255, 0.34);
+}
+
+.cyber-input:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.checkbox-group {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.cyber-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
+  cursor: pointer;
+  font-size: 13px;
+  color: #eef6ff;
+  transition: all 0.18s ease;
+}
+
+.cyber-checkbox:hover {
+  border-color: rgba(255, 170, 0, 0.16);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.cyber-checkbox.is-disabled {
+  opacity: 0.46;
+  cursor: not-allowed;
+}
+
+.cyber-checkbox input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: #ffae00;
+  cursor: pointer;
+}
+
+.support-card {
+  margin-top: 14px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(0, 204, 255, 0.14);
+  background:
+    radial-gradient(circle at top right, rgba(0, 204, 255, 0.08), transparent 45%),
+    rgba(255, 255, 255, 0.03);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.support-card.warning {
+  border-color: rgba(255, 170, 0, 0.24);
+  background:
+    radial-gradient(circle at top right, rgba(255, 170, 0, 0.1), transparent 45%),
+    rgba(255, 255, 255, 0.03);
+}
+
+.support-card-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #f2f7ff;
+}
+
+.support-card-body {
+  margin: 6px 0 0;
+  color: #8ba0bf;
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.support-pill {
+  flex-shrink: 0;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  letter-spacing: 0.4px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.support-pill.success {
+  color: #baf5d8;
+  background: rgba(32, 195, 115, 0.12);
+  border-color: rgba(32, 195, 115, 0.22);
+}
+
+.support-pill.warning {
+  color: #ffd78b;
+  background: rgba(255, 170, 0, 0.12);
+  border-color: rgba(255, 170, 0, 0.22);
+}
+
+:deep(.crawler-select .el-select__wrapper) {
+  background: rgba(10, 10, 15, 0.78);
+  border: 1px solid rgba(0, 204, 255, 0.16);
+  border-radius: 14px;
+  box-shadow: none;
+  padding: 7px 12px;
+  min-height: 38px;
+  transition: all 0.18s ease;
+}
+
+:deep(.crawler-select .el-select__wrapper:hover) {
+  border-color: rgba(255, 170, 0, 0.26);
+  background: rgba(16, 18, 28, 0.88);
+}
+
+:deep(.crawler-select .el-select__wrapper.is-focus) {
+  border-color: rgba(255, 170, 0, 0.45);
+  box-shadow: 0 0 14px rgba(255, 170, 0, 0.16);
+}
+
+:deep(.crawler-select .el-select__selected-item) {
+  color: #fff;
+  font-size: 13px;
+}
+
+:deep(.crawler-select .el-select__placeholder) {
+  color: rgba(255, 255, 255, 0.34);
+  font-size: 13px;
+}
+
+:deep(.crawler-select .el-select__suffix) {
+  color: rgba(255, 255, 255, 0.48);
+}
+
+:deep(.crawler-select.is-disabled .el-select__wrapper) {
+  opacity: 0.42;
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+:deep(.crawler-dropdown) {
+  background: rgba(12, 16, 24, 0.88) !important;
+  backdrop-filter: blur(30px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(30px) saturate(180%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 18px !important;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.35) !important;
+}
+
+:deep(.crawler-dropdown .el-select-dropdown__list) {
+  background: transparent !important;
+  padding: 6px 8px !important;
+}
+
+:deep(.crawler-dropdown .el-select-dropdown__item) {
+  color: #9bb0cc !important;
+  font-size: 13px !important;
+  height: 36px !important;
+  line-height: 36px !important;
+  margin: 1px 4px !important;
+  border-radius: 10px !important;
+  padding: 0 12px !important;
+  transition: all 0.16s ease !important;
+}
+
+:deep(.crawler-dropdown .el-select-dropdown__item:hover) {
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: #ffffff !important;
+}
+
+:deep(.crawler-dropdown .el-select-dropdown__item.is-selected) {
+  background: rgba(255, 170, 0, 0.15) !important;
+  color: #ffcf69 !important;
+  font-weight: 500 !important;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 16px;
+  margin-top: 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.cyber-btn {
+  padding: 10px 20px;
+  border: 1px solid;
+  border-radius: 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  letter-spacing: 0.3px;
+  background: rgba(10, 10, 15, 0.82);
+}
+
+.action-btn {
+  min-width: 220px;
+  min-height: 54px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 3px;
+  padding: 11px 18px;
+  border-radius: 18px;
+}
+
+.action-btn-kicker {
+  font-size: 10px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  opacity: 0.72;
+}
+
+.action-btn-label {
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.cyber-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+.cyber-btn-primary {
+  border-color: rgba(0, 204, 255, 0.24);
+  color: #f5fbff;
+  background:
+    linear-gradient(135deg, rgba(255, 170, 0, 0.26), rgba(0, 204, 255, 0.18)),
+    rgba(10, 10, 15, 0.88);
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.28), 0 8px 24px rgba(0, 204, 255, 0.18);
+}
+
+.cyber-btn-primary:hover:not(:disabled) {
+  background:
+    linear-gradient(135deg, rgba(255, 170, 0, 0.34), rgba(0, 204, 255, 0.24)),
+    rgba(10, 10, 15, 0.92);
+  box-shadow: 0 18px 32px rgba(0, 0, 0, 0.34), 0 10px 28px rgba(255, 170, 0, 0.18);
+  transform: translateY(-2px);
+}
+
+.cyber-btn-secondary {
+  border-color: rgba(255, 255, 255, 0.22);
+  color: rgba(241, 247, 255, 0.88);
+  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.08);
+}
+
+.cyber-btn-secondary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 6px 16px rgba(255, 255, 255, 0.14);
+  transform: translateY(-1px);
+}
+
+.cyber-btn-danger {
+  border-color: rgba(255, 107, 107, 0.6);
+  color: #ffe9e9;
+  background:
+    linear-gradient(135deg, rgba(255, 107, 107, 0.2), rgba(255, 77, 109, 0.12)),
+    rgba(10, 10, 15, 0.88);
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.28), 0 8px 24px rgba(255, 107, 107, 0.16);
+}
+
+.cyber-btn-danger:hover:not(:disabled) {
+  background:
+    linear-gradient(135deg, rgba(255, 107, 107, 0.28), rgba(255, 77, 109, 0.16)),
+    rgba(10, 10, 15, 0.92);
+  box-shadow: 0 18px 32px rgba(0, 0, 0, 0.34), 0 10px 28px rgba(255, 107, 107, 0.2);
+  transform: translateY(-2px);
 }
 
 .qr-modal-overlay {
@@ -321,11 +1116,11 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   padding: 20px;
-  z-index: 2100;
+  z-index: 3200;
 }
 
 .qr-modal {
-  width: min(420px, 100%);
+  width: min(440px, 100%);
   background: linear-gradient(180deg, rgba(11, 16, 26, 0.96), rgba(6, 9, 18, 0.98));
   border: 1px solid rgba(105, 180, 255, 0.2);
   border-radius: 24px;
@@ -350,6 +1145,7 @@ onUnmounted(() => {
   margin: 6px 0 0;
   color: rgba(222, 236, 255, 0.68);
   font-size: 13px;
+  line-height: 1.55;
 }
 
 .qr-close-btn {
@@ -438,6 +1234,11 @@ onUnmounted(() => {
   font-size: 14px;
 }
 
+.qr-meta {
+  color: rgba(176, 206, 238, 0.7);
+  font-size: 12px;
+}
+
 .qr-error {
   margin: 12px 0 0;
   color: #ff9c9c;
@@ -460,269 +1261,34 @@ onUnmounted(() => {
   }
 }
 
-.form-row {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-}
+@media (max-width: 760px) {
+  .overview-grid {
+    grid-template-columns: 1fr;
+  }
 
-.form-group {
-  flex: 1;
-  min-width: 130px;
-}
+  .checkbox-group {
+    grid-template-columns: 1fr;
+  }
 
-.form-group.full-width {
-  flex: 100%;
-}
+  .support-card {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 
-.form-group > label {
-  display: block;
-  margin-bottom: 6px;
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.7);
-  font-weight: 500;
-  letter-spacing: 0.3px;
-}
+  .form-actions {
+    justify-content: stretch;
+  }
 
-/* === Cyberpunk Input === */
-.cyber-input {
-  width: 100%;
-  padding: 8px 12px;
-  background: var(--app-surface, rgba(10, 10, 15, 0.85));
-  border: 1px solid var(--app-glass-border, rgba(0, 204, 255, 0.2));
-  border-radius: var(--app-radius, 12px);
-  color: #fff;
-  font-size: 13px;
-  transition: all 0.15s ease;
-}
+  .form-actions .cyber-btn {
+    flex: 1;
+  }
 
-.cyber-input:focus {
-  outline: none;
-  border-color: var(--app-accent, #ffae00);
-  box-shadow: 0 0 12px rgba(255, 174, 0, 0.2);
-  background: var(--app-surface-hover, rgba(20, 20, 30, 0.9));
-}
+  .qr-actions {
+    flex-direction: column;
+  }
 
-.cyber-input::placeholder {
-  color: rgba(255, 255, 255, 0.35);
-}
-
-.cyber-input:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-  border-color: rgba(255, 255, 255, 0.08);
-}
-
-/* === Cyberpunk Select === */
-:deep(.crawler-select .el-select__wrapper) {
-  background: var(--app-surface, rgba(10, 10, 15, 0.85));
-  border: 1px solid var(--app-glass-border, rgba(0, 204, 255, 0.2));
-  border-radius: var(--app-radius, 12px);
-  box-shadow: none;
-  padding: 6px 12px;
-  min-height: 34px;
-  transition: all 0.15s ease;
-}
-
-:deep(.crawler-select .el-select__wrapper:hover) {
-  border-color: rgba(255, 174, 0, 0.3);
-  background: var(--app-surface-hover, rgba(20, 20, 30, 0.9));
-}
-
-:deep(.crawler-select .el-select__wrapper.is-focus) {
-  border-color: var(--app-accent, #ffae00);
-  box-shadow: 0 0 12px rgba(255, 174, 0, 0.2);
-}
-
-:deep(.crawler-select .el-select__selected-item) {
-  color: #fff;
-  font-size: 13px;
-  line-height: 1.4;
-}
-
-:deep(.crawler-select .el-select__placeholder) {
-  color: rgba(255, 255, 255, 0.35);
-  font-size: 13px;
-}
-
-:deep(.crawler-select .el-select__suffix) {
-  color: rgba(255, 255, 255, 0.5);
-}
-
-:deep(.crawler-select.is-focus .el-select__suffix) {
-  color: var(--app-accent, #ffae00);
-}
-
-:deep(.crawler-select.is-disabled .el-select__wrapper) {
-  opacity: 0.4;
-  cursor: not-allowed;
-  border-color: rgba(255, 255, 255, 0.08);
-}
-
-/* === Cyberpunk Dropdown === */
-:deep(.crawler-dropdown) {
-  background: rgba(20, 25, 35, 0.75) !important;
-  backdrop-filter: blur(40px) saturate(180%) !important;
-  -webkit-backdrop-filter: blur(40px) saturate(180%) !important;
-  border: 1px solid rgba(255, 255, 255, 0.1) !important;
-  border-radius: 20px !important;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4) !important;
-  z-index: 9999 !important;
-  position: absolute !important;
-}
-
-:deep(.crawler-dropdown .el-select-dropdown__list) {
-  background: transparent !important;
-  padding: 6px 8px !important;
-}
-
-:deep(.crawler-dropdown .el-select-dropdown__item) {
-  color: #8da0b7 !important;
-  font-size: 13px !important;
-  height: 36px !important;
-  line-height: 36px !important;
-  margin: 1px 4px !important;
-  border-radius: 8px !important;
-  padding: 0 12px !important;
-  transition: all 0.15s ease !important;
-  cursor: pointer !important;
-}
-
-:deep(.crawler-dropdown .el-select-dropdown__item:hover) {
-  background: rgba(255, 255, 255, 0.08) !important;
-  color: #ffffff !important;
-}
-
-:deep(.crawler-dropdown .el-select-dropdown__item.is-selected) {
-  background: rgba(255, 174, 0, 0.15) !important;
-  color: #ffae00 !important;
-  font-weight: 500 !important;
-}
-
-:deep(.crawler-dropdown .el-select-dropdown__item.is-disabled) {
-  color: rgba(255, 255, 255, 0.2) !important;
-  cursor: not-allowed !important;
-}
-
-/* === Checkbox === */
-.checkbox-group {
-  display: flex;
-  gap: 16px;
-  align-items: center;
-  flex-wrap: wrap;
-}
-
-.cyber-checkbox {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  font-size: 13px;
-  margin: 0;
-  color: #fff;
-  transition: all 0.15s ease;
-  user-select: none;
-}
-
-.cyber-checkbox:hover {
-  color: var(--app-accent, #ffae00);
-}
-
-.cyber-checkbox input[type="checkbox"] {
-  cursor: pointer;
-  width: 16px;
-  height: 16px;
-  accent-color: var(--app-accent, #ffae00);
-  border-radius: 4px;
-  border: 1px solid var(--app-glass-border, rgba(0, 204, 255, 0.2));
-  background: var(--app-surface, rgba(10, 10, 15, 0.85));
-}
-
-.warning-hint {
-  color: var(--app-accent, #ffae00);
-  font-size: 11px;
-  margin-left: 4px;
-}
-
-/* === Actions === */
-.form-actions {
-  display: flex;
-  justify-content: flex-end;
-  padding-top: 12px;
-  border-top: 1px solid var(--app-glass-border, rgba(0, 204, 255, 0.15));
-  margin-top: 4px;
-}
-
-.cyber-btn {
-  padding: 9px 20px;
-  border: 1px solid;
-  border-radius: 12px;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  letter-spacing: 0.3px;
-  background: var(--app-surface, rgba(10, 10, 15, 0.85));
-}
-
-.cyber-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-  transform: none !important;
-  box-shadow: none !important;
-}
-
-.cyber-btn-primary {
-  border-color: var(--app-primary, #00ccff);
-  color: var(--app-primary, #00ccff);
-  box-shadow: 0 4px 12px rgba(0, 204, 255, 0.15);
-}
-
-.cyber-btn-primary:hover:not(:disabled) {
-  background: rgba(0, 204, 255, 0.12);
-  box-shadow: 0 6px 16px rgba(0, 204, 255, 0.25);
-  transform: translateY(-1px);
-}
-
-.cyber-btn-secondary {
-  border-color: rgba(255, 255, 255, 0.22);
-  color: rgba(241, 247, 255, 0.88);
-  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.08);
-}
-
-.cyber-btn-secondary:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.08);
-  box-shadow: 0 6px 16px rgba(255, 255, 255, 0.14);
-  transform: translateY(-1px);
-}
-
-.cyber-btn-danger {
-  border-color: rgba(255, 107, 107, 0.6);
-  color: rgba(255, 107, 107, 0.9);
-  box-shadow: 0 4px 12px rgba(255, 107, 107, 0.15);
-}
-
-.cyber-btn-danger:hover:not(:disabled) {
-  background: rgba(255, 107, 107, 0.12);
-  box-shadow: 0 6px 16px rgba(255, 107, 107, 0.25);
-  transform: translateY(-1px);
-}
-
-/* === Scrollbar === */
-.crawler-control::-webkit-scrollbar {
-  width: 4px;
-}
-
-.crawler-control::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.crawler-control::-webkit-scrollbar-thumb {
-  background: rgba(0, 204, 255, 0.3);
-  border-radius: 2px;
-}
-
-.crawler-control::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 204, 255, 0.5);
+  .qr-actions .cyber-btn {
+    width: 100%;
+  }
 }
 </style>

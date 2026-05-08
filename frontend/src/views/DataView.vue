@@ -346,12 +346,22 @@
 
     <transition name="dialog">
       <div v-if="crawlerDialogVisible" class="dialog-overlay" @click.self="crawlerDialogVisible = false">
-        <div class="dialog-panel">
-          <div class="dialog-header">
-            <span>更新</span>
-            <button class="drawer-close" type="button" @click="crawlerDialogVisible = false">×</button>
+        <div class="dialog-panel update-dialog-panel">
+          <div class="border-glow gold-tint"></div>
+          <div class="dialog-header update-dialog-header">
+            <div class="dialog-title-block">
+              <span class="dialog-kicker">UPDATE TASK</span>
+              <div class="dialog-title-row">
+                <h3 class="dialog-title">数据更新</h3>
+                <span class="dialog-status-chip" :class="{ running: crawlerStatus === 'running' }">
+                  {{ crawlerStatus === 'running' ? '运行中' : '待提交' }}
+                </span>
+              </div>
+            </div>
+            <button class="drawer-close dialog-close" type="button" @click="crawlerDialogVisible = false">×</button>
           </div>
-          <div class="dialog-body">
+
+          <div class="dialog-body update-dialog-body">
             <CrawlerControl
               :current-platform="currentPlatform"
               @crawler-status-change="onCrawlerStatusChange"

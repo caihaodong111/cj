@@ -38,7 +38,7 @@
 - MySQL：>= 5.7 (需要预先安装)
 - 内存：建议 >= 4GB
 - 磁盘：建议 >= 20GB
-- 端口：80, 8000, 3306, 6379
+- 端口：80, 8000, 3306, 6379, 6080（服务器扫码登录时用于 noVNC）
 
 ### 2. 安装 Docker 和 Docker Compose
 
@@ -77,10 +77,12 @@ FLUSH PRIVILEGES;
 sudo ufw allow 80/tcp
 sudo ufw allow 8000/tcp
 sudo ufw allow 3306/tcp  # 如果需要远程访问MySQL
+sudo ufw allow 6080/tcp  # 如果需要通过 noVNC 打开服务器浏览器扫码
 
 # CentOS/RHEL
 sudo firewall-cmd --permanent --add-port=80/tcp
 sudo firewall-cmd --permanent --add-port=8000/tcp
+sudo firewall-cmd --permanent --add-port=6080/tcp
 sudo firewall-cmd --reload
 ```
 
@@ -186,6 +188,54 @@ chmod +x deploy.sh
 | **健康检查** | http://39.105.122.26/api/health | 服务健康状态 |
 | **管理后台** | http://39.105.122.26/admin/ | Django Admin |
 | **配置选项** | http://39.105.122.26/api/config/options | 平台与运行配置接口 |
+| **服务器桌面（noVNC）** | http://39.105.122.26:6080 | 服务器容器内浏览器桌面，用于扫码登录/滑块验证 |
+
+## 服务器扫码登录与外部 CDP
+
+### 1. 默认服务器扫码方式
+
+如果前端“外部 Chrome CDP 地址”留空，二维码登录时浏览器会运行在服务器容器里，不会弹到你本地电脑。
+
+操作方式：
+
+1. 在前端选择“二维码登录”并启动任务。
+2. 打开 `http://服务器IP:6080` 进入 noVNC 桌面。
+3. 在服务器容器里的真实浏览器中完成扫码、短信验证或滑块验证。
+4. 同时前端会轮询 `/api/login/qr/<platform>` 和状态接口显示二维码与登录结果。
+
+说明：
+
+- `6080` 是后端容器暴露的 noVNC 端口。
+- 如果浏览器没有自动进入桌面首页，可尝试访问 `http://服务器IP:6080/vnc.html`。
+- 服务器未开放 `6080` 时，你会看到“爬虫已启动”，但看不到服务器里的真实浏览器。
+
+### 2. 外部 CDP 方式（在你自己的电脑扫码）
+
+如果你不想通过服务器 noVNC 扫码，可以把爬虫接到你自己电脑上的 Chrome。
+
+本机启动 Chrome 调试端口示例：
+
+```bash
+# macOS
+/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --remote-debugging-port=9222
+
+# Linux
+google-chrome --remote-debugging-port=9222
+
+# Windows（PowerShell）
+& "C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222
+```
+
+然后在前端“外部 Chrome CDP 地址”中填写以下任一形式：
+
+- `http://你的电脑IP:9222`
+- `ws://你的电脑IP:9222/devtools/browser/...`
+
+使用外部 CDP 后：
+
+- 扫码和验证会发生在你自己电脑的 Chrome 页面中。
+- 前端仍会轮询二维码状态接口。
+- 这时通常不需要再打开 `http://服务器IP:6080`。
 
 ## 常用运维命令
 

@@ -9,110 +9,133 @@
 用于分析内容的情绪倾向（积极、消极、中性、敏感）
 """
 
+import json
 import re
-from typing import Dict, List, Tuple
+from copy import deepcopy
+from functools import lru_cache
+from pathlib import Path
+from typing import Any, Dict, List
 
 
 class SentimentType:
     """情绪类型枚举"""
-    POSITIVE = 'positive'    # 积极
-    NEGATIVE = 'negative'    # 消极
-    NEUTRAL = 'neutral'      # 中性
-    SENSITIVE = 'sensitive'  # 敏感（涉黄、涉政等）
+
+    POSITIVE = "positive"
+    NEGATIVE = "negative"
+    NEUTRAL = "neutral"
+    SENSITIVE = "sensitive"
 
 
 class SentimentAnalyzer:
     """基于规则的情绪分析器"""
 
-    # 敏感关键词（涉黄、涉政、违法等）
-    SENSITIVE_KEYWORDS = {
-        'adult': [
-            '色情', '淫秽', '裸体', '性交', '做爱', '约炮', '卖淫',
-            '黄色', '三级片', 'AV', 'Porn', '性服务', '援交',
-            '色播', '裸聊', '情趣', 'SM', 'BDSM',
-        ],
-        'political': [
-            '反党', '反政府', '反国家', '颠覆', '暴动', '造反',
-            '法轮', '邪教', '分裂', '恐怖', '恐怖主义',
-            '反共', '反华', '反体制', '六四', '天安门',
-        ],
-        'violence': [
-            '杀人', '杀戮', '暴力', '血腥', '残忍', '虐待',
-            '自杀', '自残', '炸弹', '爆炸', '投毒',
-            '枪支', '管制刀具', '毒药', '毒品',
-        ],
-        'illegal': [
-            '赌博', '博彩', '赌场', '彩票', '六合彩',
-            '诈骗', '传销', '洗钱', '高利贷', '套路贷',
-            '假币', '假发票', '走私', '贩卖',
-        ],
+    LEXICON_PATH = Path(__file__).with_name("sensitive_lexicon.json")
+
+    DEFAULT_LEXICON = {
+        "global_whitelist_phrases": [],
+        "categories": {
+            "adult": {
+                "keywords": [],
+                "whitelist_phrases": [],
+            },
+            "political": {
+                "keywords": [],
+                "whitelist_phrases": [],
+            },
+            "violence": {
+                "keywords": [],
+                "whitelist_phrases": [],
+            },
+            "illegal": {
+                "keywords": [],
+                "whitelist_phrases": [],
+            },
+        },
     }
 
-    # 积极关键词
     POSITIVE_KEYWORDS = [
-        '开心', '快乐', '幸福', '美好', '优秀', '棒', '赞',
-        '喜欢', '爱', '感谢', '支持', '加油', '努力',
-        '成功', '胜利', '棒棒', '厉害', '太好了',
-        '😊', '😄', '👍', '💪', '❤️', '🎉',
+        "开心",
+        "快乐",
+        "幸福",
+        "美好",
+        "优秀",
+        "棒",
+        "赞",
+        "喜欢",
+        "爱",
+        "感谢",
+        "支持",
+        "加油",
+        "努力",
+        "成功",
+        "胜利",
+        "棒棒",
+        "厉害",
+        "太好了",
+        "😊",
+        "😄",
+        "👍",
+        "💪",
+        "❤️",
+        "🎉",
     ]
 
-    # 消极关键词
     NEGATIVE_KEYWORDS = [
-        '难过', '伤心', '痛苦', '失望', '糟糕', '差',
-        '讨厌', '恨', '愤怒', '生气', '烦', '痛苦',
-        '失败', '完蛋', '垃圾', '废物', '没用',
-        '😭', '😢', '😡', '😠', '💔',
+        "难过",
+        "伤心",
+        "痛苦",
+        "失望",
+        "糟糕",
+        "差",
+        "讨厌",
+        "恨",
+        "愤怒",
+        "生气",
+        "烦",
+        "痛苦",
+        "失败",
+        "完蛋",
+        "垃圾",
+        "废物",
+        "没用",
+        "😭",
+        "😢",
+        "😡",
+        "😠",
+        "💔",
     ]
+
+    ASCII_WORD_CHARS = "0-9A-Za-z_"
 
     @classmethod
-    def analyze(cls, content: str, title: str = '') -> Dict:
-        """
-        分析内容的情绪
-
-        Args:
-            content: 内容文本
-            title: 标题文本（可选）
-
-        Returns:
-            {
-                'sentiment': 'positive/negative/neutral/sensitive',
-                'score': float,
-                'labels': {
-                    'sensitive': bool,
-                    'adult': bool,
-                    'political': bool,
-                    'violence': bool,
-                    'illegal': bool
-                }
-            }
-        """
+    def analyze(cls, content: str, title: str = "") -> Dict[str, Any]:
         if not content and not title:
             return cls._neutral_result()
 
-        # 合并标题和内容进行分析
-        text = f"{title} {content}".lower()
+        text = f"{title or ''} {content or ''}".strip()
+        normalized_text = text.casefold()
 
-        # 1. 优先检测敏感内容
         sensitive_result = cls._check_sensitive(text)
-        if sensitive_result['is_sensitive']:
+        if sensitive_result["is_sensitive"]:
             return {
-                'sentiment': SentimentType.SENSITIVE,
-                'score': -1.0,
-                'labels': sensitive_result['labels']
+                "sentiment": SentimentType.SENSITIVE,
+                "score": -1.0,
+                "labels": sensitive_result["labels"],
             }
 
-        # 2. 检测积极/消极倾向
-        positive_count = sum(1 for keyword in cls.POSITIVE_KEYWORDS if keyword in text)
-        negative_count = sum(1 for keyword in cls.NEGATIVE_KEYWORDS if keyword in text)
+        positive_count = sum(
+            1 for keyword in cls.POSITIVE_KEYWORDS if keyword.casefold() in normalized_text
+        )
+        negative_count = sum(
+            1 for keyword in cls.NEGATIVE_KEYWORDS if keyword.casefold() in normalized_text
+        )
 
-        # 计算情绪分数 (-1 到 1)
         total_count = positive_count + negative_count
         if total_count == 0:
             score = 0.0
         else:
             score = (positive_count - negative_count) / total_count
 
-        # 确定情绪类型
         if score > 0.3:
             sentiment = SentimentType.POSITIVE
         elif score < -0.3:
@@ -121,72 +144,254 @@ class SentimentAnalyzer:
             sentiment = SentimentType.NEUTRAL
 
         return {
-            'sentiment': sentiment,
-            'score': score,
-            'labels': {
-                'sensitive': False,
-                'adult': False,
-                'political': False,
-                'violence': False,
-                'illegal': False
-            }
+            "sentiment": sentiment,
+            "score": score,
+            "labels": cls._empty_labels(cls._get_sensitive_config()["category_names"]),
         }
 
     @classmethod
-    def _check_sensitive(cls, text: str) -> Dict:
-        """
-        检测敏感内容
+    def _check_sensitive(cls, text: str) -> Dict[str, Any]:
+        config = cls._get_sensitive_config()
+        labels = cls._empty_labels(config["category_names"])
+        matched_categories: List[str] = []
+        matched_keywords: List[str] = []
+        matched_by_category: Dict[str, List[str]] = {}
 
-        Returns:
-            {
-                'is_sensitive': bool,
-                'labels': {
-                    'adult': bool,
-                    'political': bool,
-                    'violence': bool,
-                    'illegal': bool
-                }
-            }
-        """
-        labels = {
-            'adult': False,
-            'political': False,
-            'violence': False,
-            'illegal': False
+        global_whitelist_spans = cls._collect_match_spans(text, config["global_whitelist"])
+
+        for category in config["category_names"]:
+            category_config = config["categories"][category]
+            category_whitelist_spans = cls._collect_match_spans(
+                text,
+                category_config["whitelist"],
+            )
+            whitelist_spans = cls._merge_spans(global_whitelist_spans + category_whitelist_spans)
+            category_hits = cls._find_unwhitelisted_keywords(
+                text,
+                category_config["keywords"],
+                whitelist_spans,
+            )
+
+            if category_hits:
+                labels[category] = True
+                matched_categories.append(category)
+                matched_by_category[category] = category_hits
+                matched_keywords.extend(category_hits)
+
+        labels["sensitive"] = bool(matched_categories)
+        labels["matched_categories"] = matched_categories
+        labels["matched_keywords"] = list(dict.fromkeys(matched_keywords))
+        labels["matched_by_category"] = matched_by_category
+
+        return {
+            "is_sensitive": labels["sensitive"],
+            "labels": labels,
         }
 
-        for category, keywords in cls.SENSITIVE_KEYWORDS.items():
-            for keyword in keywords:
-                if keyword in text:
-                    labels[category] = True
+    @classmethod
+    def clear_cache(cls) -> None:
+        cls._build_sensitive_config.cache_clear()
+
+    @classmethod
+    def _get_sensitive_config(cls) -> Dict[str, Any]:
+        return cls._build_sensitive_config(cls._get_lexicon_cache_key())
+
+    @classmethod
+    def _get_lexicon_cache_key(cls) -> str:
+        try:
+            stat = cls.LEXICON_PATH.stat()
+        except OSError:
+            return "default"
+        return f"{stat.st_mtime_ns}:{stat.st_size}"
+
+    @classmethod
+    @lru_cache(maxsize=1)
+    def _build_sensitive_config(cls, _cache_key: str) -> Dict[str, Any]:
+        lexicon = cls._load_lexicon()
+        compiled_categories: Dict[str, Dict[str, List[tuple[str, re.Pattern]]]] = {}
+
+        for category, category_config in lexicon["categories"].items():
+            compiled_categories[category] = {
+                "keywords": [
+                    cls._compile_phrase_matcher(keyword)
+                    for keyword in category_config.get("keywords", [])
+                ],
+                "whitelist": [
+                    cls._compile_phrase_matcher(phrase)
+                    for phrase in category_config.get("whitelist_phrases", [])
+                ],
+            }
+
+        return {
+            "category_names": list(lexicon["categories"].keys()),
+            "global_whitelist": [
+                cls._compile_phrase_matcher(phrase)
+                for phrase in lexicon.get("global_whitelist_phrases", [])
+            ],
+            "categories": compiled_categories,
+        }
+
+    @classmethod
+    def _load_lexicon(cls) -> Dict[str, Any]:
+        lexicon = deepcopy(cls.DEFAULT_LEXICON)
+
+        try:
+            raw_lexicon = json.loads(cls.LEXICON_PATH.read_text(encoding="utf-8"))
+        except (OSError, TypeError, ValueError):
+            return lexicon
+
+        if not isinstance(raw_lexicon, dict):
+            return lexicon
+
+        raw_categories = raw_lexicon.get("categories")
+        category_names = list(lexicon["categories"].keys())
+        if isinstance(raw_categories, dict):
+            extra_categories = [
+                category for category in raw_categories.keys() if category not in lexicon["categories"]
+            ]
+            category_names.extend(extra_categories)
+
+        normalized_categories: Dict[str, Dict[str, List[str]]] = {}
+        for category in category_names:
+            default_config = lexicon["categories"].get(
+                category,
+                {"keywords": [], "whitelist_phrases": []},
+            )
+            raw_category_config = raw_categories.get(category) if isinstance(raw_categories, dict) else None
+
+            keywords_source = (
+                raw_category_config.get("keywords")
+                if isinstance(raw_category_config, dict)
+                else default_config.get("keywords")
+            )
+            whitelist_source = (
+                raw_category_config.get("whitelist_phrases")
+                if isinstance(raw_category_config, dict)
+                else default_config.get("whitelist_phrases")
+            )
+
+            normalized_categories[category] = {
+                "keywords": cls._normalize_string_list(
+                    keywords_source,
+                    default_config.get("keywords", []),
+                ),
+                "whitelist_phrases": cls._normalize_string_list(
+                    whitelist_source,
+                    default_config.get("whitelist_phrases", []),
+                ),
+            }
+
+        lexicon["categories"] = normalized_categories
+        lexicon["global_whitelist_phrases"] = cls._normalize_string_list(
+            raw_lexicon.get("global_whitelist_phrases"),
+            lexicon.get("global_whitelist_phrases", []),
+        )
+        return lexicon
+
+    @classmethod
+    def _compile_phrase_matcher(cls, phrase: str) -> tuple[str, re.Pattern]:
+        if cls._is_ascii_keyword(phrase):
+            pattern = re.compile(
+                rf"(?<![{cls.ASCII_WORD_CHARS}]){re.escape(phrase)}(?![{cls.ASCII_WORD_CHARS}])",
+                flags=re.IGNORECASE,
+            )
+        else:
+            pattern = re.compile(re.escape(phrase))
+        return phrase, pattern
+
+    @classmethod
+    def _find_unwhitelisted_keywords(
+        cls,
+        text: str,
+        matchers: List[tuple[str, re.Pattern]],
+        whitelist_spans: List[tuple[int, int]],
+    ) -> List[str]:
+        hits: List[str] = []
+
+        for keyword, pattern in matchers:
+            for match in pattern.finditer(text):
+                if not cls._is_span_whitelisted(match.span(), whitelist_spans):
+                    hits.append(keyword)
                     break
-            if labels[category]:
-                break
 
-        is_sensitive = any(labels.values())
+        return hits
 
-        return {
-            'is_sensitive': is_sensitive,
-            'labels': labels
-        }
+    @staticmethod
+    def _collect_match_spans(
+        text: str,
+        matchers: List[tuple[str, re.Pattern]],
+    ) -> List[tuple[int, int]]:
+        spans: List[tuple[int, int]] = []
+        for _, pattern in matchers:
+            spans.extend(match.span() for match in pattern.finditer(text))
+        return SentimentAnalyzer._merge_spans(spans)
+
+    @staticmethod
+    def _merge_spans(spans: List[tuple[int, int]]) -> List[tuple[int, int]]:
+        if not spans:
+            return []
+
+        merged: List[List[int]] = []
+        for start, end in sorted(spans):
+            if not merged or start > merged[-1][1]:
+                merged.append([start, end])
+            else:
+                merged[-1][1] = max(merged[-1][1], end)
+
+        return [(start, end) for start, end in merged]
+
+    @staticmethod
+    def _is_span_whitelisted(
+        span: tuple[int, int],
+        whitelist_spans: List[tuple[int, int]],
+    ) -> bool:
+        start, end = span
+        for white_start, white_end in whitelist_spans:
+            if start >= white_start and end <= white_end:
+                return True
+        return False
+
+    @staticmethod
+    def _normalize_string_list(values: Any, default_values: List[str]) -> List[str]:
+        source = values if isinstance(values, list) else default_values
+        normalized: List[str] = []
+        seen = set()
+
+        for item in source:
+            text = str(item or "").strip()
+            if not text or text in seen:
+                continue
+            seen.add(text)
+            normalized.append(text)
+
+        return normalized
+
+    @staticmethod
+    def _is_ascii_keyword(keyword: str) -> bool:
+        if not keyword or not keyword.isascii():
+            return False
+        return any(ch.isalnum() for ch in keyword)
 
     @classmethod
-    def _neutral_result(cls) -> Dict:
-        """返回中性结果"""
+    def _empty_labels(cls, category_names: List[str]) -> Dict[str, Any]:
+        labels: Dict[str, Any] = {"sensitive": False}
+        for category in category_names:
+            labels[category] = False
+        labels["matched_categories"] = []
+        labels["matched_keywords"] = []
+        labels["matched_by_category"] = {}
+        return labels
+
+    @classmethod
+    def _neutral_result(cls) -> Dict[str, Any]:
         return {
-            'sentiment': SentimentType.NEUTRAL,
-            'score': 0.0,
-            'labels': {
-                'sensitive': False,
-                'adult': False,
-                'political': False,
-                'violence': False,
-                'illegal': False
-            }
+            "sentiment": SentimentType.NEUTRAL,
+            "score": 0.0,
+            "labels": cls._empty_labels(cls._get_sensitive_config()["category_names"]),
         }
 
 
-# 便捷函数
-def analyze_sentiment(content: str, title: str = '') -> Dict:
+def analyze_sentiment(content: str, title: str = "") -> Dict[str, Any]:
     """分析内容情绪的便捷函数"""
+
     return SentimentAnalyzer.analyze(content, title)

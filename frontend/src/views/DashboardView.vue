@@ -5,97 +5,146 @@
     <div class="layout-wrapper">
       <header class="page-header entrance-slide-in">
         <div class="title-group">
-          <h1 class="ios-title">舆情监测总览<span class="subtitle">Sentiment Dashboard</span></h1>
-          <div class="status-tag">
-            <span class="dot pulse"></span> 最近更新：{{ lastUpdatedAt ? formatRelativeTime(lastUpdatedAt) : '暂无' }}
+          <div class="title-copy">
+            <h1 class="ios-title">舆情监测总览<span class="subtitle">Sentiment Dashboard</span></h1>
+            <p class="page-intro">聚合全网敏感密度、情绪结构与实时动态，优先暴露需要下钻的平台和风险点。</p>
+          </div>
+          <div class="header-meta">
+            <div class="status-tag">
+              <span class="dot pulse"></span> 最近更新：{{ lastUpdatedAt ? formatRelativeTime(lastUpdatedAt) : '暂无' }}
+            </div>
+            <div class="header-actions">
+              <button class="ghost-btn" @click="showAllSensitive">查看敏感池</button>
+              <button class="refresh-btn hero-refresh" :disabled="feedLoading" @click="refreshMonitorFeed">
+                <span class="refresh-icon" :class="{ spinning: feedLoading }">⟳</span>
+                {{ feedLoading ? '刷新中' : '刷新总览' }}
+              </button>
+            </div>
           </div>
         </div>
       </header>
 
-      <div class="dashboard-main-grid">
-        <aside class="side-panel left">
-          <div class="panel-card ios-glass main-card entrance-scale-up">
-            <div class="border-glow entrance-border-glow"></div>
-            <div class="cell-header">
-              <span class="accent-bar"></span>
-              各平台敏感数据分布
+      <section class="hero-section ios-glass entrance-scale-up">
+        <div class="border-glow gold-tint entrance-border-glow"></div>
+        <div class="hero-content">
+          <div class="stats-grid hero-kpis">
+            <div class="stat-card">
+              <div class="stat-icon">◉</div>
+              <div class="stat-info">
+                <span class="label">监测总量</span>
+                <span class="value">{{ formatCount(displayTotalCount) }}</span>
+                <span class="trend">覆盖 {{ activePlatformsCount }} 个活跃平台</span>
+              </div>
             </div>
-            <div ref="mainChartRef" class="main-chart-box entrance-chart-fade"></div>
-          </div>
 
-          <div class="sentiment-grid">
-            <div class="platform-card ios-glass entrance-scale-up clickable" style="animation-delay: 0.3s" @click="handlePlatformJump('xhs')">
-              <div class="border-glow entrance-border-glow"></div>
-              <div class="cell-header compact">
-                <span class="accent-bar small"></span>
-                小红书
-              </div>
-              <div class="platform-chart-wrapper">
-                <div class="platform-mini-chart" :ref="el => setChartRef('xhs', el)"></div>
-              </div>
-            </div>
-            <div class="platform-card ios-glass entrance-scale-up clickable" style="animation-delay: 0.35s" @click="handlePlatformJump('dy')">
-              <div class="border-glow entrance-border-glow"></div>
-              <div class="cell-header compact">
-                <span class="accent-bar small"></span>
-                抖音
-              </div>
-              <div class="platform-chart-wrapper">
-                <div class="platform-mini-chart" :ref="el => setChartRef('dy', el)"></div>
+            <div class="stat-card">
+              <div class="stat-icon warning">!</div>
+              <div class="stat-info">
+                <span class="label">敏感内容</span>
+                <span class="value sensitive">{{ formatCount(displaySensitiveCount) }}</span>
+                <span class="trend" :class="getSentimentTrendClass(displaySensitiveCount, displayTotalCount)">
+                  {{ getSentimentTrendText(displaySensitiveCount, displayTotalCount) }}
+                </span>
               </div>
             </div>
-            <div class="platform-card ios-glass entrance-scale-up clickable" style="animation-delay: 0.4s" @click="handlePlatformJump('ks')">
-              <div class="border-glow entrance-border-glow"></div>
-              <div class="cell-header compact">
-                <span class="accent-bar small"></span>
-                快手
-              </div>
-              <div class="platform-chart-wrapper">
-                <div class="platform-mini-chart" :ref="el => setChartRef('ks', el)"></div>
-              </div>
-            </div>
-            <div class="platform-card ios-glass entrance-scale-up clickable" style="animation-delay: 0.45s" @click="handlePlatformJump('bili')">
-              <div class="border-glow entrance-border-glow"></div>
-              <div class="cell-header compact">
-                <span class="accent-bar small"></span>
-                B站
-              </div>
-              <div class="platform-chart-wrapper">
-                <div class="platform-mini-chart" :ref="el => setChartRef('bili', el)"></div>
+
+            <div class="stat-card">
+              <div class="stat-icon" :class="getSentimentIndexClass(stats.sentimentIndex || 0)">∿</div>
+              <div class="stat-info">
+                <span class="label">情绪指数</span>
+                <span class="value" :class="getSentimentIndexClass(stats.sentimentIndex || 0)">
+                  {{ formatSentimentIndex(stats.sentimentIndex || 0) }}
+                </span>
+                <span class="trend">{{ getSentimentIndexText(stats.sentimentIndex || 0) }}</span>
               </div>
             </div>
-            <div class="platform-card ios-glass entrance-scale-up clickable" style="animation-delay: 0.5s" @click="handlePlatformJump('wb')">
-              <div class="border-glow entrance-border-glow"></div>
-              <div class="cell-header compact">
-                <span class="accent-bar small"></span>
-                微博
-              </div>
-              <div class="platform-chart-wrapper">
-                <div class="platform-mini-chart" :ref="el => setChartRef('wb', el)"></div>
-              </div>
-            </div>
-            <div class="platform-card ios-glass entrance-scale-up clickable" style="animation-delay: 0.55s" @click="handlePlatformJump('tieba')">
-              <div class="border-glow entrance-border-glow"></div>
-              <div class="cell-header compact">
-                <span class="accent-bar small"></span>
-                贴吧
-              </div>
-              <div class="platform-chart-wrapper">
-                <div class="platform-mini-chart" :ref="el => setChartRef('tieba', el)"></div>
-              </div>
-            </div>
-            <div class="platform-card ios-glass entrance-scale-up clickable" style="animation-delay: 0.6s" @click="handlePlatformJump('zhihu')">
-              <div class="border-glow entrance-border-glow"></div>
-              <div class="cell-header compact">
-                <span class="accent-bar small"></span>
-                知乎
-              </div>
-              <div class="platform-chart-wrapper">
-                <div class="platform-mini-chart" :ref="el => setChartRef('zhihu', el)"></div>
+
+            <div class="stat-card">
+              <div class="stat-icon heat">✦</div>
+              <div class="stat-info">
+                <span class="label">监测热度</span>
+                <span class="value hot">{{ Math.round(stats.hotScore || 0) }}</span>
+                <span class="trend">{{ getHotScoreText(stats.hotScore || 0) }}</span>
               </div>
             </div>
           </div>
-        </aside>
+        </div>
+      </section>
+
+      <div class="dashboard-main-grid">
+        <section class="panel-card ios-glass main-card entrance-scale-up-delay-2">
+          <div class="border-glow entrance-border-glow"></div>
+          <div class="cell-header">
+            <span class="accent-bar"></span>
+            风险分布总览
+            <span class="section-note">点击环图或重点平台，可直接查看对应敏感内容</span>
+          </div>
+          <div class="overview-panel-body">
+            <div ref="mainChartRef" class="main-chart-box entrance-chart-fade"></div>
+
+            <div class="insight-column">
+              <div class="insight-block">
+                <div class="insight-title-row">
+                  <h3>重点平台</h3>
+                  <span class="insight-caption">按敏感占比排序</span>
+                </div>
+
+                <div v-if="topRiskPlatforms.length" class="ranking-list">
+                  <button
+                    v-for="(platform, index) in topRiskPlatforms"
+                    :key="platform.key"
+                    type="button"
+                    class="ranking-item"
+                    :class="platform.statusTone"
+                    @click="openSensitiveModal(platform.key)"
+                  >
+                    <span class="ranking-order">{{ String(index + 1).padStart(2, '0') }}</span>
+                    <div class="ranking-main">
+                      <div class="ranking-label-row">
+                        <strong>{{ platform.label }}</strong>
+                        <span class="risk-status-pill" :class="platform.statusTone">{{ platform.statusLabel }}</span>
+                      </div>
+                      <div class="ranking-meter">
+                        <span :style="{ width: `${platform.sensitiveRate}%` }"></span>
+                      </div>
+                      <div class="ranking-meta">
+                        <span>敏感 {{ formatCount(platform.sensitive) }}</span>
+                        <span>占比 {{ platform.sensitiveRateText }}</span>
+                        <span>{{ platform.dominantLabel }}</span>
+                      </div>
+                    </div>
+                  </button>
+                </div>
+
+                <div v-else class="empty-inline-state">暂无可排序的平台风险数据</div>
+              </div>
+
+              <div class="insight-block compact">
+                <div class="insight-title-row">
+                  <h3>全网情绪结构</h3>
+                  <span class="insight-caption">{{ activePlatformsCount }} 个平台有数据</span>
+                </div>
+
+                <div class="sentiment-stack">
+                  <div v-for="item in sentimentBreakdown" :key="item.key" class="sentiment-row">
+                    <div class="sentiment-row-head">
+                      <span
+                        class="sentiment-dot"
+                        :style="{ background: item.color, boxShadow: `0 0 16px ${item.glow}` }"
+                      ></span>
+                      <span class="sentiment-label">{{ item.label }}</span>
+                      <span class="sentiment-value">{{ formatCount(item.value) }}</span>
+                    </div>
+                    <div class="sentiment-bar">
+                      <span :style="{ width: `${item.share}%`, background: item.gradient }"></span>
+                    </div>
+                    <div class="sentiment-meta">{{ item.shareText }}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
 
         <section class="center-panel">
           <div class="recent-list ios-glass compact entrance-scale-up-delay-2 feed-panel">
@@ -103,23 +152,63 @@
             <div class="cell-header">
               <span class="accent-bar purple"></span>
               Monitor Feed 实时动态
+              <span class="section-note">当前页 {{ currentPage }}/{{ totalPages }}</span>
               <button class="refresh-btn header-refresh" :disabled="feedLoading" @click="refreshMonitorFeed">
                 <span class="refresh-icon" :class="{ spinning: feedLoading }">⟳</span>
                 {{ feedLoading ? '刷新中' : '刷新' }}
               </button>
             </div>
 
+            <div class="feed-summary-strip">
+              <span class="feed-summary-chip">总量 {{ formatCount(displayTotalCount) }}</span>
+              <span class="feed-summary-chip warning">敏感 {{ formatCount(displaySensitiveCount) }} / {{ sensitiveRatioText }}</span>
+              <span class="feed-summary-chip">当前展示 {{ feedItems.length }} 条</span>
+            </div>
+
             <div v-if="feedItems && feedItems.length > 0" class="list-wrapper">
-              <div class="list-item" v-for="(item, index) in feedItems" :key="item.id" :class="getSentimentClass(item.sentiment)">
-                <span class="platform-tag">{{ item.platformLabel }}</span>
-                <span class="content">{{ item.content }}</span>
-                <span class="sentiment-tag" :class="item.sentiment || 'neutral'">
-                  {{ getSentimentLabel(item.sentiment) }}
-                </span>
-                <span class="time">{{ item.timeLabel }}</span>
-                <span class="author" :class="{ muted: !item.authorLabel }">
-                  {{ item.authorLabel || '匿名' }}
-                </span>
+              <div v-for="item in feedItems" :key="item.id" class="list-item" :class="getSentimentClass(item.sentiment)">
+                <div class="feed-item-main">
+                  <div class="feed-item-topline">
+                    <span class="platform-tag">{{ item.platformLabel }}</span>
+                    <span class="sentiment-tag" :class="item.sentiment === 'sensitive' ? 'sensitive' : 'normal'">
+                      {{ getSentimentLabel(item.sentiment) }}
+                    </span>
+                    <span class="author" :class="{ muted: !item.authorLabel }">
+                      {{ item.authorLabel || '匿名' }}
+                    </span>
+                  </div>
+                  <p class="content">{{ item.content }}</p>
+                  <div v-if="item.isSensitive && hasSensitiveReasons(item)" class="reason-block">
+                    <div v-if="item.sensitiveReasons.categories.length" class="reason-row">
+                      <span class="reason-label">命中类别</span>
+                      <span
+                        v-for="category in item.sensitiveReasons.categories"
+                        :key="`${item.id}-category-${category.key}`"
+                        class="reason-chip category"
+                      >
+                        {{ category.label }}
+                      </span>
+                    </div>
+                    <div v-if="item.sensitiveReasons.keywords.length" class="reason-row">
+                      <span class="reason-label">命中词</span>
+                      <span
+                        v-for="keyword in item.sensitiveReasons.keywords.slice(0, 4)"
+                        :key="`${item.id}-keyword-${keyword}`"
+                        class="reason-chip keyword"
+                      >
+                        {{ keyword }}
+                      </span>
+                      <span v-if="item.sensitiveReasons.keywords.length > 4" class="reason-more">
+                        +{{ item.sensitiveReasons.keywords.length - 4 }}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="feed-item-side">
+                  <span class="time">{{ item.timeLabel }}</span>
+                  <a v-if="item.url" :href="item.url" target="_blank" rel="noopener" class="feed-link">原文</a>
+                </div>
               </div>
             </div>
 
@@ -180,7 +269,51 @@
           </div>
         </section>
       </div>
-    </div>
+
+      <section class="platform-shell ios-glass entrance-scale-up-delay-2">
+        <div class="border-glow blue-tint entrance-border-glow"></div>
+        <div class="cell-header">
+          <span class="accent-bar blue"></span>
+          平台矩阵
+          <span class="section-note">每个平台都保留敏感占比、总量与主导情绪，方便横向比较</span>
+        </div>
+        <div class="sentiment-grid">
+          <div
+            v-for="(platform, index) in platformCards"
+            :key="platform.key"
+            class="platform-card ios-glass entrance-scale-up clickable"
+            :style="{ animationDelay: `${0.28 + index * 0.05}s` }"
+            @click="handlePlatformJump(platform.key)"
+          >
+            <div class="border-glow entrance-border-glow" :class="platform.glowClass"></div>
+            <div class="cell-header compact">
+              <span class="accent-bar small" :class="platform.accentClass"></span>
+              {{ platform.label }}
+              <span class="platform-status-pill" :class="platform.statusTone">{{ platform.statusLabel }}</span>
+            </div>
+            <div class="platform-chart-wrapper">
+              <div class="platform-mini-chart" :ref="el => setChartRef(platform.key, el)"></div>
+              <div class="platform-data-col">
+                <div class="mini-stat-row">
+                  <label>总量</label>
+                  <span class="value">{{ formatCount(platform.total) }}</span>
+                </div>
+                <div class="mini-stat-row">
+                  <label>敏感占比</label>
+                  <span class="value" :class="{ 'has-risk': platform.sensitive > 0, normal: platform.sensitive === 0 }">
+                    {{ platform.sensitiveRateText }}
+                  </span>
+                </div>
+                <div class="mini-stat-row">
+                  <label>主导情绪</label>
+                  <span class="value" :class="platform.dominantClass">{{ platform.dominantShort }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        </section>
+      </div>
 
     <div v-if="sensitiveModalOpen" class="modal-overlay" @click.self="closeSensitiveModal">
       <div class="modal-card ios-glass">
@@ -210,6 +343,31 @@
                 <span class="time">{{ item.timeLabel }}</span>
               </div>
               <div class="modal-content">{{ item.content }}</div>
+              <div v-if="hasSensitiveReasons(item)" class="reason-block modal-reason-block">
+                <div v-if="item.sensitiveReasons.categories.length" class="reason-row">
+                  <span class="reason-label">命中类别</span>
+                  <span
+                    v-for="category in item.sensitiveReasons.categories"
+                    :key="`${item.id}-modal-category-${category.key}`"
+                    class="reason-chip category"
+                  >
+                    {{ category.label }}
+                  </span>
+                </div>
+                <div v-if="item.sensitiveReasons.keywords.length" class="reason-row">
+                  <span class="reason-label">命中词</span>
+                  <span
+                    v-for="keyword in item.sensitiveReasons.keywords.slice(0, 8)"
+                    :key="`${item.id}-modal-keyword-${keyword}`"
+                    class="reason-chip keyword"
+                  >
+                    {{ keyword }}
+                  </span>
+                  <span v-if="item.sensitiveReasons.keywords.length > 8" class="reason-more">
+                    +{{ item.sensitiveReasons.keywords.length - 8 }}
+                  </span>
+                </div>
+              </div>
               <div class="modal-footer">
                 <span class="author">{{ item.authorLabel || '匿名' }}</span>
                 <a v-if="item.url" :href="item.url" target="_blank" rel="noopener">原文</a>
@@ -817,6 +975,33 @@ const sensitiveModalTotalPages = ref(1)
 const sensitiveModalTotalCount = ref(0)
 const sensitiveModalPlatform = ref('')
 const sensitiveModalPlatformLabel = ref('全部平台')
+const monitoredPlatforms = ['xhs', 'dy', 'ks', 'bili', 'wb', 'tieba', 'zhihu']
+const sentimentVisuals = {
+  positive: {
+    label: '积极',
+    color: '#00ff88',
+    glow: 'rgba(0, 255, 136, 0.45)',
+    gradient: 'linear-gradient(90deg, rgba(0, 255, 136, 0.95), rgba(0, 255, 136, 0.2))'
+  },
+  neutral: {
+    label: '中性',
+    color: '#00ccff',
+    glow: 'rgba(0, 204, 255, 0.45)',
+    gradient: 'linear-gradient(90deg, rgba(0, 204, 255, 0.95), rgba(0, 204, 255, 0.2))'
+  },
+  negative: {
+    label: '消极',
+    color: '#ff6b6b',
+    glow: 'rgba(255, 107, 107, 0.45)',
+    gradient: 'linear-gradient(90deg, rgba(255, 107, 107, 0.95), rgba(255, 107, 107, 0.2))'
+  },
+  sensitive: {
+    label: '敏感',
+    color: '#ffae00',
+    glow: 'rgba(255, 174, 0, 0.45)',
+    gradient: 'linear-gradient(90deg, rgba(255, 174, 0, 0.95), rgba(255, 174, 0, 0.2))'
+  }
+}
 
 const sentimentCounts = computed(() => {
   const counts = { positive: 0, negative: 0, neutral: 0, sensitive: 0 }
@@ -838,11 +1023,10 @@ const platformSentimentCounts = computed(() => {
   if (platformStats.value) {
     return platformStats.value
   }
-  const platforms = ['xhs', 'dy', 'ks', 'bili', 'wb', 'tieba', 'zhihu']
   const base = { positive: 0, negative: 0, neutral: 0, sensitive: 0, total: 0 }
   const result = {}
 
-  platforms.forEach((platform) => {
+  monitoredPlatforms.forEach((platform) => {
     result[platform] = { ...base }
   })
 
@@ -863,6 +1047,140 @@ const platformSentimentCounts = computed(() => {
   return result
 })
 
+const aggregatedSentimentCounts = computed(() => {
+  return monitoredPlatforms.reduce((acc, platform) => {
+    const row = platformSentimentCounts.value?.[platform] || {}
+    acc.positive += Number(row.positive || 0)
+    acc.negative += Number(row.negative || 0)
+    acc.neutral += Number(row.neutral || 0)
+    acc.sensitive += Number(row.sensitive || 0)
+    acc.total += Number(row.total || 0)
+    return acc
+  }, { positive: 0, negative: 0, neutral: 0, sensitive: 0, total: 0 })
+})
+
+const displayTotalCount = computed(() => {
+  return Number(stats.value?.total ?? totalCount.value ?? 0) || 0
+})
+
+const displaySensitiveCount = computed(() => {
+  return Number(stats.value?.sensitive ?? 0) || 0
+})
+
+const activePlatformsCount = computed(() => {
+  return monitoredPlatforms.filter(platform => {
+    return Number(platformSentimentCounts.value?.[platform]?.total || 0) > 0
+  }).length
+})
+
+const sensitiveRatio = computed(() => {
+  if (!displayTotalCount.value) return 0
+  return Number(((displaySensitiveCount.value / displayTotalCount.value) * 100).toFixed(1))
+})
+
+const sensitiveRatioText = computed(() => formatPercent(sensitiveRatio.value))
+
+const resolveDominantSentiment = (row) => {
+  const options = [
+    { key: 'sensitive', value: Number(row.sensitive || 0), label: '敏感内容最集中', short: '敏感', className: 'has-risk' },
+    { key: 'negative', value: Number(row.negative || 0), label: '负向讨论偏多', short: '消极', className: 'has-risk' },
+    { key: 'neutral', value: Number(row.neutral || 0), label: '中性讨论为主', short: '中性', className: 'normal' },
+    { key: 'positive', value: Number(row.positive || 0), label: '积极反馈更多', short: '积极', className: 'positive' }
+  ]
+
+  return options.sort((a, b) => b.value - a.value)[0]
+}
+
+const resolvePlatformStatus = (total, sensitiveRate) => {
+  if (!total) {
+    return {
+      statusTone: 'idle',
+      statusLabel: '待采集',
+      accentClass: 'purple',
+      glowClass: 'purple-tint'
+    }
+  }
+  if (sensitiveRate >= 12) {
+    return {
+      statusTone: 'critical',
+      statusLabel: '高风险',
+      accentClass: 'risk',
+      glowClass: 'risk-tint'
+    }
+  }
+  if (sensitiveRate >= 5) {
+    return {
+      statusTone: 'warning',
+      statusLabel: '关注',
+      accentClass: '',
+      glowClass: ''
+    }
+  }
+  return {
+    statusTone: 'stable',
+    statusLabel: '平稳',
+    accentClass: 'safe',
+    glowClass: 'blue-tint'
+  }
+}
+
+const platformCards = computed(() => {
+  return monitoredPlatforms.map((platform) => {
+    const row = platformSentimentCounts.value?.[platform] || {}
+    const total = Number(row.total || 0)
+    const sensitive = Number(row.sensitive || 0)
+    const positive = Number(row.positive || 0)
+    const negative = Number(row.negative || 0)
+    const neutral = Number(row.neutral || 0)
+    const sensitiveRate = total ? Number(((sensitive / total) * 100).toFixed(1)) : 0
+    const dominant = resolveDominantSentiment({ sensitive, negative, neutral, positive })
+    const status = resolvePlatformStatus(total, sensitiveRate)
+
+    return {
+      key: platform,
+      label: getPlatformLabel(platform),
+      total,
+      sensitive,
+      positive,
+      negative,
+      neutral,
+      sensitiveRate,
+      sensitiveRateText: formatPercent(sensitiveRate),
+      dominantKey: dominant.key,
+      dominantLabel: dominant.label,
+      dominantShort: dominant.short,
+      dominantClass: dominant.className,
+      ...status
+    }
+  })
+})
+
+const topRiskPlatforms = computed(() => {
+  return [...platformCards.value]
+    .filter(platform => platform.total > 0)
+    .sort((a, b) => {
+      if (b.sensitiveRate !== a.sensitiveRate) return b.sensitiveRate - a.sensitiveRate
+      if (b.sensitive !== a.sensitive) return b.sensitive - a.sensitive
+      return b.total - a.total
+    })
+    .slice(0, 3)
+})
+
+const sentimentBreakdown = computed(() => {
+  const total = aggregatedSentimentCounts.value.total || 0
+  return ['positive', 'neutral', 'negative', 'sensitive'].map((key) => {
+    const value = Number(aggregatedSentimentCounts.value?.[key] || 0)
+    const share = total ? Number(((value / total) * 100).toFixed(1)) : 0
+    return {
+      key,
+      value,
+      share,
+      shareText: total ? `占全部 ${share.toFixed(1)}%` : '暂无样本',
+      ...sentimentVisuals[key]
+    }
+  })
+})
+
 const fetchPlatformStats = async ({ signal = null } = {}) => {
   if (signal?.aborted) return
   try {
@@ -879,7 +1197,7 @@ const fetchPlatformStats = async ({ signal = null } = {}) => {
 
 const openSensitiveModal = async (platformKey) => {
   sensitiveModalPlatform.value = platformKey || ''
-  sensitiveModalPlatformLabel.value = getPlatformLabel(platformKey)
+  sensitiveModalPlatformLabel.value = platformKey ? getPlatformLabel(platformKey) : '全部平台'
   sensitiveModalPage.value = 1
   sensitiveModalOpen.value = true
   await fetchSensitiveModalPage()
@@ -890,6 +1208,7 @@ const closeSensitiveModal = () => {
   sensitiveModalItems.value = []
   sensitiveModalTotalPages.value = 1
   sensitiveModalTotalCount.value = 0
+  sensitiveModalPlatformLabel.value = '全部平台'
 }
 
 const fetchSensitiveModalPage = async () => {
@@ -906,6 +1225,7 @@ const fetchSensitiveModalPage = async () => {
     sensitiveModalItems.value = items.map((row, index) => {
       const platformKey = normalizePlatform(row?.platform)
       const recordTime = row?.created_at || getRecordTime(row)
+      const sentimentLabels = row?.sentiment_labels || {}
       return {
         id: row?.id || `${platformKey || 'data'}-${index}`,
         platformKey,
@@ -914,7 +1234,10 @@ const fetchSensitiveModalPage = async () => {
         timeLabel: formatRelativeTime(recordTime),
         authorLabel: row?.author || '',
         url: row?.url || '',
-        sortTime: recordTime || 0
+        sortTime: recordTime || 0,
+        sentimentLabels,
+        sensitiveReasons: buildSensitiveReasons(sentimentLabels),
+        isSensitive: true
       }
     })
     if (res.data?.pagination) {
@@ -1005,6 +1328,10 @@ const buildPlatformPieOptions = ({ sensitive = 0, total = 0 }) => ({
 const handlePlatformJump = (platformKey) => {
   if (!platformKey) return
   router.push({ path: '/data', query: { platform: platformKey } })
+}
+
+const showAllSensitive = () => {
+  openSensitiveModal('')
 }
 
 const platformPieOptions = computed(() => {
@@ -1113,6 +1440,58 @@ const formatRelativeTime = (value) => {
   return `${Math.floor(diff / (24 * 60 * 60 * 1000))}天前`
 }
 
+const formatCount = (value) => {
+  return new Intl.NumberFormat('zh-CN').format(Math.max(0, Math.round(Number(value) || 0)))
+}
+
+const formatPercent = (value) => {
+  return `${(Number(value) || 0).toFixed(1)}%`
+}
+
+const sensitiveCategoryLabels = {
+  adult: '涉黄',
+  political: '涉政',
+  violence: '暴力',
+  illegal: '违法'
+}
+
+const normalizeStringList = (value) => {
+  if (!Array.isArray(value)) return []
+  const seen = new Set()
+  return value.reduce((acc, item) => {
+    const text = String(item || '').trim()
+    if (!text || seen.has(text)) return acc
+    seen.add(text)
+    acc.push(text)
+    return acc
+  }, [])
+}
+
+const getSensitiveCategoryReasons = (sentimentLabels) => {
+  const directCategories = normalizeStringList(sentimentLabels?.matched_categories)
+  if (directCategories.length > 0) {
+    return directCategories.map(category => ({
+      key: category,
+      label: sensitiveCategoryLabels[category] || category
+    }))
+  }
+
+  return Object.entries(sensitiveCategoryLabels)
+    .filter(([key]) => Boolean(sentimentLabels?.[key]))
+    .map(([key, label]) => ({ key, label }))
+}
+
+const buildSensitiveReasons = (sentimentLabels) => ({
+  categories: getSensitiveCategoryReasons(sentimentLabels),
+  keywords: normalizeStringList(sentimentLabels?.matched_keywords)
+})
+
+const hasSensitiveReasons = (item) => {
+  const categories = item?.sensitiveReasons?.categories || []
+  const keywords = item?.sensitiveReasons?.keywords || []
+  return categories.length > 0 || keywords.length > 0
+}
+
 const pickContent = (row) => {
   if (!row) return '暂无内容'
   if (typeof row === 'string') return row
@@ -1163,6 +1542,7 @@ const buildFeedItems = (rows) => {
     const recordTime = row?.created_at || getRecordTime(row)
     const isSensitive = row?.is_sensitive ?? row?.isSensitive ?? row?.sentiment === 'sensitive'
     const sentiment = isSensitive ? 'sensitive' : (row?.sentiment || 'neutral')
+    const sentimentLabels = row?.sentiment_labels || {}
 
     // 生成唯一标识：优先使用 id，否则用 url+content+platform 组合
     const uniqueKey = row?.id || `${row?.url || ''}-${row?.content || ''}-${platformKey}`
@@ -1179,7 +1559,8 @@ const buildFeedItems = (rows) => {
       // 情绪分析数据
       sentiment,
       sentimentScore: row?.sentiment_score || 0,
-      sentimentLabels: row?.sentiment_labels || {},
+      sentimentLabels,
+      sensitiveReasons: buildSensitiveReasons(sentimentLabels),
       isSensitive
     }
 
@@ -1337,7 +1718,12 @@ const fetchMonitorFeedPage = async ({ withLoading = true, signal = null } = {}) 
 
     // 更新统计数据
     if (res.data?.stats) {
-      stats.value = res.data.stats
+      stats.value = {
+        total: Number(res.data.stats.total || 0),
+        sensitive: Number(res.data.stats.sensitive || 0),
+        sentimentIndex: Number(res.data.stats.sentiment_index ?? res.data.stats.sentimentIndex ?? 0),
+        hotScore: Number(res.data.stats.hot_score ?? res.data.stats.hotScore ?? 0)
+      }
     }
 
     const merged = buildFeedItems(items)
@@ -1355,6 +1741,12 @@ const fetchMonitorFeedPage = async ({ withLoading = true, signal = null } = {}) 
     platformStats.value = null
     totalCount.value = 0
     totalPages.value = 1
+    stats.value = {
+      total: 0,
+      sensitive: 0,
+      sentimentIndex: 0,
+      hotScore: 0
+    }
     lastUpdatedAt.value = new Date()
   } finally {
     if (withLoading && !signal?.aborted) {

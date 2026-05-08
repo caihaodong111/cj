@@ -1,52 +1,102 @@
 <template>
   <div class="main-layout">
-    <!-- Trigger Zone -->
     <div
       class="sidebar-trigger"
+      @click="toggleSidebar"
       @mouseenter="showSidebar"
       @mouseleave="hideSidebar"
     >
       <div class="trigger-indicator">
-        <span class="trigger-dots">···</span>
+        <span class="trigger-pulse"></span>
+        <span class="trigger-label">NAV</span>
       </div>
     </div>
 
-    <!-- Sidebar -->
     <aside
       class="sidebar"
       :class="{ 'sidebar-visible': isSidebarVisible }"
+      @click.stop
       @mouseenter="showSidebar"
       @mouseleave="hideSidebar"
     >
-      <div class="logo">
-        <h1>舆镜</h1>
-      </div>
+      <div class="sidebar-shell">
+        <div class="sidebar-glow cyan"></div>
+        <div class="sidebar-glow gold"></div>
 
-      <nav class="nav-menu">
-        <router-link to="/dashboard" class="nav-item" active-class="active">
-          <span class="icon">◉</span>
-          <span class="label">舆情监测总览</span>
-        </router-link>
-        <router-link to="/data" class="nav-item" active-class="active">
-          <span class="icon">▤</span>
-          <span class="label">数据源概览</span>
-        </router-link>
-        <router-link to="/analysis" class="nav-item" active-class="active">
-          <span class="icon">🔍</span>
-          <span class="label">深度分析</span>
-        </router-link>
-        <router-link to="/settings" class="nav-item" active-class="active">
-          <span class="icon">⚙️</span>
-          <span class="label">系统设置</span>
-        </router-link>
-      </nav>
+        <div class="brand-panel">
+          <div class="brand-mark" aria-hidden="true">
+            <span class="brand-ring outer"></span>
+            <span class="brand-ring inner"></span>
+            <span class="brand-core"></span>
+          </div>
+          <div class="brand-copy">
+            <span class="brand-eyebrow">Media Intelligence</span>
+            <h1>舆镜</h1>
+            <p>Sentiment Control Deck</p>
+          </div>
+        </div>
 
-      <div class="sidebar-footer">
-        <div class="version">v1.0.1 Beta</div>
+        <div class="menu-eyebrow">Navigation</div>
+
+        <nav class="nav-menu">
+          <router-link
+            v-for="item in navItems"
+            :key="item.to"
+            :to="item.to"
+            class="nav-item"
+            active-class="active"
+          >
+            <span class="nav-icon" aria-hidden="true">
+              <svg v-if="item.key === 'dashboard'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M4 12h16" />
+                <path d="M12 4v16" />
+                <circle cx="12" cy="12" r="3.5" />
+              </svg>
+              <svg v-else-if="item.key === 'data'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="4" y="5" width="16" height="14" rx="2.5" />
+                <path d="M4 10h16" />
+                <path d="M9 5v14" />
+                <path d="M15 5v14" />
+              </svg>
+              <svg v-else-if="item.key === 'analysis'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="11" cy="11" r="5.5" />
+                <path d="M16 16l4 4" />
+                <path d="M11 8v6" />
+                <path d="M8 11h6" />
+              </svg>
+              <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="3.2" />
+                <path d="M12 2.8v2.4" />
+                <path d="M12 18.8v2.4" />
+                <path d="M4.8 4.8l1.7 1.7" />
+                <path d="M17.5 17.5l1.7 1.7" />
+                <path d="M2.8 12h2.4" />
+                <path d="M18.8 12h2.4" />
+                <path d="M4.8 19.2l1.7-1.7" />
+                <path d="M17.5 6.5l1.7-1.7" />
+              </svg>
+            </span>
+
+            <span class="nav-copy">
+              <span class="nav-title">{{ item.label }}</span>
+              <span class="nav-subtitle">{{ item.subtitle }}</span>
+            </span>
+
+            <span class="nav-arrow" aria-hidden="true">
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M6 14L14 6" />
+                <path d="M7 6h7v7" />
+              </svg>
+            </span>
+          </router-link>
+        </nav>
+
+        <div class="sidebar-footer">
+          <div class="version">v1.0.1 Beta</div>
+        </div>
       </div>
     </aside>
 
-    <!-- Main Content Area -->
     <div class="main-content-layout">
       <main class="content-wrapper">
         <router-view v-slot="{ Component }">
@@ -61,8 +111,36 @@
 
 <script setup>
 import { ref } from 'vue'
+
 const isSidebarVisible = ref(false)
 let hideTimer = null
+
+const navItems = [
+  {
+    key: 'dashboard',
+    to: '/dashboard',
+    label: '舆情监测总览',
+    subtitle: 'Sentiment Dashboard'
+  },
+  {
+    key: 'data',
+    to: '/data',
+    label: '数据源概览',
+    subtitle: 'Data Source Overview'
+  },
+  {
+    key: 'analysis',
+    to: '/analysis',
+    label: '深度分析',
+    subtitle: 'Deep Analysis'
+  },
+  {
+    key: 'settings',
+    to: '/settings',
+    label: '系统设置',
+    subtitle: 'System Settings'
+  }
+]
 
 const showSidebar = () => {
   if (hideTimer) {
@@ -78,7 +156,23 @@ const hideSidebar = () => {
   }
   hideTimer = setTimeout(() => {
     isSidebarVisible.value = false
-  }, 200)
+  }, 180)
+}
+
+const closeSidebar = () => {
+  if (hideTimer) {
+    clearTimeout(hideTimer)
+    hideTimer = null
+  }
+  isSidebarVisible.value = false
+}
+
+const toggleSidebar = () => {
+  if (isSidebarVisible.value) {
+    closeSidebar()
+    return
+  }
+  showSidebar()
 }
 </script>
 
@@ -93,206 +187,400 @@ const hideSidebar = () => {
   position: relative;
 }
 
-/* Trigger Zone */
 .sidebar-trigger {
   position: fixed;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 8px;
-  z-index: 5;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 132px;
+  z-index: 15;
   cursor: pointer;
 }
 
 .trigger-indicator {
   position: absolute;
   left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 4px;
-  height: 60px;
-  background: linear-gradient(180deg, transparent, var(--app-primary), transparent);
-  border-radius: 0 4px 4px 0;
-  opacity: 0.3;
-  transition: opacity 0.3s, width 0.3s, box-shadow 0.3s;
-  box-shadow: 0 0 10px rgba(0, 204, 255, 0.3);
+  inset: 0;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 204, 255, 0.16);
+  background: linear-gradient(180deg, rgba(0, 204, 255, 0.14), rgba(8, 12, 18, 0.82), rgba(255, 170, 0, 0.1));
+  backdrop-filter: blur(18px);
+  box-shadow:
+    0 0 18px rgba(0, 204, 255, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  transition: all 0.28s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
 }
 
 .sidebar-trigger:hover .trigger-indicator {
-  opacity: 0.9;
-  width: 6px;
-  box-shadow: 0 0 20px rgba(0, 204, 255, 0.6);
+  transform: translateX(2px);
+  border-color: rgba(0, 204, 255, 0.28);
+  box-shadow:
+    0 0 24px rgba(0, 204, 255, 0.28),
+    0 0 40px rgba(255, 170, 0, 0.08);
 }
 
-.trigger-dots {
-  display: none;
-  position: absolute;
-  left: 6px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--app-primary);
-  font-size: 14px;
-  letter-spacing: 1px;
+.trigger-label {
+  color: #9fe6ff;
+  font-size: 11px;
+  letter-spacing: 2px;
   writing-mode: vertical-rl;
   text-orientation: upright;
-  text-shadow: 0 0 10px rgba(0, 204, 255, 0.5);
+  text-shadow: 0 0 12px rgba(0, 204, 255, 0.45);
 }
 
-.sidebar-trigger:hover .trigger-dots {
-  display: block;
+.trigger-pulse {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #00d6ff;
+  box-shadow: 0 0 14px rgba(0, 214, 255, 0.75);
+  animation: triggerPulse 2s ease-in-out infinite;
 }
 
-/* Sidebar */
+@keyframes triggerPulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.75;
+  }
+  50% {
+    transform: scale(1.35);
+    opacity: 1;
+  }
+}
+
 .sidebar {
-  width: 240px;
-  display: flex;
-  flex-direction: column;
-  background: linear-gradient(180deg, rgba(10, 12, 18, 0.98) 0%, rgba(8, 10, 16, 0.98) 100%);
-  border-right: 1px solid rgba(0, 204, 255, 0.2);
   z-index: 10;
-  transform: translateX(-100%);
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: fixed;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  box-shadow: 0 0 40px rgba(0, 102, 255, 0.15), 0 20px 40px rgba(0, 0, 0, 0.5);
+  left: 18px;
+  top: 18px;
+  bottom: 18px;
+  width: 286px;
+  transform: translateX(calc(-100% - 34px));
+  transition: transform 0.34s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .sidebar.sidebar-visible {
   transform: translateX(0);
 }
 
-.logo {
-  height: 80px;
+.sidebar-shell {
+  position: relative;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 1.5rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  flex-direction: column;
+  height: 100%;
+  padding: 18px;
+  border-radius: 30px;
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, rgba(8, 12, 18, 0.92) 0%, rgba(6, 9, 15, 0.94) 100%);
+  backdrop-filter: blur(28px) saturate(165%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow:
+    0 28px 70px rgba(0, 0, 0, 0.45),
+    0 0 0 1px rgba(255, 255, 255, 0.03),
+    0 0 36px rgba(0, 204, 255, 0.12);
 }
 
-.logo h1 {
-  font-size: 1.8rem;
-  font-weight: 900;
-  color: var(--app-primary);
-  letter-spacing: 8px;
-  font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
-  background: linear-gradient(135deg, #00ccff 0%, #0099ff 50%, #00ccff 100%);
+.sidebar-glow {
+  position: absolute;
+  border-radius: 999px;
+  filter: blur(64px);
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.sidebar-glow.cyan {
+  width: 220px;
+  height: 220px;
+  left: -80px;
+  top: -30px;
+  background: rgba(0, 204, 255, 0.18);
+}
+
+.sidebar-glow.gold {
+  width: 180px;
+  height: 180px;
+  right: -70px;
+  bottom: 44px;
+  background: rgba(255, 170, 0, 0.14);
+}
+
+.brand-panel,
+.nav-menu,
+.sidebar-footer,
+.menu-eyebrow {
+  position: relative;
+  z-index: 1;
+}
+
+.brand-panel {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 6px 20px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.brand-mark {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  flex-shrink: 0;
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(0, 204, 255, 0.22), rgba(255, 170, 0, 0.14));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 0 24px rgba(0, 204, 255, 0.18);
+}
+
+.brand-ring,
+.brand-core {
+  position: absolute;
+  inset: 50%;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+}
+
+.brand-ring.outer {
+  width: 28px;
+  height: 28px;
+  border: 1px solid rgba(0, 204, 255, 0.7);
+}
+
+.brand-ring.inner {
+  width: 16px;
+  height: 16px;
+  border: 1px solid rgba(255, 170, 0, 0.8);
+}
+
+.brand-core {
+  width: 6px;
+  height: 6px;
+  background: #ffffff;
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.9);
+}
+
+.brand-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.brand-eyebrow {
+  font-size: 10px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: rgba(0, 204, 255, 0.72);
+}
+
+.brand-copy h1 {
+  margin: 0;
+  font-size: 1.7rem;
+  font-weight: 800;
+  letter-spacing: 6px;
+  background: linear-gradient(135deg, #f8fbff 0%, #7ce6ff 45%, #f0f7ff 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  filter: drop-shadow(0 0 20px rgba(0, 204, 255, 0.6))
-          drop-shadow(0 0 40px rgba(0, 204, 255, 0.4));
-  animation: titleGlow 3s ease-in-out infinite alternate;
+  text-shadow: 0 0 24px rgba(0, 204, 255, 0.18);
 }
 
-@keyframes titleGlow {
-  0% {
-    filter: drop-shadow(0 0 20px rgba(0, 204, 255, 0.6))
-            drop-shadow(0 0 40px rgba(0, 204, 255, 0.4));
-  }
-  100% {
-    filter: drop-shadow(0 0 30px rgba(0, 204, 255, 0.8))
-            drop-shadow(0 0 60px rgba(0, 204, 255, 0.6));
-  }
+.brand-copy p {
+  margin: 0;
+  font-size: 11px;
+  letter-spacing: 1px;
+  color: #7f94b3;
+}
+
+.menu-eyebrow {
+  padding: 12px 6px 10px;
+  font-size: 10px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: rgba(255, 170, 0, 0.75);
 }
 
 .nav-menu {
   flex: 1;
-  padding: 1.5rem 0.8rem;
+  padding: 0.2rem 0;
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
+  gap: 0.55rem;
 }
 
 .nav-item {
-  display: flex;
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr) 18px;
   align-items: center;
-  gap: 1rem;
-  padding: 0.85rem 1rem;
-  border-radius: var(--app-radius);
-  color: var(--app-text);
-  transition: all 0.2s ease;
-  border: 1px solid transparent;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 18px;
+  color: #c8d5ea;
+  transition: all 0.24s ease;
+  border: 1px solid rgba(255, 255, 255, 0.04);
   text-decoration: none;
   position: relative;
   overflow: hidden;
+  background: rgba(255, 255, 255, 0.015);
 }
 
 .nav-item::before {
   content: '';
   position: absolute;
-  left: 0;
+  left: 10px;
+  right: 10px;
   top: 0;
-  bottom: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent);
+  opacity: 0;
+  transition: opacity 0.24s ease;
+}
+
+.nav-item::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 16px;
+  bottom: 16px;
   width: 3px;
-  background: var(--app-primary);
-  transform: scaleY(0);
-  transition: transform 0.2s ease;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #00ccff, #ffae00);
+  opacity: 0;
+  transform: scaleY(0.4);
+  transition: all 0.24s ease;
 }
 
 .nav-item:hover {
-  background: var(--app-surface-hover);
+  background: rgba(255, 255, 255, 0.045);
   color: #fff;
-  transform: translateX(4px);
-  border-color: rgba(0, 204, 255, 0.15);
-  box-shadow: 0 0 20px rgba(0, 204, 255, 0.1);
+  transform: translateX(3px);
+  border-color: rgba(0, 204, 255, 0.12);
+  box-shadow: 0 0 22px rgba(0, 204, 255, 0.08);
 }
 
-.nav-item:hover::before {
+.nav-item:hover::before,
+.nav-item:hover::after {
+  opacity: 1;
   transform: scaleY(1);
 }
 
 .nav-item.active {
-  background: rgba(255, 170, 0, 0.12);
-  color: var(--app-accent);
-  border-color: rgba(255, 170, 0, 0.3);
-  box-shadow: 0 0 25px rgba(255, 170, 0, 0.15);
-  text-shadow: 0 0 10px rgba(255, 170, 0, 0.3);
+  background:
+    linear-gradient(135deg, rgba(255, 170, 0, 0.12), rgba(0, 204, 255, 0.06)),
+    rgba(255, 255, 255, 0.035);
+  color: #fff7de;
+  border-color: rgba(255, 170, 0, 0.24);
+  box-shadow:
+    0 0 26px rgba(255, 170, 0, 0.12),
+    0 0 18px rgba(0, 204, 255, 0.08);
 }
 
-.nav-item.active::before {
-  background: var(--app-accent);
+.nav-item.active::before,
+.nav-item.active::after {
+  opacity: 1;
   transform: scaleY(1);
 }
 
-.nav-item .icon {
-  font-size: 1.4rem;
-  transition: transform 0.2s ease;
-  filter: drop-shadow(0 0 8px rgba(0, 204, 255, 0.3));
+.nav-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #93e7ff;
+  background: linear-gradient(135deg, rgba(0, 204, 255, 0.12), rgba(255, 255, 255, 0.03));
+  border: 1px solid rgba(0, 204, 255, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
+  transition: all 0.24s ease;
 }
 
-.nav-item:hover .icon {
-  transform: scale(1.15);
-  filter: drop-shadow(0 0 12px rgba(0, 204, 255, 0.5));
+.nav-icon svg {
+  width: 20px;
+  height: 20px;
 }
 
-.nav-item.active .icon {
-  filter: drop-shadow(0 0 12px rgba(255, 170, 0, 0.5));
+.nav-item:hover .nav-icon {
+  transform: translateY(-1px);
+  color: #c4f4ff;
+  border-color: rgba(0, 204, 255, 0.2);
 }
 
-.nav-item .label {
+.nav-item.active .nav-icon {
+  color: #ffd98d;
+  background: linear-gradient(135deg, rgba(255, 170, 0, 0.16), rgba(0, 204, 255, 0.08));
+  border-color: rgba(255, 170, 0, 0.22);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.08),
+    0 0 18px rgba(255, 170, 0, 0.14);
+}
+
+.nav-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.nav-title {
   font-weight: 600;
-  letter-spacing: 2px;
-  font-size: 0.95rem;
+  letter-spacing: 0.5px;
+  font-size: 0.98rem;
+  color: inherit;
+}
+
+.nav-subtitle {
+  font-size: 0.72rem;
+  letter-spacing: 0.9px;
+  color: #7f94b3;
+  text-transform: uppercase;
+}
+
+.nav-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.28);
+  transition: all 0.24s ease;
+}
+
+.nav-arrow svg {
+  width: 14px;
+  height: 14px;
+}
+
+.nav-item:hover .nav-arrow,
+.nav-item.active .nav-arrow {
+  color: #9fe6ff;
+  transform: translate(1px, -1px);
 }
 
 .sidebar-footer {
-  padding: 1.2rem;
-  text-align: center;
-  color: var(--app-muted);
-  font-size: 0.75rem;
+  padding-top: 14px;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
-  letter-spacing: 1px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
-.sidebar-footer .version {
+.version {
+  align-self: flex-start;
+  padding: 0.42rem 0.8rem;
+  border-radius: 999px;
   background: rgba(0, 204, 255, 0.08);
-  padding: 0.4rem 0.8rem;
-  border-radius: 20px;
   border: 1px solid rgba(0, 204, 255, 0.15);
-  display: inline-block;
+  color: #9edcf4;
+  font-size: 0.72rem;
+  letter-spacing: 1px;
 }
 
 .main-content-layout {
@@ -337,5 +625,20 @@ const hideSidebar = () => {
 
 .content-wrapper::-webkit-scrollbar-thumb:hover {
   background: rgba(0, 204, 255, 0.4);
+}
+
+@media (max-width: 900px) {
+  .sidebar {
+    width: min(286px, calc(100vw - 32px));
+    left: 16px;
+    top: 16px;
+    bottom: 16px;
+  }
+
+  .sidebar-trigger {
+    left: 8px;
+    width: 26px;
+    height: 116px;
+  }
 }
 </style>
