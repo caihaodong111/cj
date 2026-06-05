@@ -134,7 +134,7 @@ async def main() -> None:
     crawler = CrawlerFactory.create_crawler(platform=config.PLATFORM)
     await crawler.start()
 
-    if config.SAVE_DATA_OPTION in ("db", "sqlite"):
+    if config.SAVE_DATA_OPTION in ("db", "postgres"):
         try:
             from tools.monitor_feed_sync import sync_platform_incremental
             synced = await sync_platform_incremental(config.PLATFORM)
@@ -168,7 +168,7 @@ async def async_cleanup() -> None:
                 if "closed" not in error_msg and "disconnected" not in error_msg:
                     print(f"[Main] Error closing browser context: {e}")
 
-    if config.SAVE_DATA_OPTION in ("db", "sqlite"):
+    if config.SAVE_DATA_OPTION in ("db", "postgres"):
         await db.close()
 
 if __name__ == "__main__":

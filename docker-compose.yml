@@ -3,7 +3,7 @@ services:
     image: backend:0.1
     container_name: mediacrawler-backend
     env_file:
-      - ./.env
+      - ./backend/.env
     environment:
       DJANGO_DEBUG: "False"
       RUN_DB_MIGRATIONS: "1"

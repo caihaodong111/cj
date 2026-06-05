@@ -204,15 +204,6 @@ class TieBaJsonStoreImplement(AbstractStore):
 
         """
         await self.writer.write_single_item_to_json(item_type="creators", item=creator)
-
-
-class TieBaSqliteStoreImplement(TieBaDbStoreImplement):
-    """
-    Tieba sqlite store implement
-    """
-    pass
-
-
 class TieBaMongoStoreImplement(AbstractStore):
     """Tieba MongoDB storage implementation"""
 

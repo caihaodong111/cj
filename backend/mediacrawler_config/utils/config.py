@@ -85,7 +85,7 @@ class Config:
         # Database config
         db_cfg = settings.DATABASES['default']
         self.database = DatabaseConfig(
-            engine=getattr(settings, 'DB_ENGINE', 'sqlite3'),
+            engine=getattr(settings, 'DB_ENGINE', 'mysql'),
             name=str(db_cfg.get('NAME', '')),
             user=db_cfg.get('USER', ''),
             password=db_cfg.get('PASSWORD', ''),

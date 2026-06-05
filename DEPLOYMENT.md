@@ -107,17 +107,15 @@ ssh root@39.105.122.26
 # 进入项目目录
 cd /opt/mediacrawler
 
-# 复制环境配置模板
-cp backend/.env.production .env
-
-# 编辑配置
-nano .env  # 或使用 vim
+# 创建并编辑配置
+mkdir -p backend
+nano backend/.env  # 或使用 vim
 ```
 
 **必须修改的配置：**
 
 ```bash
-# .env 文件关键配置
+# backend/.env 文件关键配置
 DJANGO_SECRET_KEY=<使用下面命令生成的密钥>
 DB_PASSWORD=your_actual_mysql_password
 CORS_ALLOWED_ORIGINS=http://39.105.122.26
@@ -368,7 +366,7 @@ docker compose exec backend python manage.py check
 ### 数据库连接失败
 
 1. 检查 MySQL 是否运行：`sudo systemctl status mysql`
-2. 验证 .env 中的数据库配置
+2. 验证 `backend/.env` 中的数据库配置
 3. 确认防火墙允许内部网络通信
 
 ### 构建速度慢

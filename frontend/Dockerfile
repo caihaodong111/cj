@@ -1,9 +1,16 @@
 # MediaCrawler Frontend Dockerfile
 # Multi-stage build with Chinese mirrors for faster package installation.
 
-FROM node:20-alpine AS builder
+ARG NODE_IMAGE=docker.m.daocloud.io/library/node:20-alpine
+ARG NGINX_IMAGE=docker.m.daocloud.io/library/nginx:1.27-alpine
 
-RUN npm config set registry https://registry.npmmirror.com
+FROM ${NODE_IMAGE} AS builder
+
+ARG NPM_REGISTRY=https://registry.npmmirror.com
+
+ENV npm_config_registry=${NPM_REGISTRY}
+
+RUN npm config set registry "${NPM_REGISTRY}"
 
 WORKDIR /app
 
@@ -13,9 +20,11 @@ RUN npm ci && npm cache clean --force
 COPY . .
 RUN npm run build
 
-FROM nginx:1.27-alpine
+FROM ${NGINX_IMAGE}
 
-RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apk/repositories && \
+ARG ALPINE_MIRROR_HOST=mirrors.tuna.tsinghua.edu.cn
+
+RUN sed -i "s|dl-cdn.alpinelinux.org|${ALPINE_MIRROR_HOST}|g" /etc/apk/repositories && \
     apk update && \
     apk add --no-cache curl
 

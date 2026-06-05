@@ -1,18 +1,26 @@
 # MediaCrawler Backend Dockerfile
 # Multi-stage build with Chinese mirrors for faster package installation.
 
-FROM python:3.11-slim AS builder
+ARG PYTHON_IMAGE=docker.m.daocloud.io/library/python:3.11-slim
+
+FROM ${PYTHON_IMAGE} AS builder
+
+ARG PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
+ARG PIP_TRUSTED_HOST=pypi.tuna.tsinghua.edu.cn
+ARG APT_MIRROR_HOST=mirrors.tuna.tsinghua.edu.cn
+ARG PLAYWRIGHT_DOWNLOAD_HOST=https://npmmirror.com/mirrors/playwright
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple \
-    PIP_TRUSTED_HOST=pypi.tuna.tsinghua.edu.cn \
+    PIP_INDEX_URL=${PIP_INDEX_URL} \
+    PIP_TRUSTED_HOST=${PIP_TRUSTED_HOST} \
     MEDIACRAWLER_QR_MODE=web \
-    PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+    PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
+    PLAYWRIGHT_DOWNLOAD_HOST=${PLAYWRIGHT_DOWNLOAD_HOST}
 
-RUN sed -i 's|deb.debian.org|mirrors.tuna.tsinghua.edu.cn|g; s|security.debian.org|mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list.d/debian.sources && \
+RUN sed -i "s|deb.debian.org|${APT_MIRROR_HOST}|g; s|security.debian.org|${APT_MIRROR_HOST}|g" /etc/apt/sources.list.d/debian.sources && \
     apt-get update && \
     apt-get install -y --no-install-recommends \
         curl \
@@ -37,10 +45,13 @@ RUN pip install --upgrade pip && \
 # an Ubuntu package list that includes unavailable font packages.
 RUN playwright install chromium
 
-FROM python:3.11-slim
+FROM ${PYTHON_IMAGE}
 
 LABEL maintainer="MediaCrawler" \
       description="MediaCrawler Backend Service"
+
+ARG APT_MIRROR_HOST=mirrors.tuna.tsinghua.edu.cn
+ARG CHROME_DOWNLOAD_URL=https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -49,9 +60,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     MEDIACRAWLER_QR_MODE=web \
     PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 
-RUN sed -i 's|deb.debian.org|mirrors.tuna.tsinghua.edu.cn|g; s|security.debian.org|mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list.d/debian.sources && \
+RUN sed -i "s|deb.debian.org|${APT_MIRROR_HOST}|g; s|security.debian.org|${APT_MIRROR_HOST}|g" /etc/apt/sources.list.d/debian.sources && \
     apt-get update && \
     apt-get install -y --no-install-recommends \
+        ca-certificates \
         curl \
         fonts-freefont-ttf \
         gosu \
@@ -90,6 +102,9 @@ RUN sed -i 's|deb.debian.org|mirrors.tuna.tsinghua.edu.cn|g; s|security.debian.o
         websockify \
         x11vnc \
         xvfb && \
+    curl -fsSLo /tmp/google-chrome.deb "${CHROME_DOWNLOAD_URL}" && \
+    apt-get install -y /tmp/google-chrome.deb && \
+    rm -f /tmp/google-chrome.deb && \
     rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /opt/venv /opt/venv

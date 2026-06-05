@@ -173,13 +173,6 @@ class KuaishouJsonStoreImplement(AbstractStore):
 
     async def store_creator(self, creator: Dict):
         pass
-
-
-class KuaishouSqliteStoreImplement(KuaishouDbStoreImplement):
-    async def store_creator(self, creator: Dict):
-        pass
-
-
 class KuaishouMongoStoreImplement(AbstractStore):
     """Kuaishou MongoDB storage implementation"""
 

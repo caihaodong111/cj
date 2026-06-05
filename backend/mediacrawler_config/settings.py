@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Django settings for MediaCrawler Backend
-# Reference .env: /Users/caihd/Desktop/MediaCrawler-main/.env
+# Reference .env: /Users/caihd/Desktop/MediaCrawler-main/backend/.env
 
 import os
 from pathlib import Path
@@ -72,8 +72,6 @@ WSGI_APPLICATION = "mediacrawler_config.wsgi.application"
 
 # Database
 SUPPORTED_DB_ENGINES = {
-    "sqlite": "sqlite3",
-    "sqlite3": "sqlite3",
     "mysql": "mysql",
     "postgres": "postgresql",
     "postgresql": "postgresql",
@@ -88,7 +86,7 @@ def _get_env(name: str, default: str = "") -> str:
 
 
 def _normalize_db_engine(raw_engine: str) -> str:
-    normalized = (raw_engine or "sqlite3").strip().lower()
+    normalized = (raw_engine or "mysql").strip().lower()
     try:
         return SUPPORTED_DB_ENGINES[normalized]
     except KeyError as exc:
@@ -104,16 +102,6 @@ def _require_database_setting(name: str, value: str, engine: str) -> str:
     raise ImproperlyConfigured(f"{name} must be set when DB_ENGINE='{engine}'.")
 
 
-def _resolve_sqlite_db_name(raw_name: str):
-    if raw_name == ":memory:":
-        return raw_name
-
-    db_path = Path(raw_name)
-    if not db_path.is_absolute():
-        db_path = BASE_DIR / db_path
-    return db_path
-
-
 DB_ENGINE = _normalize_db_engine(os.environ.get("DB_ENGINE"))
 DB_NAME = ""
 DB_USER = ""
@@ -121,31 +109,15 @@ DB_PASSWORD = ""
 DB_HOST = ""
 DB_PORT = ""
 
-if DB_ENGINE == "sqlite3":
-    DB_NAME = _get_env("DB_NAME", "db.sqlite3")
-    DATABASES = {
-        "default": {
-            "ENGINE": "django.db.backends.sqlite3",
-            "NAME": _resolve_sqlite_db_name(DB_NAME),
-        }
-    }
-elif DB_ENGINE == "mysql":
+if DB_ENGINE == "mysql":
     import pymysql
 
     pymysql.__version__ = "2.2.1"
     pymysql.version_info = (2, 2, 1, "final", 0)
     pymysql.install_as_MySQLdb()
 
-    DB_NAME = _require_database_setting(
-        "DB_NAME",
-        _get_env("DB_NAME") or _get_env("MYSQL_DB_NAME"),
-        DB_ENGINE,
-    )
-    DB_USER = _require_database_setting(
-        "DB_USER",
-        _get_env("DB_USER") or _get_env("MYSQL_DB_USER"),
-        DB_ENGINE,
-    )
+    DB_NAME = _get_env("DB_NAME") or _get_env("MYSQL_DB_NAME", "media_crawler")
+    DB_USER = _get_env("DB_USER") or _get_env("MYSQL_DB_USER", "root")
     DB_PASSWORD = (
         _get_env("DB_PASSWORD")
         or _get_env("MYSQL_DB_PASSWORD")
@@ -256,7 +228,7 @@ CRAWLER_CONFIG = {
     "platforms": ["xhs", "dy", "ks", "bili", "wb", "tieba", "zhihu"],
     "login_types": ["qrcode", "cookie", "phone"],
     "crawler_types": ["search", "detail", "creator"],
-    "save_options": ["json", "csv", "excel", "sqlite", "db", "mongodb"],
+    "save_options": ["json", "csv", "excel", "db", "mongodb"],
     "default_platform": os.environ.get('CRAWLER_PLATFORM', 'xhs'),
     "default_login_type": os.environ.get('CRAWLER_LOGIN_TYPE', 'qrcode'),
     "default_crawler_type": os.environ.get('CRAWLER_TYPE', 'search'),

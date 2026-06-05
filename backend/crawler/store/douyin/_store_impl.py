@@ -210,12 +210,6 @@ class DouyinJsonStoreImplement(AbstractStore):
             item_type="creators"
         )
 
-
-
-class DouyinSqliteStoreImplement(DouyinDbStoreImplement):
-    pass
-
-
 class DouyinMongoStoreImplement(AbstractStore):
     """Douyin MongoDB storage implementation"""
 

@@ -37,7 +37,7 @@ async def init_table_schema(db_type: str):
     Initializes the database table schema.
     This will create tables based on the ORM models.
     Args:
-        db_type: The type of database, 'sqlite' or 'mysql'.
+        db_type: The type of database, 'mysql' or 'postgres'.
     """
     utils.logger.info(f"[init_table_schema] begin init {db_type} table schema ...")
     await create_tables(db_type)

@@ -33,7 +33,6 @@ class TieBaStoreFactory:
         "db": TieBaDbStoreImplement,
         "postgres": TieBaDbStoreImplement,
         "json": TieBaJsonStoreImplement,
-        "sqlite": TieBaSqliteStoreImplement,
         "mongodb": TieBaMongoStoreImplement,
         "excel": TieBaExcelStoreImplement,
     }
@@ -43,7 +42,7 @@ class TieBaStoreFactory:
         store_class = TieBaStoreFactory.STORES.get(config.SAVE_DATA_OPTION)
         if not store_class:
             raise ValueError(
-                "[TieBaStoreFactory.create_store] Invalid save option only supported csv or db or json or sqlite or mongodb or excel ...")
+                "[TieBaStoreFactory.create_store] Invalid save option only supported csv or db or json or mongodb or excel ...")
         return store_class()
 
 

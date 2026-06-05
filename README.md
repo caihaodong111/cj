@@ -9,7 +9,7 @@
 | 前端应用 | 仪表盘、数据采集、深度分析、系统设置四个核心页面 |
 | 后端 API | 健康检查、平台配置、爬虫控制、数据查询、Monitor Feed、Cookie 管理、AI 分析 |
 | 爬虫运行时 | 集成在 `backend/crawler/`，支持二维码登录或 Cookie 登录 |
-| 数据存储 | 默认本地 SQLite，兼容 MySQL / PostgreSQL，Redis 和 MongoDB 为可选配置 |
+| 数据存储 | 默认使用 MySQL，兼容 PostgreSQL，Redis 和 MongoDB 为可选配置 |
 | 部署方式 | 提供 `deploy.sh`、`docker-compose.yml` 和独立部署文档 |
 
 ## 支持平台
@@ -38,7 +38,7 @@
 | 前端 | Vue 3、Vite、Vue Router、Element Plus、ECharts、Axios |
 | 后端 | Django 5、Django REST Framework、django-cors-headers |
 | 爬虫 | Playwright、MediaCrawler 运行时 |
-| 数据 | SQLite、MySQL、PostgreSQL、Pandas |
+| 数据 | MySQL、PostgreSQL、Pandas |
 | 部署 | Docker Compose、Nginx、`deploy.sh` |
 
 ## 架构关系
@@ -47,9 +47,9 @@
 flowchart LR
     UI[Vue 3 Frontend] -->|/api| API[Django Backend API]
     API --> Crawler[MediaCrawler Runtime]
-    API --> DB[(SQLite / MySQL / PostgreSQL)]
+    API --> DB[(MySQL / PostgreSQL)]
     API --> Cache[(Redis 可选)]
-    API --> AI[智谱 AI 可选]
+    API --> AI[SiliconFlow / DeepSeek 可选]
 ```
 
 ## 目录结构
@@ -62,7 +62,7 @@ MediaCrawler-main/
 │   ├── media_platform/         # 各平台数据模型
 │   ├── mediacrawler_config/    # Django 配置、路由、设置
 │   ├── tests/                  # 后端基础测试
-│   ├── .env.example            # 后端环境变量模板
+│   ├── .env                    # 唯一环境变量文件
 │   ├── README.md               # 后端模块说明
 │   └── requirements.txt        # Python 依赖
 ├── frontend/
@@ -94,15 +94,15 @@ cd backend
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env
+touch .env
 python manage.py migrate
 python manage.py runserver 0.0.0.0:8000
 ```
 
 说明：
 
-- 默认数据库可以直接使用本地 `SQLite`
-- 如需启用深度分析，请在 `backend/.env` 中配置 `ZHIPU_API_KEY`
+- 整个项目只读取 `backend/.env` 这一份环境文件
+- 如需启用深度分析，请在 `backend/.env` 中配置 `SILICONFLOW_API_KEY`
 
 ### 3. 启动前端
 

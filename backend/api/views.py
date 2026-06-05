@@ -198,6 +198,30 @@ DEFAULT_CRAWLER_SETTINGS = {
 }
 MONITOR_FEED_DEFAULT_PAGE_SIZE = 100
 MONITOR_FEED_MAX_PAGE_SIZE = 100
+DEFAULT_AI_API_BASE_URL = "https://api.siliconflow.cn/v1"
+DEFAULT_AI_CHAT_MODEL = "deepseek-ai/DeepSeek-V4-Pro"
+PRIMARY_AI_API_KEY_ENV = "SILICONFLOW_API_KEY"
+LEGACY_AI_API_KEY_ENV = "ZHIPU_API_KEY"
+
+
+def _get_ai_api_key() -> str:
+    for env_name in (PRIMARY_AI_API_KEY_ENV, LEGACY_AI_API_KEY_ENV):
+        value = os.environ.get(env_name)
+        if value and value.strip():
+            return value.strip()
+    return ""
+
+
+def _get_ai_chat_url() -> str:
+    base_url = (os.environ.get("AI_API_BASE_URL") or DEFAULT_AI_API_BASE_URL).strip().rstrip("/")
+    return f"{base_url}/chat/completions"
+
+
+def _get_ai_chat_model() -> str:
+    model = os.environ.get("AI_CHAT_MODEL")
+    if model and model.strip():
+        return model.strip()
+    return DEFAULT_AI_CHAT_MODEL
 
 
 def _build_run_cmd(args):
@@ -1005,7 +1029,6 @@ def get_config_options(request):
             {"value": "json", "label": "JSON File"},
             {"value": "csv", "label": "CSV File"},
             {"value": "excel", "label": "Excel File"},
-            {"value": "sqlite", "label": "SQLite Database"},
             {"value": "db", "label": "MySQL Database"},
             {"value": "mongodb", "label": "MongoDB Database"},
         ],
@@ -2344,8 +2367,7 @@ def get_platform_sentiment_stats(request):
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def ai_keyword_analysis(request):
-    """使用智谱 AI 分析关键词"""
-    import os
+    """使用外部 AI 分析关键词"""
     import re
     import time
 
@@ -2353,7 +2375,7 @@ def ai_keyword_analysis(request):
     print(f"[DEBUG] 收到 AI 分析请求")
 
     # 获取 API Key
-    api_key = os.environ.get('ZHIPU_API_KEY')
+    api_key = _get_ai_api_key()
 
     # 获取请求参数
     data = request.data
@@ -2394,19 +2416,19 @@ def ai_keyword_analysis(request):
     )
 
     if not api_key:
-        usage_record.error_message = "未配置智谱 AI API Key"
+        usage_record.error_message = "未配置 SiliconFlow API Key"
         usage_record.save()
         return Response(
-            {"error": "未配置智谱 AI API Key，请在后端 .env 文件中设置 ZHIPU_API_KEY"},
+            {"error": "未配置 AI API Key，请在后端 .env 文件中设置 SILICONFLOW_API_KEY"},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
     try:
-        # 调用智谱 AI API
+        # 调用外部 AI API
         import requests
-        url = "https://open.bigmodel.cn/api/paas/v4/chat/completions"
+        url = _get_ai_chat_url()
 
-        # 按照智谱 AI 文档的标准格式
+        # 使用 OpenAI 兼容的对话接口
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {api_key}"
@@ -2416,7 +2438,7 @@ def ai_keyword_analysis(request):
         prompt = f'请列出10-15个关于"{keyword}"在{platform_display}的关键词，每行一个。'
 
         payload = {
-            "model": "glm-4.7",
+            "model": _get_ai_chat_model(),
             "messages": [
                 {
                     "role": "user",
@@ -2428,7 +2450,7 @@ def ai_keyword_analysis(request):
         print(f"[DEBUG] 请求URL: {url}")
         print(f"[DEBUG] 请求头: Content-Type={headers['Content-Type']}")
         print(f"[DEBUG] 请求体: {payload}")
-        print(f"[DEBUG] 开始调用智谱 AI API...")
+        print(f"[DEBUG] 开始调用 AI API...")
 
         # 重试机制：最多重试 2 次
         max_retries = 2
@@ -2643,7 +2665,7 @@ def ai_analysis(request):
     platform_display = PLATFORM_NAMES.get(platform, platform) if platform != "all" else "所有平台"
     time_range_display = f"过去{time_range}天" if str(time_range).isdigit() else "自定义时间"
 
-    api_key = os.environ.get('ZHIPU_API_KEY')
+    api_key = _get_ai_api_key()
 
     usage_record = AIUsageRecord.objects.create(
         keyword=keyword,
@@ -2738,7 +2760,7 @@ def ai_analysis(request):
             "negative": sum(p["negative"] for p in sentiment_by_platform.values()),
             "sensitive": sum(p["sensitive"] for p in sentiment_by_platform.values()),
         })
-        usage_record.error_message = "未配置智谱 AI API Key"
+        usage_record.error_message = "未配置 SiliconFlow API Key"
         usage_record.save()
         return Response({
             "success": True,
@@ -2759,7 +2781,7 @@ def ai_analysis(request):
         })
 
     try:
-        url = "https://open.bigmodel.cn/api/paas/v4/chat/completions"
+        url = _get_ai_chat_url()
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {api_key}"
@@ -2784,7 +2806,7 @@ def ai_analysis(request):
         )
 
         payload = {
-            "model": "glm-4.7",
+            "model": _get_ai_chat_model(),
             "messages": [{"role": "user", "content": prompt}]
         }
 

@@ -70,7 +70,6 @@ class SaveDataOptionEnum(str, Enum):
     CSV = "csv"
     DB = "db"
     JSON = "json"
-    SQLITE = "sqlite"
     MONGODB = "mongodb"
     EXCEL = "excel"
     POSTGRES = "postgres"
@@ -79,7 +78,6 @@ class SaveDataOptionEnum(str, Enum):
 class InitDbOptionEnum(str, Enum):
     """Database initialization option"""
 
-    SQLITE = "sqlite"
     MYSQL = "mysql"
     POSTGRES = "postgres"
 
@@ -117,7 +115,7 @@ def _normalize_argv(argv: Optional[Sequence[str]]) -> Iterable[str]:
 
 
 def _inject_init_db_default(args: Sequence[str]) -> list[str]:
-    """Ensure bare --init_db defaults to sqlite for backward compatibility."""
+    """Ensure bare --init_db defaults to mysql for backward compatibility."""
 
     normalized: list[str] = []
     i = 0
@@ -128,7 +126,7 @@ def _inject_init_db_default(args: Sequence[str]) -> list[str]:
         if arg == "--init_db":
             next_arg = args[i + 1] if i + 1 < len(args) else None
             if not next_arg or next_arg.startswith("-"):
-                normalized.append(InitDbOptionEnum.SQLITE.value)
+                normalized.append(InitDbOptionEnum.MYSQL.value)
         i += 1
 
     return normalized
@@ -212,7 +210,7 @@ async def parse_cmd(argv: Optional[Sequence[str]] = None):
             SaveDataOptionEnum,
             typer.Option(
                 "--save_data_option",
-                help="Data save option (csv=CSV file | db=MySQL database | json=JSON file | sqlite=SQLite database | mongodb=MongoDB database | excel=Excel file | postgres=PostgreSQL database)",
+                help="Data save option (csv=CSV file | db=MySQL database | json=JSON file | mongodb=MongoDB database | excel=Excel file | postgres=PostgreSQL database)",
                 rich_help_panel="Storage Configuration",
             ),
         ] = _coerce_enum(
@@ -222,7 +220,7 @@ async def parse_cmd(argv: Optional[Sequence[str]] = None):
             Optional[InitDbOptionEnum],
             typer.Option(
                 "--init_db",
-                help="Initialize database table structure (sqlite | mysql | postgres)",
+                help="Initialize database table structure (mysql | postgres)",
                 rich_help_panel="Storage Configuration",
             ),
         ] = None,

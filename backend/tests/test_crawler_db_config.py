@@ -52,3 +52,10 @@ def test_crawler_database_defaults_are_local_only(monkeypatch):
     assert db_config.postgres_db_config["host"] == "localhost"
     assert db_config.postgres_db_config["db_name"] == "media_crawler"
     assert db_config.postgres_db_config["user"] == "postgres"
+
+
+def test_crawler_db_config_exports_supported_database_configs(monkeypatch):
+    db_config = load_db_config(monkeypatch)
+
+    assert hasattr(db_config, "mysql_db_config")
+    assert hasattr(db_config, "postgres_db_config")

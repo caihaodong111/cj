@@ -344,12 +344,6 @@ class BiliJsonStoreImplement(AbstractStore):
             item_type="dynamics"
         )
 
-
-
-class BiliSqliteStoreImplement(BiliDbStoreImplement):
-    pass
-
-
 class BiliMongoStoreImplement(AbstractStore):
     """Bilibili MongoDB storage implementation"""
 

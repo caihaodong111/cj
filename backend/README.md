@@ -7,7 +7,7 @@
 ```
 backend/
 ├── mediacrawler_config/    # Django 项目配置
-│   ├── settings.py          # 项目设置（从 .env 加载配置）
+│   ├── settings.py          # 项目设置（从 backend/.env 加载配置）
 │   ├── urls.py              # URL 路由
 │   ├── wsgi.py             # WSGI 配置
 │   └── utils/              # 工具模块
@@ -20,8 +20,7 @@ backend/
 │   └── admin.py            # Admin 配置
 ├── manage.py               # Django 管理脚本
 ├── requirements.txt        # Python 依赖
-├── .env.example            # 环境变量模板
-├── .env                    # 环境变量（不提交到版本控制）
+├── .env                    # 唯一环境变量文件（不提交到版本控制）
 ├── .gitignore             # Git 忽略文件
 └── README.md              # 本文件
 ```
@@ -46,10 +45,18 @@ pip install -r requirements.txt
 
 ### 3. 配置环境变量
 
-复制 `.env.example` 到 `.env` 并根据需要修改：
+创建 `.env` 并根据需要修改。项目运行时只读取 `backend/.env`：
 
 ```bash
-cp .env.example .env
+touch .env
+```
+
+如需启用深度分析，请在 `backend/.env` 中配置：
+
+```env
+SILICONFLOW_API_KEY=your_siliconflow_api_key
+AI_API_BASE_URL=https://api.siliconflow.cn/v1
+AI_CHAT_MODEL=deepseek-ai/DeepSeek-V4-Pro
 ```
 
 ## 环境变量配置
@@ -66,29 +73,21 @@ cp .env.example .env
 
 | 变量 | 说明 | 默认值 |
 |--------|------|--------|
-| `DB_ENGINE` | 数据库引擎 | `sqlite3` |
-| `DB_NAME` | 数据库名 / SQLite 文件名 | `db.sqlite3`（当 `DB_ENGINE=sqlite3`；MySQL/PostgreSQL 必填） |
-| `DB_USER` | 数据库用户 | MySQL 必填；PostgreSQL 默认为 `postgres` |
+| `DB_ENGINE` | 数据库引擎 | `mysql` |
+| `DB_NAME` | 数据库名 | `media_crawler`（MySQL 默认） |
+| `DB_USER` | 数据库用户 | `root`（MySQL 默认）；PostgreSQL 默认为 `postgres` |
 | `DB_PASSWORD` | 数据库密码 | 空 |
 | `DB_HOST` | 数据库主机 | `localhost`（MySQL/PostgreSQL） |
 | `DB_PORT` | 数据库端口 | `3306` / `5432`（按引擎） |
 
 支持的数据引擎：
-- `sqlite3` - SQLite（默认）
-- `sqlite` - SQLite（`sqlite3` 的兼容别名）
 - `mysql` - MySQL
 - `postgresql` - PostgreSQL
 - `postgres` - PostgreSQL（`postgresql` 的兼容别名）
 
-如果没有 `.env`，后端会默认使用本地 SQLite 数据库文件 `backend/db.sqlite3`，不会再隐式连接远程 MySQL。
+如果没有 `.env`，后端会默认按本地 MySQL 参数加载：`DB_ENGINE=mysql`、`DB_NAME=media_crawler`、`DB_USER=root`、`DB_HOST=localhost`、`DB_PORT=3306`。
 
 示例：
-
-```env
-# 默认本地开发
-DB_ENGINE=sqlite3
-DB_NAME=db.sqlite3
-```
 
 ```env
 # MySQL
@@ -121,7 +120,7 @@ DB_PORT=5432
 
 | 变量 | 说明 | 默认值 |
 |--------|------|--------|
-| `CORS_ALLOWED_ORIGINS` | 允许的跨域源 | 见 .env.example |
+| `CORS_ALLOWED_ORIGINS` | 允许的跨域源 | 按部署域名填写 |
 
 ### 日志配置
 
@@ -149,7 +148,6 @@ DB_PORT=5432
 - `json` - JSON 文件
 - `csv` - CSV 文件
 - `excel` - Excel 文件
-- `sqlite` - SQLite 数据库
 - `db` - MySQL 数据库
 - `mongodb` - MongoDB 数据库
 

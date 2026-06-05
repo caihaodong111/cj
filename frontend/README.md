@@ -44,7 +44,7 @@ npm run preview
 
 - `vite.config.js` 已将 `/api` 代理到 `http://127.0.0.1:8000`
 - 前端依赖后端接口，开发时建议先启动 Django 服务
-- 深度分析页面依赖后端 AI 接口；若未配置 `ZHIPU_API_KEY`，对应能力不可用
+- 深度分析页面依赖后端 AI 接口；若未配置 `SILICONFLOW_API_KEY`，对应能力不可用
 
 ## 目录说明
 

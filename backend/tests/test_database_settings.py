@@ -69,12 +69,16 @@ def load_settings(monkeypatch, env=None, env_file_exists=False, stub_pymysql=Fal
     return module
 
 
-def test_defaults_to_local_sqlite_when_env_file_is_missing(monkeypatch):
-    settings = load_settings(monkeypatch, env_file_exists=False)
+def test_defaults_to_local_mysql_when_env_file_is_missing(monkeypatch):
+    settings = load_settings(monkeypatch, env_file_exists=False, stub_pymysql=True)
 
-    assert settings.DB_ENGINE == "sqlite3"
-    assert settings.DATABASES["default"]["ENGINE"] == "django.db.backends.sqlite3"
-    assert Path(settings.DATABASES["default"]["NAME"]) == ENV_PATH.parent / "db.sqlite3"
+    assert settings.DB_ENGINE == "mysql"
+    assert settings.DATABASES["default"]["ENGINE"] == "django.db.backends.mysql"
+    assert settings.DATABASES["default"]["NAME"] == "media_crawler"
+    assert settings.DATABASES["default"]["USER"] == "root"
+    assert settings.DATABASES["default"]["PASSWORD"] == ""
+    assert settings.DATABASES["default"]["HOST"] == "localhost"
+    assert settings.DATABASES["default"]["PORT"] == "3306"
 
 
 def test_supports_postgresql_alias_and_compatibility_env_names(monkeypatch):

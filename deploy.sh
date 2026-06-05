@@ -4,6 +4,11 @@
 
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "${SCRIPT_DIR}"
+
+ENV_FILE="backend/.env"
+
 echo "=========================================="
 echo "MediaCrawler Full Stack Deployment"
 echo "Server: 20.212.53.247"
@@ -15,16 +20,10 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-# Check if .env file exists
-if [ ! -f .env ]; then
-    echo -e "${YELLOW}Warning: .env file not found. Creating from backend/.env.production...${NC}"
-    if [ -f backend/.env.production ]; then
-        cp backend/.env.production .env
-        echo -e "${GREEN}.env file created. Please edit it with your configuration!${NC}"
-    else
-        echo -e "${RED}Error: backend/.env.production not found. Please create .env manually.${NC}"
-        exit 1
-    fi
+# Check if backend/.env file exists
+if [ ! -f "${ENV_FILE}" ]; then
+    echo -e "${RED}Error: ${ENV_FILE} not found. Please create ${ENV_FILE} manually before deployment.${NC}"
+    exit 1
 fi
 
 # Parse command line arguments

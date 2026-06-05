@@ -284,11 +284,6 @@ class XhsDbStoreImplement(AbstractStore):
             return [item.__dict__ for item in result.scalars().all()]
 
 
-class XhsSqliteStoreImplement(XhsDbStoreImplement):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-
-
 class XhsMongoStoreImplement(AbstractStore):
     """Xiaohongshu MongoDB storage implementation"""
 

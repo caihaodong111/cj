@@ -67,15 +67,15 @@ cd /opt/mediacrawler/backend
 # 生成安全的 SECRET_KEY
 python3 -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
 
-# 复制并编辑环境配置
-cp .env.production .env
+# 创建并编辑环境配置
+touch .env
 nano .env  # 或使用 vim
 ```
 
 **必须修改的配置项：**
 
 ```bash
-# .env 文件关键配置
+# backend/.env 文件关键配置
 DJANGO_SECRET_KEY=<使用上面生成的密钥>
 DJANGO_SECRET_KEY=your_secure_random_secret_key_here
 DB_PASSWORD=your_actual_mysql_password
@@ -248,7 +248,7 @@ docker compose exec backend python manage.py check
 
 1. 检查 MySQL 是否运行
 2. 确认防火墙允许 3306 端口
-3. 验证 .env 中的数据库配置
+3. 验证 `backend/.env` 中的数据库配置
 
 ### Playwright 浏览器问题
 

@@ -50,13 +50,6 @@ REDIS_DB_NUM = os.getenv("REDIS_DB_NUM", 0)  # your redis db num
 CACHE_TYPE_REDIS = "redis"
 CACHE_TYPE_MEMORY = "memory"
 
-# sqlite config
-SQLITE_DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "database", "sqlite_tables.db")
-
-sqlite_db_config = {
-    "db_path": SQLITE_DB_PATH
-}
-
 # mongodb config
 MONGODB_HOST = os.getenv("MONGODB_HOST", "localhost")
 MONGODB_PORT = os.getenv("MONGODB_PORT", 27017)
