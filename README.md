@@ -83,9 +83,10 @@ MediaCrawler-main/
 
 ### 1. 环境准备
 
-- Python `3.11+`（仓库包含 `.python-version`）
+- Python `3.11+`
 - Node.js（建议 LTS 版本）
-- 可选：MySQL / PostgreSQL、Redis、Docker
+- 必需：可连接的 MySQL 或 PostgreSQL 服务及已创建的数据库（后端默认连接 MySQL）
+- 可选：Redis、Docker
 
 ### 2. 启动后端
 
@@ -95,6 +96,24 @@ python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 touch .env
+```
+
+在迁移前先启动数据库服务、创建数据库，并将连接参数写入 `backend/.env`。例如使用本地 MySQL：
+
+```env
+DB_ENGINE=mysql
+DB_NAME=media_crawler
+DB_USER=root
+DB_PASSWORD=your_local_mysql_password
+DB_HOST=127.0.0.1
+DB_PORT=3306
+```
+
+请将示例用户名和密码替换为本地数据库账户；该账户需要有目标数据库的建表与读写权限。数据库创建示例和 PostgreSQL 配置见 [后端数据库配置](backend/README.md#数据库配置)。空 `.env` 不会自动创建数据库或启动数据库服务。
+
+随后在已激活虚拟环境的 `backend/` 目录执行：
+
+```bash
 python manage.py migrate
 python manage.py runserver 0.0.0.0:8000
 ```
