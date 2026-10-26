@@ -87,6 +87,17 @@ AI_CHAT_MODEL=deepseek-ai/DeepSeek-V4-Pro
 
 如果没有 `.env`，后端会默认按本地 MySQL 参数加载：`DB_ENGINE=mysql`、`DB_NAME=media_crawler`、`DB_USER=root`、`DB_HOST=localhost`、`DB_PORT=3306`。
 
+首次运行前必须先启动所选数据库服务，并创建 `DB_NAME` 指定的数据库。`python manage.py migrate` 负责在已有数据库中创建和更新表，不会创建 MySQL / PostgreSQL 数据库本身。
+
+例如，使用有建库权限的本地 MySQL 账户连接服务后执行：
+
+```sql
+CREATE DATABASE IF NOT EXISTS media_crawler
+  CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+```
+
+如使用 PostgreSQL，请用有建库权限的账户创建 `media_crawler`（例如 `createdb -U postgres media_crawler`），并填写下面对应的连接配置。运行 Django 的数据库账户需要有目标数据库的建表与读写权限。
+
 示例：
 
 ```env
