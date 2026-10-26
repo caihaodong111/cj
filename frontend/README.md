@@ -24,11 +24,23 @@
 
 ## 本地开发
 
+### 环境要求
+
+- 安装 Node.js 和 npm。锁文件中的 Vite 7 与 `@vitejs/plugin-vue` 要求 Node.js `^20.19.0 || >=22.12.0`，即 20.19.0 及以上的 20.x 版本，或 22.12.0 及以上版本。
+- 可以通过 `node --version` 和 `npm --version` 查看当前版本。Node.js 18 或较早的 20.x / 22.x 版本不满足此要求。
+- 需要后端数据时，先按 [后端说明](../backend/README.md) 配置数据库并启动 Django，保持后端终端运行。
+
+### 启动开发服务
+
+另开终端，从仓库根目录执行：
+
 ```bash
 cd frontend
-npm install
+npm ci
 npm run dev
 ```
+
+仓库已提交 `package-lock.json`，首次安装使用 `npm ci`，按锁定版本安装依赖。只有需要有意更新依赖时才使用 `npm install`，并核对锁文件的变更。
 
 默认开发地址：`http://127.0.0.1:5173`
 
