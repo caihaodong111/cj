@@ -84,7 +84,7 @@ MediaCrawler-main/
 ### 1. 环境准备
 
 - Python `3.11+`
-- Node.js（建议 LTS 版本）
+- Node.js `^20.19.0 || >=22.12.0`（Vite 7 和 Vue 插件的版本要求）及 npm
 - 必需：可连接的 MySQL 或 PostgreSQL 服务及已创建的数据库（后端默认连接 MySQL）
 - 可选：Redis、Docker
 
@@ -125,9 +125,11 @@ python manage.py runserver 0.0.0.0:8000
 
 ### 3. 启动前端
 
+保持后端运行，另开一个终端，从仓库根目录执行。先通过 `node --version` 确认 Node.js 满足上述版本要求，再安装锁文件中记录的依赖：
+
 ```bash
 cd frontend
-npm install
+npm ci
 npm run dev
 ```
 
