@@ -95,6 +95,7 @@ cd backend
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+python -m playwright install chromium
 touch .env
 ```
 
@@ -120,6 +121,7 @@ python manage.py runserver 0.0.0.0:8000
 
 说明：
 
+- Playwright 的 Python 包与浏览器二进制需要分别安装；`python -m playwright install chromium` 为爬虫安装匹配当前 Playwright 版本的 Chromium。更新 Playwright 后需重新执行该命令。
 - 整个项目只读取 `backend/.env` 这一份环境文件
 - 如需启用深度分析，请在 `backend/.env` 中配置 `SILICONFLOW_API_KEY`
 
