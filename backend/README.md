@@ -68,9 +68,11 @@ AI_CHAT_MODEL=deepseek-ai/DeepSeek-V4-Pro
 
 | 变量 | 说明 | 默认值 |
 |--------|------|--------|
-| `DJANGO_SECRET_KEY` | Django 密钥 | 自动生成 |
+| `DJANGO_SECRET_KEY` | Django 密钥 | 固定的开发占位值 `django-insecure-dev-key-change-in-production` |
 | `DJANGO_DEBUG` | 调试模式 | `True` |
 | `DJANGO_ALLOWED_HOSTS` | 允许的主机 | `localhost,127.0.0.1` |
+
+未设置 `DJANGO_SECRET_KEY` 时，后端使用代码中的固定开发占位值，不会自动生成随机密钥。生产部署前，请按[生成密钥](#生成密钥)中的命令生成独立密钥并写入 `backend/.env` 的 `DJANGO_SECRET_KEY`，避免使用默认值。
 
 ### 数据库配置
 
