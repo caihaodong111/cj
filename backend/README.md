@@ -41,7 +41,10 @@ venv\Scripts\activate  # Windows
 
 ```bash
 pip install -r requirements.txt
+python -m playwright install chromium
 ```
+
+`pip install` 不会安装 Playwright 所需的浏览器二进制。请在同一个已激活的虚拟环境中执行上述浏览器安装命令，为使用 Playwright 自带浏览器的爬虫模式准备 Chromium；否则首次启动浏览器时可能提示 `Executable doesn't exist`。更新 Playwright 后，请重新执行安装命令以匹配浏览器版本，详见 [Playwright 浏览器安装说明](https://playwright.dev/python/docs/browsers)。
 
 ### 3. 配置环境变量
 
